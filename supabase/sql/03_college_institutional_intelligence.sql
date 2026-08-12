@@ -1,8 +1,8 @@
 -- NSWEIS SQL MIGRATION
 -- ID: 03
--- Feature: College Institutional Intelligence & Intervention Management
+-- Feature: College Institutional Intelligence & Intervention Management (Idempotent)
 -- Purpose: Server-side aggregation functions enforcing privacy threshold (>= 10 students), RLS enhancements, and demo interventions
--- Execution: Manual Supabase SQL Editor
+-- Execution: Safe for repeated manual execution in Supabase SQL Editor
 -- Dependencies: 00_initial_schema.sql, 01_seed_demo_data.sql, 02_demo_student_profile.sql
 -- Status: PENDING MANUAL EXECUTION
 
@@ -177,76 +177,61 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 4. Seed Initial Demo Interventions for Institution 1
-INSERT INTO public.interventions (
-  id,
-  institution_id,
-  created_by,
-  title,
-  description,
-  category,
-  target_department_id,
-  target_year,
-  scheduled_at,
-  location,
-  capacity,
-  status
-) VALUES
-  (
-    'i1111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111', -- Fallback institution ref / officer
-    'Academic Workload & Time Management Seminar',
-    'Interactive session on study micro-chunking, assignment prioritization, and exam prep strategies.',
-    'academic',
-    'a1111111-1111-1111-1111-111111111111',
-    2,
-    NOW() + INTERVAL '5 days',
-    'Seminar Hall B, CSE Block',
-    45,
-    'scheduled'
-  ),
-  (
-    'i2222222-2222-2222-2222-222222222222',
-    '11111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111',
-    'Sleep Hygiene & Digital Detox Workshop',
-    'Practical strategies for evening wind-down routines and managing late-night screen time during exams.',
-    'sleep_rest',
-    NULL,
-    NULL,
-    NOW() + INTERVAL '8 days',
-    'Student Activity Center Room 204',
-    60,
-    'scheduled'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  title = EXCLUDED.title,
-  description = EXCLUDED.description,
-  scheduled_at = EXCLUDED.scheduled_at,
-  location = EXCLUDED.location,
-  status = EXCLUDED.status;
+-- 4. Seed Initial Demo Interventions for Institution 1 (Idempotent)
+DO $$
+DECLARE
+  v_creator_id UUID;
+BEGIN
+  SELECT id INTO v_creator_id FROM public.profiles LIMIT 1;
 
--- 5. Additional Demo Profile for College Officer (Optional Link Placeholder)
--- Instructions: Project Manager can create a College Officer user in Supabase Auth (e.g. officer@demo.nsweis.gov.in)
--- and link their Auth UUID to public.profiles using this query format:
-/*
-INSERT INTO public.profiles (
-  id,
-  full_name,
-  role,
-  institution_id,
-  department_id,
-  active
-) VALUES (
-  'REPLACE_WITH_COLLEGE_OFFICER_AUTH_USER_UUID',
-  'Dr. Sarah Jenkins (Welfare Officer)',
-  'college_officer',
-  '11111111-1111-1111-1111-111111111111',
-  'a1111111-1111-1111-1111-111111111111',
-  TRUE
-)
-ON CONFLICT (id) DO UPDATE SET
-  role = EXCLUDED.role,
-  institution_id = EXCLUDED.institution_id;
-*/
+  IF v_creator_id IS NOT NULL THEN
+    INSERT INTO public.interventions (
+      id,
+      institution_id,
+      created_by,
+      title,
+      description,
+      category,
+      target_department_id,
+      target_year,
+      scheduled_at,
+      location,
+      capacity,
+      status
+    ) VALUES
+      (
+        'f1111111-1111-1111-1111-111111111111',
+        '11111111-1111-1111-1111-111111111111',
+        v_creator_id,
+        'Academic Workload & Time Management Seminar',
+        'Interactive session on study micro-chunking, assignment prioritization, and exam prep strategies.',
+        'academic',
+        'a1111111-1111-1111-1111-111111111111',
+        2,
+        NOW() + INTERVAL '5 days',
+        'Seminar Hall B, CSE Block',
+        45,
+        'scheduled'
+      ),
+      (
+        'f2222222-2222-2222-2222-222222222222',
+        '11111111-1111-1111-1111-111111111111',
+        v_creator_id,
+        'Sleep Hygiene & Digital Detox Workshop',
+        'Practical strategies for evening wind-down routines and managing late-night screen time during exams.',
+        'sleep_rest',
+        NULL,
+        NULL,
+        NOW() + INTERVAL '8 days',
+        'Student Activity Center Room 204',
+        60,
+        'scheduled'
+      )
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      description = EXCLUDED.description,
+      scheduled_at = EXCLUDED.scheduled_at,
+      location = EXCLUDED.location,
+      status = EXCLUDED.status;
+  END IF;
+END $$;
