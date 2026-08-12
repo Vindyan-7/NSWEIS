@@ -1,21 +1,402 @@
 ---
 import CollegeLayout from '../../layouts/CollegeLayout.astro';
 import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getCollegeParticipationMetrics,
+  getCollegeCategorySummaries,
+  getCollegeDepartmentSummaries,
+} from '../../services/analytics';
+import { getInstitutionInterventions } from '../../services/interventions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  // If student tries to access college route, redirect to student dashboard
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
+}
+
+const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
+
+// Server-side authorized queries for authenticated officer's institution
+const participation = await getCollegeParticipationMetrics(supabase, institutionId);
+const categorySummaries = await getCollegeCategorySummaries(supabase, institutionId);
+const departmentSummaries = await getCollegeDepartmentSummaries(supabase, institutionId);
+const interventions = await getInstitutionInterventions(supabase, institutionId);
+
+// Filter categories needing attention
+const attentionCategories = categorySummaries.filter(
+  (cs) => cs.dominant_band === 'needs_attention' || cs.dominant_band === 'elevated' || cs.dominant_band === 'watch'
+);
 ---
 
-<CollegeLayout title="College Dashboard" activePath="/college/dashboard">
+<CollegeLayout title="Institutional Wellness Overview" activePath="/college/dashboard">
   <PageHeader
-    title="College Institutional Wellness Dashboard"
-    subtitle="Aggregate insights & active preventative intervention programs."
-  />
+    title="College Institutional Intelligence"
+    subtitle={`Anonymous aggregate well-being trends for ${participation.active_cycle_name}`}
+  >
+    <a href="/college/interventions/new">
+      <Button variant="primary" size="sm">+ Create Intervention</Button>
+    </a>
+  </PageHeader>
 
-  <PrivacyNotice variant="compact" />
+  <div class="college-dashboard-layout">
+    {/* Question 1: Are students participating? */}
+    <div class="metrics-grid">
+      <MetricCard
+        title="Participation Rate"
+        value={`${participation.participation_rate.toFixed(1)}%`}
+        change={`${participation.participating_students} checked in`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Eligible Students"
+        value={participation.total_eligible_students.toLocaleString()}
+        change="Active Campus Population"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Areas Needing Attention"
+        value={attentionCategories.length.toString()}
+        change="Categories below stable threshold"
+        changeType={attentionCategories.length > 0 ? "negative" : "positive"}
+      />
+      <MetricCard
+        title="Active Interventions"
+        value={interventions.filter((i) => i.status === 'scheduled' || i.status === 'ongoing').length.toString()}
+        change="Scheduled wellness programs"
+        changeType="positive"
+      />
+    </div>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
-    <MetricCard title="Student Participation Rate" value="84.5%" change="+3.2%" changeType="positive" subtitle="Active weekly cycle" />
-    <MetricCard title="Institutional Wellness Index" value="7.4 / 10" change="Stable" changeType="neutral" subtitle="Category aggregate" />
-    <MetricCard title="Active Interventions" value="4" subtitle="Scheduled this month" />
+    {/* Question 2 & 3: What areas need attention & What is changing? */}
+    <div class="dashboard-section-grid">
+      <Card padding="lg" class="categories-card">
+        <div class="section-header">
+          <h3 class="card-section-title">Institutional Wellness Categories</h3>
+          <a href="/college/insights" class="header-link">View Full Insights &rarr;</a>
+        </div>
+        <p class="section-subtext">Aggregate category indicators derived from completed student reflections.</p>
+
+        <div class="categories-list">
+          {categorySummaries.map((cs) => (
+            <div class="category-row">
+              <div class="cat-info">
+                <span class="cat-title">{cs.category.replace('_', ' ')}</span>
+                <Badge variant={cs.dominant_band || 'neutral'} size="sm">
+                  {cs.dominant_band ? cs.dominant_band.replace('_', ' ') : 'Insufficient Data'}
+                </Badge>
+              </div>
+              <div class="cat-value">
+                {cs.is_suppressed ? (
+                  <span class="suppressed-tag">Insufficient group size (&lt;10)</span>
+                ) : (
+                  <span class="score-display">{cs.average_score?.toFixed(1)} / 10</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Question 5: What action should be taken? */}
+      <Card padding="lg" class="actions-card">
+        <h3 class="card-section-title">Recommended Interventions</h3>
+        <p class="section-subtext">Suggested campus wellness initiatives based on current category signals.</p>
+
+        <div class="recommended-interventions">
+          {attentionCategories.length > 0 ? (
+            attentionCategories.map((cat) => (
+              <div class="recommendation-box">
+                <div class="rec-top">
+                  <span class="rec-category-badge">{cat.category.replace('_', ' ')}</span>
+                  <Badge variant="primary" size="sm">Suggested Action</Badge>
+                </div>
+                <h4 class="rec-heading">
+                  {cat.category === 'academic'
+                    ? 'Academic Workload Management Session'
+                    : cat.category === 'sleep_rest'
+                    ? 'Sleep & Recovery Strategy Workshop'
+                    : 'Peer Community & Welfare Gathering'}
+                </h4>
+                <p class="rec-body">
+                  {cat.category === 'academic'
+                    ? 'Organize faculty advising office hours and assignment scheduling guidance.'
+                    : 'Provide sleep hygiene guidelines and digital detox recommendations before finals.'}
+                </p>
+                <div class="rec-footer">
+                  <a href={`/college/interventions/new?category=${cat.category}`}>
+                    <Button variant="outline" size="sm">Schedule Intervention &rarr;</Button>
+                  </a>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p class="empty-text">Institutional categories show stable aggregate indicators for this cycle.</p>
+          )}
+        </div>
+      </Card>
+    </div>
+
+    {/* Question 4: Which departments need attention? (Enforcing Privacy Threshold >= 10) */}
+    <Card padding="lg">
+      <div class="section-header">
+        <h3 class="card-section-title">Department Comparison & Anonymous Group Insights</h3>
+        <Badge variant="neutral" size="sm">Privacy Threshold: &ge; 10 Students</Badge>
+      </div>
+      <p class="section-subtext">Department aggregate wellness indicators are displayed only when at least 10 students complete check-ins to preserve complete anonymity.</p>
+
+      <div class="departments-grid">
+        {departmentSummaries.map((dept) => (
+          <div class="department-card">
+            <div class="dept-header">
+              <span class="dept-code">{dept.department_code}</span>
+              <span class="dept-name">{dept.department_name}</span>
+            </div>
+            <div class="dept-body">
+              {dept.is_suppressed ? (
+                <div class="suppressed-box">
+                  <span class="lock-icon">🔒</span>
+                  <p class="suppressed-msg">{dept.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
+                </div>
+              ) : (
+                <div class="dept-metrics">
+                  <div class="metric-pair">
+                    <span class="label">Overall Indicator:</span>
+                    <span class="val">{dept.average_overall_score?.toFixed(1)} / 10</span>
+                  </div>
+                  <div class="metric-pair">
+                    <span class="label">Dominant Status:</span>
+                    <Badge variant={dept.dominant_band || 'neutral'} size="sm">
+                      {dept.dominant_band?.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
   </div>
 </CollegeLayout>
+
+<style>
+  .college-dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .dashboard-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .header-link {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .categories-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .category-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .cat-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .cat-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    text-transform: capitalize;
+  }
+
+  .suppressed-tag {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .score-display {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .recommended-interventions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .recommendation-box {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-left: 4px solid var(--color-primary-600);
+    border-radius: var(--radius-lg);
+  }
+
+  .rec-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .rec-category-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+  }
+
+  .rec-heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .rec-body {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .departments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .department-card {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .dept-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .dept-code {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .dept-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .suppressed-box {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background-color: var(--color-bg-surface);
+    border-radius: var(--radius-md);
+  }
+
+  .suppressed-msg {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .dept-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .metric-pair {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+  }
+
+  .metric-pair .label {
+    color: var(--color-text-muted);
+  }
+
+  .metric-pair .val {
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .empty-text {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+</style>

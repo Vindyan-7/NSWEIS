@@ -216,6 +216,7 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 | `00_initial_schema.sql` | Initial Schema | Create enums, tables, FKs, indexes, RLS & functions | None | **PENDING MANUAL EXECUTION** |
 | `01_seed_demo_data.sql` | Demo Seed Data | Seed institutions, departments, cycle, questions, rules, recs | `00_initial_schema.sql` | **PENDING MANUAL EXECUTION** |
 | `02_demo_student_profile.sql` | Demo Student Link | Link Auth user UUID to public.profiles | `00_initial_schema.sql`, `01_seed_demo_data.sql` | **PENDING MANUAL EXECUTION** |
+| `03_college_institutional_intelligence.sql` | College Analytics & Interventions | Aggregation functions (>=10 threshold), RLS & interventions seed | `00..02` | **PENDING MANUAL EXECUTION** |
 
 ### Database Tables Summary
 - `profiles`: Linked to `auth.users.id`. Stores user role, institution, department, and student details.
@@ -303,9 +304,9 @@ Ready for end-to-end testing of the complete Student Product Flow:
 
 ---
 
-## Q. Next Milestone
-**Milestone 3 — College Institutional Intelligence**  
-*(Status: NOT started. Standing by for CTO instruction.)*
+## Q. Current Milestone
+**Milestone 3 — College Institutional Intelligence & Intervention Management**  
+*(Status: IN PROGRESS — Database schema change 03_college_institutional_intelligence.sql created and pending manual execution.)*
 
 ---
 

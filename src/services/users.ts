@@ -16,6 +16,8 @@ export async function getUserProfile(
   return data as UserProfile;
 }
 
+export { getUserProfile as getProfile };
+
 export async function updateUserProfile(
   supabase: SupabaseClient<Database>,
   userId: string,

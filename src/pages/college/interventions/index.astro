@@ -1,0 +1,77 @@
+---
+import CollegeLayout from '../../../layouts/CollegeLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import Button from '../../../components/ui/Button.astro';
+import EmptyState from '../../../components/ui/EmptyState.astro';
+import InterventionCard from '../../../components/interventions/InterventionCard.astro';
+import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { getInstitutionInterventions } from '../../../services/interventions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
+}
+
+const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
+const interventions = await getInstitutionInterventions(supabase, institutionId);
+---
+
+<CollegeLayout title="Intervention Management" activePath="/college/interventions">
+  <PageHeader
+    title="Wellness Interventions & Support Programs"
+    subtitle="Schedule, manage, and track institution-wide student wellness programs"
+  >
+    <a href="/college/interventions/new">
+      <Button variant="primary" size="sm">+ Create New Intervention</Button>
+    </a>
+  </PageHeader>
+
+  <div class="interventions-page-layout">
+    {interventions.length === 0 ? (
+      <Card padding="lg">
+        <EmptyState
+          title="No interventions created yet"
+          description="Create preventative wellness programs, workload management workshops, or sleep recovery sessions for your campus."
+        >
+          <a href="/college/interventions/new">
+            <Button variant="primary">Create First Intervention</Button>
+          </a>
+        </EmptyState>
+      </Card>
+    ) : (
+      <div class="interventions-grid">
+        {interventions.map((item) => (
+          <InterventionCard intervention={item} />
+        ))}
+      </div>
+    )}
+
+    <PrivacyNotice variant="full" />
+  </div>
+</CollegeLayout>
+
+<style>
+  .interventions-page-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .interventions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+</style>

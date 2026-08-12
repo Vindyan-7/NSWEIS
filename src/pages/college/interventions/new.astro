@@ -1,0 +1,182 @@
+---
+import CollegeLayout from '../../../layouts/CollegeLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import Button from '../../../components/ui/Button.astro';
+import Input from '../../../components/ui/Input.astro';
+import Select from '../../../components/ui/Select.astro';
+import Textarea from '../../../components/ui/Textarea.astro';
+import Alert from '../../../components/ui/Alert.astro';
+import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { createIntervention } from '../../../services/interventions';
+import type { WellnessCategory } from '../../../types/domain';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
+}
+
+const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
+const initialCategory = Astro.url.searchParams.get('category') || 'academic';
+
+let errorMessage = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const title = formData.get('title')?.toString();
+    const category = formData.get('category')?.toString() as WellnessCategory;
+    const description = formData.get('description')?.toString();
+    const scheduled_at = formData.get('scheduled_at')?.toString();
+    const location = formData.get('location')?.toString();
+    const capacityStr = formData.get('capacity')?.toString();
+
+    if (!title || !category || !description || !scheduled_at || !location) {
+      errorMessage = 'Please complete all required intervention fields.';
+    } else {
+      const result = await createIntervention(supabase, {
+        institution_id: institutionId,
+        created_by: user.id,
+        title,
+        category,
+        description,
+        scheduled_at: new Date(scheduled_at).toISOString(),
+        location,
+        capacity: capacityStr ? parseInt(capacityStr, 10) : undefined,
+        status: 'scheduled',
+      });
+
+      if (result.success) {
+        return Astro.redirect('/college/interventions');
+      } else {
+        errorMessage = result.error || 'Failed to schedule intervention.';
+      }
+    }
+  } catch (err: any) {
+    errorMessage = err.message || 'An error occurred while creating intervention.';
+  }
+}
+---
+
+<CollegeLayout title="Schedule New Intervention" activePath="/college/interventions">
+  <PageHeader
+    title="Create Wellness Intervention Program"
+    subtitle="Design a non-clinical preventative workshop or academic support session for your campus"
+  >
+    <a href="/college/interventions">
+      <Button variant="outline" size="sm">&larr; Back to Interventions</Button>
+    </a>
+  </PageHeader>
+
+  <div class="new-intervention-layout">
+    <Card padding="lg">
+      {errorMessage && (
+        <Alert type="error" title="Form Submission Error">
+          {errorMessage}
+        </Alert>
+      )}
+
+      <form method="POST" class="intervention-form">
+        <Input
+          label="Intervention Title"
+          name="title"
+          placeholder="e.g. Academic Workload & Time Management Seminar"
+          required
+        />
+
+        <div class="form-row">
+          <Select label="Wellness Category" name="category" required>
+            <option value="academic" selected={initialCategory === 'academic'}>Academic Well-being</option>
+            <option value="sleep_rest" selected={initialCategory === 'sleep_rest'}>Sleep & Rest</option>
+            <option value="emotional_wellbeing" selected={initialCategory === 'emotional_wellbeing'}>Emotional Well-being</option>
+            <option value="social_connection" selected={initialCategory === 'social_connection'}>Social Connection</option>
+            <option value="financial" selected={initialCategory === 'financial'}>Financial Wellness</option>
+            <option value="career" selected={initialCategory === 'career'}>Career Readiness</option>
+            <option value="campus_experience" selected={initialCategory === 'campus_experience'}>Campus Experience</option>
+          </Select>
+
+          <Input
+            label="Scheduled Date & Time"
+            name="scheduled_at"
+            type="datetime-local"
+            required
+          />
+        </div>
+
+        <div class="form-row">
+          <Input
+            label="Location / Room"
+            name="location"
+            placeholder="e.g. Seminar Hall B, CSE Block"
+            required
+          />
+
+          <Input
+            label="Expected Student Capacity"
+            name="capacity"
+            type="number"
+            placeholder="e.g. 50"
+          />
+        </div>
+
+        <Textarea
+          label="Session Description & Agenda"
+          name="description"
+          placeholder="Provide practical non-clinical self-care strategies, peer support activities, or academic guidance planned for this session..."
+          rows={5}
+          required
+        />
+
+        <div class="form-actions">
+          <a href="/college/interventions">
+            <Button variant="outline" type="button">Cancel</Button>
+          </a>
+          <Button variant="primary" type="submit">Schedule Intervention Program</Button>
+        </div>
+      </form>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</CollegeLayout>
+
+<style>
+  .new-intervention-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .intervention-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+</style>

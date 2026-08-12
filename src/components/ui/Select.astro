@@ -8,7 +8,7 @@ interface Props {
   label?: string;
   id?: string;
   name?: string;
-  options: Option[];
+  options?: Option[];
   value?: string;
   placeholder?: string;
   required?: boolean;
@@ -46,12 +46,18 @@ const {
     class={`select-field ${error ? 'has-error' : ''}`}
     {...rest}
   >
-    {placeholder && <option value="" disabled selected={!value}>{placeholder}</option>}
-    {options.map((opt) => (
-      <option value={opt.value} selected={opt.value === value}>
-        {opt.label}
-      </option>
-    ))}
+    {options.length > 0 ? (
+      <>
+        {placeholder && <option value="" disabled selected={!value}>{placeholder}</option>}
+        {options.map((opt) => (
+          <option value={opt.value} selected={opt.value === value}>
+            {opt.label}
+          </option>
+        ))}
+      </>
+    ) : (
+      <slot />
+    )}
   </select>
   {error && <span class="select-error">{error}</span>}
 </div>
