@@ -42,6 +42,7 @@ export interface Institution {
   district: string;
   state: string;
   institution_type: string;
+  type?: string;
   active: boolean;
   created_at: string;
   updated_at: string;

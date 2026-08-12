@@ -1,0 +1,369 @@
+---
+import GovernmentLayout from '../../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import MetricCard from '../../../components/ui/MetricCard.astro';
+import Button from '../../../components/ui/Button.astro';
+import Badge from '../../../components/ui/Badge.astro';
+import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
+import { LockKeyhole } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { getAuthorizedInstitutions, getInstitutionById } from '../../../services/institutions';
+import {
+  getCollegeParticipationMetrics,
+  getCollegeCategorySummaries,
+  getCollegeDepartmentSummaries,
+} from '../../../services/analytics';
+import { getInstitutionInterventions } from '../../../services/interventions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+}
+
+const { institutionId } = Astro.params;
+
+if (!institutionId) {
+  return Astro.redirect('/admin/institutions');
+}
+
+// CRITICAL SECURITY: Verify Government Admin is authorized for this specific institution ID
+const authorizedInstitutions = await getAuthorizedInstitutions(supabase, user.id);
+const isAuthorized = authorizedInstitutions.some((inst) => inst.id === institutionId);
+
+if (!isAuthorized && profile?.role !== 'super_admin') {
+  // Scope boundary violation attempt: Redirect safely
+  return Astro.redirect('/admin/institutions');
+}
+
+const institution = await getInstitutionById(supabase, institutionId);
+
+if (!institution) {
+  return Astro.redirect('/admin/institutions');
+}
+
+const metrics = await getCollegeParticipationMetrics(supabase, institutionId);
+const categorySummaries = await getCollegeCategorySummaries(supabase, institutionId);
+const departmentSummaries = await getCollegeDepartmentSummaries(supabase, institutionId);
+const interventions = await getInstitutionInterventions(supabase, institutionId);
+---
+
+<GovernmentLayout title={`Oversight: ${institution.name}`} activePath="/admin/institutions">
+  <PageHeader
+    title={`Institutional Oversight — ${institution.name}`}
+    subtitle={`Aggregate well-being signals for ${institution.code} (${institution.state || 'National'})`}
+  >
+    <a href="/admin/institutions">
+      <Button variant="outline" size="sm">&larr; Back to Directory</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-inst-detail-layout">
+    <div class="metrics-grid">
+      <MetricCard
+        title="Check-in Participation"
+        value={`${metrics.participation_rate.toFixed(1)}%`}
+        change={`${metrics.participating_students} Students Checked-in`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Eligible Students"
+        value={metrics.total_eligible_students.toLocaleString()}
+        change="Campus Population"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Active Interventions"
+        value={interventions.length.toString()}
+        change="Scheduled Wellness Sessions"
+        changeType="positive"
+      />
+    </div>
+
+    <div class="detail-section-grid">
+      {/* Category Breakdown */}
+      <Card padding="lg">
+        <h3 class="card-section-title">Aggregate Category Well-being Indicators</h3>
+        <p class="section-subtext">Category averages (0.0 to 10.0) derived from completed reflections.</p>
+
+        <div class="categories-list">
+          {categorySummaries.map((cs) => (
+            <div class="cat-row">
+              <span class="cat-title">{cs.category.replace('_', ' ')}</span>
+              {cs.is_suppressed ? (
+                <span class="suppressed-txt">Suppressed (&lt;10)</span>
+              ) : (
+                <div class="cat-val-group">
+                  <span class="score-display">{cs.average_score?.toFixed(1)} / 10</span>
+                  <Badge variant={cs.dominant_band || 'neutral'} size="sm">
+                    {cs.dominant_band?.replace('_', ' ')}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Interventions Oversight */}
+      <Card padding="lg">
+        <h3 class="card-section-title">Institutional Interventions Oversight</h3>
+        <p class="section-subtext">Wellness programs scheduled by the college officer.</p>
+
+        <div class="interventions-list">
+          {interventions.length > 0 ? (
+            interventions.map((item) => (
+              <div class="intervention-item">
+                <div class="item-top">
+                  <span class="item-cat">{item.category.replace('_', ' ')}</span>
+                  <Badge variant="primary" size="sm">{item.status}</Badge>
+                </div>
+                <h4 class="item-title">{item.title}</h4>
+                <p class="item-desc">{item.description}</p>
+                <div class="item-meta">
+                  <span>Location: {item.location}</span>
+                  <span>Scheduled: {new Date(item.scheduled_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p class="empty-txt">No interventions currently scheduled for this institution.</p>
+          )}
+        </div>
+      </Card>
+    </div>
+
+    {/* Department Aggregates (Privacy Enforced) */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Department Aggregate Comparison</h3>
+      <p class="section-subtext">Department statistics are displayed only for groups with &ge; 10 participating students.</p>
+
+      <div class="departments-grid">
+        {departmentSummaries.map((dept) => (
+          <div class="dept-box">
+            <div class="dept-top">
+              <span class="dept-code">{dept.department_code}</span>
+              <span class="dept-name">{dept.department_name}</span>
+            </div>
+
+            {dept.is_suppressed ? (
+              <div class="suppressed-box">
+                <LockKeyhole size={14} />
+                <span>{dept.suppression_message || 'Insufficient group size.'}</span>
+              </div>
+            ) : (
+              <div class="dept-stats">
+                <div class="stat-line">
+                  <span>Indicator:</span>
+                  <strong>{dept.average_overall_score?.toFixed(1)} / 10</strong>
+                </div>
+                <div class="stat-line">
+                  <span>Status:</span>
+                  <Badge variant={dept.dominant_band || 'neutral'} size="sm">
+                    {dept.dominant_band?.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</GovernmentLayout>
+
+<style>
+  .gov-inst-detail-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .detail-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .categories-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .cat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .cat-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    text-transform: capitalize;
+  }
+
+  .cat-val-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .score-display {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .suppressed-txt {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .interventions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .intervention-item {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-left: 4px solid var(--color-primary-600);
+    border-radius: var(--radius-lg);
+  }
+
+  .item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .item-cat {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+  }
+
+  .item-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .item-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-2);
+  }
+
+  .item-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .departments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .dept-box {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .dept-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .dept-code {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .dept-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .suppressed-box {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--color-bg-surface);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .dept-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+  }
+
+  .stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .empty-txt {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+</style>

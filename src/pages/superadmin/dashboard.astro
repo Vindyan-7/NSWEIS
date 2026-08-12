@@ -1,18 +1,247 @@
 ---
 import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
 import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { Building2, UserCog, CalendarDays } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getSuperAdminSystemMetrics } from '../../services/analytics';
+import { getAllInstitutions } from '../../services/institutions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+  if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
+}
+
+const metrics = await getSuperAdminSystemMetrics(supabase);
+const institutions = await getAllInstitutions(supabase);
 ---
 
-<SuperAdminLayout title="Super Admin System Control" activePath="/superadmin/dashboard">
+<SuperAdminLayout title="Super Admin System Overview" activePath="/superadmin/dashboard">
   <PageHeader
-    title="System Configuration & Management"
-    subtitle="Configure assessment cycles, questions, rules, institutions, and demo accounts."
-  />
+    title="National Ecosystem Management"
+    subtitle={`System configuration, institution directory, and government administrator scope control`}
+  >
+    <a href="/superadmin/institutions">
+      <Button variant="primary" size="sm">+ Manage Institutions</Button>
+    </a>
+  </PageHeader>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
-    <MetricCard title="System Users" value="1,254" subtitle="All roles" />
-    <MetricCard title="Active Institutions" value="128" subtitle="System tenants" />
-    <MetricCard title="Active Questions" value="25" subtitle="Base & adaptive rules" />
+  <div class="superadmin-dashboard-layout">
+    <div class="metrics-grid">
+      <MetricCard
+        title="Onboarded Institutions"
+        value={metrics.total_institutions.toString()}
+        change={`${metrics.active_institutions} Active Institutions`}
+        changeType="positive"
+      />
+      <MetricCard
+        title="Registered Students"
+        value={metrics.total_students.toLocaleString()}
+        change="Campus Accounts"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Wellness Officers"
+        value={metrics.total_officers.toString()}
+        change="College Administrators"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Government Admins"
+        value={metrics.total_government_admins.toString()}
+        change="Scoped Authority Accounts"
+        changeType="neutral"
+      />
+    </div>
+
+    <div class="admin-modules-grid">
+      <Card padding="lg">
+        <div class="module-header">
+          <Building2 size={24} class="module-icon" />
+          <h3 class="card-section-title">Institution Management</h3>
+        </div>
+        <p class="section-subtext">Register new universities and colleges or configure institutional status.</p>
+        <div class="module-actions">
+          <a href="/superadmin/institutions">
+            <Button variant="outline" size="sm">Manage Institutions &rarr;</Button>
+          </a>
+        </div>
+      </Card>
+
+      <Card padding="lg">
+        <div class="module-header">
+          <UserCog size={24} class="module-icon" />
+          <h3 class="card-section-title">Government Admin Scopes</h3>
+        </div>
+        <p class="section-subtext">Assign or update regional institution authority for government administrators.</p>
+        <div class="module-actions">
+          <a href="/superadmin/scopes">
+            <Button variant="outline" size="sm">Configure Scopes &rarr;</Button>
+          </a>
+        </div>
+      </Card>
+
+      <Card padding="lg">
+        <div class="module-header">
+          <CalendarDays size={24} class="module-icon" />
+          <h3 class="card-section-title">Assessment Cycles</h3>
+        </div>
+        <p class="section-subtext">View and manage national weekly check-in schedules and reporting windows.</p>
+        <div class="module-actions">
+          <a href="/superadmin/cycles">
+            <Button variant="outline" size="sm">View Cycles &rarr;</Button>
+          </a>
+        </div>
+      </Card>
+    </div>
+
+    {/* National Institutions Directory List */}
+    <Card padding="lg">
+      <div class="section-header">
+        <h3 class="card-section-title">National Institution Directory ({institutions.length})</h3>
+        <a href="/superadmin/institutions" class="header-link">Manage All &rarr;</a>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Institution Name</th>
+              <th>Code</th>
+              <th>State</th>
+              <th>Type</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {institutions.map((inst) => (
+              <tr>
+                <td class="font-medium">{inst.name}</td>
+                <td><span class="code-badge">{inst.code}</span></td>
+                <td>{inst.state || 'National'}</td>
+                <td class="capitalize">{inst.type || 'college'}</td>
+                <td>
+                  <Badge variant={inst.active ? 'stable' : 'neutral'} size="sm">
+                    {inst.active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
   </div>
 </SuperAdminLayout>
+
+<style>
+  .superadmin-dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .admin-modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .module-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+    color: var(--color-primary-600);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .header-link {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .code-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .capitalize {
+    text-transform: capitalize;
+  }
+</style>

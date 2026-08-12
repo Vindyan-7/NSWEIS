@@ -6,6 +6,7 @@ import MetricCard from '../../components/ui/MetricCard.astro';
 import Button from '../../components/ui/Button.astro';
 import Badge from '../../components/ui/Badge.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { LockKeyhole } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import {
@@ -170,7 +171,7 @@ const attentionCategories = categorySummaries.filter(
             <div class="dept-body">
               {dept.is_suppressed ? (
                 <div class="suppressed-box">
-                  <span class="lock-icon">🔒</span>
+                  <LockKeyhole size={16} class="lock-icon-svg" />
                   <p class="suppressed-msg">{dept.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
                 </div>
               ) : (

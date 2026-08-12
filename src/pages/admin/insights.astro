@@ -1,0 +1,274 @@
+---
+import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import ChartCard from '../../components/analytics/ChartCard.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getGovernmentParticipationMetrics,
+  getGovernmentCategorySummaries,
+  getGovernmentInstitutionSummaries,
+  getGovernmentTrends,
+} from '../../services/analytics';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+}
+
+const metrics = await getGovernmentParticipationMetrics(supabase, user.id);
+const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id);
+const institutionSummaries = await getGovernmentInstitutionSummaries(supabase, user.id);
+const trends = await getGovernmentTrends(supabase, user.id);
+---
+
+<GovernmentLayout title="Regional Aggregate Insights" activePath="/admin/insights">
+  <PageHeader
+    title="Cross-Institutional Regional Insights"
+    subtitle={`Aggregated well-being trends and comparative indicators across authorized institutions for ${metrics.active_cycle_name}`}
+  >
+    <a href="/admin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-insights-layout">
+    <div class="metrics-grid">
+      <MetricCard
+        title="Authorized Scope"
+        value={`${metrics.authorized_institutions_count} Institutions`}
+        change={`${metrics.active_reporting_institutions_count} Actively Reporting`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Participating Population"
+        value={metrics.participating_students.toLocaleString()}
+        change={`${metrics.participation_rate.toFixed(1)}% Regional Participation`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Privacy Protection"
+        value="&ge; 10 Students"
+        change="Threshold Enforced Database-side"
+        changeType="positive"
+      />
+    </div>
+
+    <div class="insights-section-grid">
+      {/* Category Indicators Bar Breakdown */}
+      <ChartCard
+        title="Regional Category Indicators"
+        subtitle="Aggregate average indicator scores (0.0 to 10.0) across authorized scope"
+      >
+        <div class="category-bars">
+          {categorySummaries.map((cs) => (
+            <div class="bar-row">
+              <span class="bar-label">{cs.category.replace('_', ' ')}</span>
+              <div class="bar-track">
+                {cs.is_suppressed ? (
+                  <div class="bar-suppressed">Suppressed (&lt;10 students)</div>
+                ) : (
+                  <div
+                    class={`bar-fill band-${cs.dominant_band}`}
+                    style={`width: ${((cs.average_score || 0) * 10)}%`}
+                  >
+                    <span class="bar-val">{cs.average_score?.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ChartCard>
+
+      {/* Institutional Comparison Table */}
+      <Card padding="lg">
+        <h3 class="card-section-title">Institutional Well-being Comparison</h3>
+        <p class="section-subtext">Comparative status for institutions assigned under your government admin scope.</p>
+
+        <div class="inst-comp-list">
+          {institutionSummaries.map((inst) => (
+            <div class="inst-comp-item">
+              <div class="inst-comp-top">
+                <span class="inst-comp-name">{inst.institution_name} ({inst.institution_code})</span>
+                {inst.is_suppressed ? (
+                  <Badge variant="neutral" size="sm">Suppressed (&lt;10)</Badge>
+                ) : (
+                  <Badge variant={inst.dominant_band || 'neutral'} size="sm">
+                    {inst.dominant_band?.replace('_', ' ')}
+                  </Badge>
+                )}
+              </div>
+
+              {inst.is_suppressed ? (
+                <p class="inst-suppressed-desc">{inst.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
+              ) : (
+                <div class="inst-comp-stats">
+                  <span>Aggregate Score: <strong>{inst.average_overall_score?.toFixed(1)} / 10</strong></span>
+                  <span>Reporting Students: <strong>{inst.participating_student_count}</strong></span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</GovernmentLayout>
+
+<style>
+  .gov-insights-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .insights-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .category-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+
+  .bar-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .bar-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    text-transform: capitalize;
+  }
+
+  .bar-track {
+    height: 24px;
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: var(--space-2);
+    border-radius: var(--radius-md);
+    transition: width 0.3s ease;
+  }
+
+  .bar-fill.band-stable {
+    background-color: var(--color-band-stable);
+  }
+
+  .bar-fill.band-watch {
+    background-color: var(--color-band-improving);
+  }
+
+  .bar-fill.band-needs_attention {
+    background-color: var(--color-band-attention);
+  }
+
+  .bar-fill.band-elevated {
+    background-color: var(--color-band-elevated);
+  }
+
+  .bar-val {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-white);
+  }
+
+  .bar-suppressed {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: var(--space-3);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .inst-comp-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .inst-comp-item {
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .inst-comp-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .inst-comp-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .inst-suppressed-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .inst-comp-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+  }
+</style>

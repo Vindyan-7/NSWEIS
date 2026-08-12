@@ -16,10 +16,10 @@ export function isRouteAllowedForRole(pathname: string, role: UserRole): boolean
     return role === 'student';
   }
   if (pathname.startsWith('/college/')) {
-    return role === 'college_officer';
+    return role === 'college_officer' || role === 'super_admin';
   }
   if (pathname.startsWith('/admin/')) {
-    return role === 'government_admin';
+    return role === 'government_admin' || role === 'super_admin';
   }
   if (pathname.startsWith('/superadmin/')) {
     return role === 'super_admin';

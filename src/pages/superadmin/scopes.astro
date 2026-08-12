@@ -1,0 +1,230 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getAllInstitutions } from '../../services/institutions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  return Astro.redirect('/superadmin/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const admin_profile_id = formData.get('admin_profile_id')?.toString();
+    const institution_id = formData.get('institution_id')?.toString();
+
+    if (admin_profile_id && institution_id) {
+      const { error } = await (supabase as any)
+        .from('government_admin_scopes')
+        .insert({ admin_profile_id, institution_id });
+
+      if (error) {
+        message = error.message;
+        isError = true;
+      } else {
+        message = 'Scope assigned successfully.';
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'Failed to assign scope.';
+    isError = true;
+  }
+}
+
+// Fetch Government Admins and Scopes
+const { data: govAdminsData } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('role', 'government_admin');
+
+const govAdmins = (govAdminsData || []) as any[];
+
+const { data: scopesData } = await (supabase as any)
+  .from('government_admin_scopes')
+  .select('*, profiles!government_admin_scopes_admin_profile_id_fkey(full_name), institutions(name, code)');
+
+const scopes = (scopesData || []) as any[];
+const institutions = await getAllInstitutions(supabase);
+---
+
+<SuperAdminLayout title="Government Admin Scope Control" activePath="/superadmin/scopes">
+  <PageHeader
+    title="Government Admin Scope Authorization"
+    subtitle="Configure regional institutional authority assignments for Government Administrators"
+  >
+    <a href="/superadmin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+    </a>
+  </PageHeader>
+
+  <div class="superadmin-scopes-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Error' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    {/* Assign Scope Form */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Assign Institution Scope</h3>
+      <p class="section-subtext">Grant a Government Administrator oversight access to a specific campus.</p>
+
+      <form method="POST" class="scope-form">
+        <div class="form-row">
+          <Select label="Government Administrator" name="admin_profile_id" required>
+            {govAdmins.map((adm) => (
+              <option value={adm.id}>{adm.full_name || adm.id}</option>
+            ))}
+          </Select>
+
+          <Select label="Target Institution" name="institution_id" required>
+            {institutions.map((inst) => (
+              <option value={inst.id}>{inst.name} ({inst.code})</option>
+            ))}
+          </Select>
+        </div>
+        <div class="form-actions">
+          <Button variant="primary" type="submit">+ Assign Scope</Button>
+        </div>
+      </form>
+    </Card>
+
+    {/* Active Scope Assignments */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Active Scope Assignments</h3>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Government Administrator</th>
+              <th>Assigned Institution</th>
+              <th>Code</th>
+              <th>Assigned Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scopes.length > 0 ? (
+              scopes.map((sc) => (
+                <tr>
+                  <td class="font-medium">{sc.profiles?.full_name || sc.admin_profile_id}</td>
+                  <td>{sc.institutions?.name || sc.institution_id}</td>
+                  <td><span class="code-badge">{sc.institutions?.code || 'INST'}</span></td>
+                  <td>{new Date(sc.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colspan="4" class="empty-cell">No active scope assignments found.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</SuperAdminLayout>
+
+<style>
+  .superadmin-scopes-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .scope-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin-top: var(--space-4);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .code-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: var(--space-6) !important;
+  }
+</style>

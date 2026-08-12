@@ -1,21 +1,408 @@
 ---
-import AdminLayout from '../../layouts/AdminLayout.astro';
+import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
 import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Alert from '../../components/ui/Alert.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { TrendingUp, TrendingDown, Minus } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getGovernmentParticipationMetrics,
+  getGovernmentCategorySummaries,
+  getGovernmentInstitutionSummaries,
+  getGovernmentTrends,
+} from '../../services/analytics';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+}
+
+// Server-side scope-authorized analytics
+const metrics = await getGovernmentParticipationMetrics(supabase, user.id);
+const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id);
+const institutionSummaries = await getGovernmentInstitutionSummaries(supabase, user.id);
+const trends = await getGovernmentTrends(supabase, user.id);
+
+const attentionCategories = categorySummaries.filter(
+  (cs) => cs.dominant_band === 'needs_attention' || cs.dominant_band === 'elevated' || cs.dominant_band === 'watch'
+);
 ---
 
-<AdminLayout title="Government Overview" activePath="/admin/dashboard">
+<GovernmentLayout title="Government Intelligence Overview" activePath="/admin/dashboard">
   <PageHeader
-    title="National Student Well-being Oversight"
-    subtitle="Statewide adoption, institutional adoption rates, and intervention compliance."
-  />
+    title="Government Regional & Institutional Intelligence"
+    subtitle={`Aggregate well-being signals across authorized institutions for ${metrics.active_cycle_name}`}
+  >
+    <a href="/admin/institutions">
+      <Button variant="outline" size="sm">View Authorized Directory &rarr;</Button>
+    </a>
+  </PageHeader>
 
-  <PrivacyNotice variant="compact" />
+  <div class="gov-dashboard-layout">
+    {/* Question 1: How widely is NSWEIS being used? */}
+    <div class="metrics-grid">
+      <MetricCard
+        title="Authorized Institutions"
+        value={metrics.authorized_institutions_count.toString()}
+        change={`${metrics.active_reporting_institutions_count} Reporting Active Data`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Participating Students"
+        value={metrics.participating_students.toLocaleString()}
+        change={`Out of ${metrics.total_eligible_students.toLocaleString()} Eligible`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Regional Engagement Rate"
+        value={`${metrics.participation_rate.toFixed(1)}%`}
+        change="Campus-wide Reflection Rate"
+        changeType="positive"
+      />
+      <MetricCard
+        title="Areas of Concern"
+        value={attentionCategories.length.toString()}
+        change="Categories below stable threshold"
+        changeType={attentionCategories.length > 0 ? "negative" : "positive"}
+      />
+    </div>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
-    <MetricCard title="Participating Institutions" value="128" change="+12" changeType="positive" subtitle="Active higher education campuses" />
-    <MetricCard title="National Participation" value="79.2%" subtitle="Across all registered colleges" />
-    <MetricCard title="Total Interventions Managed" value="342" change="+45 this cycle" changeType="positive" subtitle="Targeted institutional programs" />
+    {/* Calm Non-Clinical Policy Insight Action Alert */}
+    {attentionCategories.length > 0 && (
+      <Alert type="warning" title="Regional Institutional Action Recommended">
+        <p>
+          Aggregate signals indicate elevated stress indicators in <strong>{attentionCategories.map((c) => c.category.replace('_', ' ')).join(', ')}</strong> across authorized institutions. Consider coordinating targeted workload management or peer-support workshops.
+        </p>
+      </Alert>
+    )}
+
+    <div class="dashboard-grid">
+      {/* Question 2: What is happening across institutions? */}
+      <Card padding="lg">
+        <div class="section-header">
+          <h3 class="card-section-title">Aggregate Well-being Categories</h3>
+          <a href="/admin/insights" class="header-link">Detailed Analytics &rarr;</a>
+        </div>
+        <p class="section-subtext">Cross-institutional category indicators computed from authorized student reflections.</p>
+
+        <div class="categories-list">
+          {categorySummaries.map((cs) => (
+            <div class="category-row">
+              <div class="cat-left">
+                <span class="cat-title">{cs.category.replace('_', ' ')}</span>
+                <Badge variant={cs.dominant_band || 'neutral'} size="sm">
+                  {cs.dominant_band ? cs.dominant_band.replace('_', ' ') : 'Insufficient Data'}
+                </Badge>
+              </div>
+              <div class="cat-right">
+                {cs.is_suppressed ? (
+                  <span class="suppressed-tag">Suppressed (&lt;10 students)</span>
+                ) : (
+                  <span class="score-num">{cs.average_score?.toFixed(1)} / 10</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Question 3: What trends are emerging? */}
+      <Card padding="lg">
+        <h3 class="card-section-title">Emerging Category Trends</h3>
+        <p class="section-subtext">Directional shifts compared to previous check-in cycles across authorized scope.</p>
+
+        <div class="trends-list">
+          {trends.map((t) => (
+            <div class="trend-item">
+              <div class="trend-info">
+                <span class="trend-category">{t.category.replace('_', ' ')}</span>
+                <span class="trend-score-diff">
+                  {t.current_score !== null ? `${t.current_score.toFixed(1)} / 10` : 'No Data'}
+                </span>
+              </div>
+              <div class="trend-badge-box">
+                {t.trend_direction === 'improving' && (
+                  <span class="trend-indicator trend-positive">
+                    <TrendingUp size={16} /> Improving
+                  </span>
+                )}
+                {t.trend_direction === 'stable' && (
+                  <span class="trend-indicator trend-neutral">
+                    <Minus size={16} /> Stable
+                  </span>
+                )}
+                {t.trend_direction === 'declining' && (
+                  <span class="trend-indicator trend-negative">
+                    <TrendingDown size={16} /> Increasing Concern
+                  </span>
+                )}
+                {t.trend_direction === 'first_check_in' && (
+                  <span class="trend-indicator trend-neutral">Baseline</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+
+    {/* Authorized Institutions Directory Summary */}
+    <Card padding="lg">
+      <div class="section-header">
+        <h3 class="card-section-title">Authorized Institution Status</h3>
+        <a href="/admin/institutions" class="header-link">Manage Directory &rarr;</a>
+      </div>
+      <p class="section-subtext">Institutions assigned under your government administration scope. Privacy threshold (&ge; 10 students) is enforced per institution.</p>
+
+      <div class="institutions-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Institution Name</th>
+              <th>Code</th>
+              <th>State</th>
+              <th>Participating Students</th>
+              <th>Aggregate Status</th>
+              <th>Interventions</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {institutionSummaries.map((inst) => (
+              <tr>
+                <td class="font-medium">{inst.institution_name}</td>
+                <td><span class="code-badge">{inst.institution_code}</span></td>
+                <td>{inst.state}</td>
+                <td>{inst.participating_student_count}</td>
+                <td>
+                  {inst.is_suppressed ? (
+                    <span class="suppressed-text">Suppressed (&lt;10)</span>
+                  ) : (
+                    <Badge variant={inst.dominant_band || 'neutral'} size="sm">
+                      {inst.dominant_band?.replace('_', ' ')}
+                    </Badge>
+                  )}
+                </td>
+                <td>{inst.active_interventions_count} active</td>
+                <td>
+                  <a href={`/admin/institutions/${inst.institution_id}`} class="action-link">
+                    Oversight &rarr;
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
   </div>
-</AdminLayout>
+</GovernmentLayout>
+
+<style>
+  .gov-dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .header-link {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .categories-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .category-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .cat-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .cat-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    text-transform: capitalize;
+  }
+
+  .suppressed-tag {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .score-num {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .trends-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .trend-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .trend-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .trend-category {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    text-transform: capitalize;
+  }
+
+  .trend-score-diff {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .trend-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-full);
+  }
+
+  .trend-positive {
+    background-color: var(--color-band-stable-bg);
+    color: #065f46;
+  }
+
+  .trend-neutral {
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-muted);
+  }
+
+  .trend-negative {
+    background-color: var(--color-band-elevated-bg);
+    color: #991b1b;
+  }
+
+  .institutions-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .code-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .suppressed-text {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .action-link {
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+</style>

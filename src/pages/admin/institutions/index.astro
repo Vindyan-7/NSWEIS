@@ -1,0 +1,239 @@
+---
+import GovernmentLayout from '../../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import Button from '../../../components/ui/Button.astro';
+import Badge from '../../../components/ui/Badge.astro';
+import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { getGovernmentInstitutionSummaries } from '../../../services/analytics';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+}
+
+const institutions = await getGovernmentInstitutionSummaries(supabase, user.id);
+---
+
+<GovernmentLayout title="Authorized Institutions Directory" activePath="/admin/institutions">
+  <PageHeader
+    title="Authorized Institutions Directory"
+    subtitle="Institutional oversight & wellness indicator monitoring for your assigned government scope"
+  >
+    <a href="/admin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-institutions-layout">
+    <Card padding="lg">
+      <div class="directory-header">
+        <h3 class="card-section-title">Institutional Overview ({institutions.length})</h3>
+        <Badge variant="neutral" size="sm">Scope Authorized Only</Badge>
+      </div>
+      <p class="section-subtext">All metrics are aggregate-only. Minimum privacy reporting threshold (&ge; 10 students) is enforced server-side.</p>
+
+      <div class="institutions-grid">
+        {institutions.map((inst) => (
+          <div class="institution-card">
+            <div class="inst-card-top">
+              <div class="inst-title-block">
+                <span class="inst-code">{inst.institution_code}</span>
+                <h4 class="inst-name">{inst.institution_name}</h4>
+              </div>
+              <span class="inst-state">{inst.state}</span>
+            </div>
+
+            <div class="inst-card-body">
+              {inst.is_suppressed ? (
+                <div class="suppressed-notice">
+                  <span class="suppressed-label">Privacy Suppressed</span>
+                  <p class="suppressed-desc">{inst.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
+                </div>
+              ) : (
+                <div class="inst-metrics">
+                  <div class="metric-line">
+                    <span class="lbl">Participating Students:</span>
+                    <span class="val">{inst.participating_student_count}</span>
+                  </div>
+                  <div class="metric-line">
+                    <span class="lbl">Aggregate Indicator:</span>
+                    <span class="val">{inst.average_overall_score?.toFixed(1)} / 10</span>
+                  </div>
+                  <div class="metric-line">
+                    <span class="lbl">Wellness Status:</span>
+                    <Badge variant={inst.dominant_band || 'neutral'} size="sm">
+                      {inst.dominant_band?.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div class="inst-card-footer">
+              <span class="interventions-tag">{inst.active_interventions_count} Active Interventions</span>
+              <a href={`/admin/institutions/${inst.institution_id}`}>
+                <Button variant="outline" size="sm">Oversight Details &rarr;</Button>
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</GovernmentLayout>
+
+<style>
+  .gov-institutions-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .directory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-6);
+  }
+
+  .institutions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .institution-card {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-subtle);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .inst-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .inst-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .inst-code {
+    align-self: flex-start;
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .inst-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .inst-state {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-surface);
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
+  }
+
+  .inst-card-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .inst-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .metric-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+  }
+
+  .metric-line .lbl {
+    color: var(--color-text-muted);
+  }
+
+  .metric-line .val {
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .suppressed-notice {
+    padding: var(--space-3);
+    background-color: var(--color-bg-surface);
+    border-radius: var(--radius-md);
+  }
+
+  .suppressed-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
+  .suppressed-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin-top: 0.125rem;
+  }
+
+  .inst-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .interventions-tag {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+</style>

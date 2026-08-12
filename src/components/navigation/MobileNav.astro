@@ -2,7 +2,7 @@
 interface NavItem {
   label: string;
   href: string;
-  icon?: string;
+  icon?: any;
   active?: boolean;
 }
 
@@ -14,12 +14,19 @@ const { items } = Astro.props;
 ---
 
 <nav class="mobile-nav glass-panel">
-  {items.map((item) => (
-    <a href={item.href} class={`mobile-nav-item ${item.active ? 'is-active' : ''}`}>
-      {item.icon && <span class="mobile-nav-icon">{item.icon}</span>}
-      <span class="mobile-nav-label">{item.label}</span>
-    </a>
-  ))}
+  {items.map((item) => {
+    const IconComponent = typeof item.icon === 'function' || (typeof item.icon === 'object' && item.icon !== null) ? item.icon : null;
+    return (
+      <a href={item.href} class={`mobile-nav-item ${item.active ? 'is-active' : ''}`}>
+        {IconComponent ? (
+          <IconComponent size={20} />
+        ) : (
+          item.icon && <span class="mobile-nav-icon">{item.icon}</span>
+        )}
+        <span class="mobile-nav-label">{item.label}</span>
+      </a>
+    );
+  })}
 </nav>
 
 <style>

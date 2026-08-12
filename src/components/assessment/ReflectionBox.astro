@@ -1,5 +1,6 @@
 ---
 import Textarea from '../ui/Textarea.astro';
+import { LockKeyhole } from '@lucide/astro';
 
 interface Props {
   id?: string;
@@ -18,7 +19,7 @@ const {
 
 <div class="reflection-box">
   <div class="reflection-header">
-    <span class="reflection-icon">🔒</span>
+    <LockKeyhole size={14} class="reflection-icon-svg" />
     <span class="reflection-privacy">Strictly Confidential & Private</span>
   </div>
   <Textarea

@@ -1,0 +1,134 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  return Astro.redirect('/superadmin/dashboard');
+}
+
+const { data: cyclesData } = await supabase
+  .from('assessment_cycles')
+  .select('*')
+  .order('starts_at', { ascending: false });
+
+const cycles = (cyclesData || []) as any[];
+---
+
+<SuperAdminLayout title="Assessment Cycles Overview" activePath="/superadmin/cycles">
+  <PageHeader
+    title="National Assessment Cycles Overview"
+    subtitle="View and manage weekly check-in cycles, reporting windows, and nationwide participation status"
+  >
+    <a href="/superadmin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+    </a>
+  </PageHeader>
+
+  <div class="superadmin-cycles-layout">
+    <Card padding="lg">
+      <h3 class="card-section-title">Assessment Cycles Directory ({cycles.length})</h3>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Cycle Name</th>
+              <th>Reporting Window</th>
+              <th>Status</th>
+              <th>Created Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cycles.length > 0 ? (
+              cycles.map((cy) => (
+                <tr>
+                  <td class="font-medium">{cy.name}</td>
+                  <td>
+                    {new Date(cy.starts_at).toLocaleDateString()} &mdash; {new Date(cy.ends_at).toLocaleDateString()}
+                  </td>
+                  <td>
+                    <Badge variant={cy.status === 'active' ? 'stable' : 'neutral'} size="sm">
+                      {cy.status}
+                    </Badge>
+                  </td>
+                  <td>{new Date(cy.created_at || cy.starts_at).toLocaleDateString()}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colspan="4" class="empty-cell">No assessment cycles recorded in database.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</SuperAdminLayout>
+
+<style>
+  .superadmin-cycles-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-4);
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: var(--space-6) !important;
+  }
+</style>

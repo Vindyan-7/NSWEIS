@@ -1,17 +1,17 @@
 # NSWEIS — Persistent Project Context & Source of Truth
 
 **Product Name:** National Student Well-being Early Intervention System (NSWEIS)  
-**Version:** 1.0.0 (Milestone 2 Baseline)  
-**Status:** Milestone 2 — LOCKED & TEST READY  
+**Version:** 1.0.0 (Milestone 4 Baseline)  
+**Status:** Milestone 4 — COMPLETED  
 **Date:** August 12, 2026  
 
 ---
 
 ## A. Project Identity
 - **Product Name:** NSWEIS (National Student Well-being Early Intervention System)
-- **Product Purpose:** A privacy-conscious, non-clinical student well-being early-intervention ecosystem. It empowers students through self-reflection, provides higher education institutions with anonymized aggregate wellness insights, and enables targeted preventative interventions with government oversight.
-- **Hackathon Context:** MVP demonstration of an early-intervention ecosystem.
-- **Current MVP Scope:** Student Auth, Student Dashboard, Weekly Check-in, Base & Adaptive Questions Engine, Deterministic Category Scoring, Non-clinical Wellness Bands & Trend Calculation, Personalized Recommendations, Student Check-in History, and Dynamic Historical Result Detail Routing.
+- **Product Purpose:** A privacy-conscious, non-clinical student well-being early-intervention ecosystem. It empowers students through self-reflection, provides higher education institutions with anonymized aggregate wellness insights, enables targeted preventative interventions, and equips government administrators with scoped regional institutional oversight.
+- **Hackathon Context:** Multi-tenant early-intervention ecosystem demonstration.
+- **Current MVP Scope:** Student Auth, Student Dashboard, Weekly Check-in, Base & Adaptive Questions Engine, Deterministic Category Scoring, Non-clinical Wellness Bands & Trend Calculation, Personalized Recommendations, Student Check-in History, Dynamic Historical Result Detail Routing, College Institutional Intelligence & Interventions, Government Regional Oversight & Scope Authorization (`government_admin_scopes`), Cross-institution Aggregate Intelligence, Anonymity Thresholding ($\ge 10$ students), Super Admin Ecosystem Control, Server-side Logout, and Lucide Icon System.
 
 ---
 
@@ -34,7 +34,7 @@ Privacy-preserving aggregate institutional insight
         ↓
 Targeted wellness intervention
         ↓
-Government/district oversight
+Government regional scope oversight & policy coordination
 ```
 > [!IMPORTANT]
 > **Safety & Boundary Guarantee:** NSWEIS is a student well-being and early-intervention platform. It is **not** a clinical diagnostic system, does not evaluate psychiatric conditions, and does not replace professional medical or counselling services.
@@ -45,6 +45,7 @@ Government/district oversight
 Dependencies sourced directly from [`package.json`](file:///c:/Projects/YI/NSWEIS/package.json):
 - **Framework:** Astro `^7.2.1` (SSR mode)
 - **Language:** TypeScript `^6.0.3`
+- **Icon Library:** `@lucide/astro` `^0.556.0` (Stroke SVG icons across all roles)
 - **Deployment Adapter:** `@astrojs/vercel` `^11.0.5`
 - **Database & Auth:** Supabase PostgreSQL & Supabase Auth (`@supabase/supabase-js` `^2.112.3`, `@supabase/ssr` `^0.12.4`)
 - **Diagnostics:** `@astrojs/check` `^0.9.10`
@@ -55,139 +56,33 @@ Dependencies sourced directly from [`package.json`](file:///c:/Projects/YI/NSWEI
 - **Rendering Architecture:** Server-Side Rendering (`output: 'server'`) with `@astrojs/vercel` adapter.
 - **Database Authorization:** PostgreSQL Row Level Security (RLS) on all exposed tables.
 - **Authentication & Middleware:** Cookie-based session management using `@supabase/ssr` inside [`src/middleware.ts`](file:///c:/Projects/YI/NSWEIS/src/middleware.ts), verifying user roles and enforcing route guards.
+- **Government Scope Authorization Model:** Explicit institution assignment via `government_admin_scopes` table (`admin_profile_id` $\rightarrow$ `institution_id`). Super Admins have system-wide visibility.
 - **Service Layer Pattern:** Business operations encapsulated in [`src/services/`](file:///c:/Projects/YI/NSWEIS/src/services/) (`assessments.ts`, `users.ts`, `institutions.ts`, `interventions.ts`, `analytics.ts`).
 - **Scoring Engine:** Deterministic normalized category scoring engine in [`src/lib/scoring/engine.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/scoring/engine.ts).
 - **Validation Layer:** Input validation helpers in [`src/lib/validation/schemas.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/validation/schemas.ts).
 
 ---
 
-## F. Folder Structure
-```text
-NSWEIS/
-├── .env.example
-├── .gitignore
-├── AGENTS.md
-├── ARCHITECTURE.md
-├── astro.config.mjs
-├── package.json
-├── PROJECT_CONTEXT.md
-├── tsconfig.json
-├── src/
-│   ├── components/
-│   │   ├── analytics/
-│   │   │   └── ChartCard.astro
-│   │   ├── assessment/
-│   │   │   ├── AssessmentNavigation.astro
-│   │   │   ├── AssessmentProgress.astro
-│   │   │   ├── ChoiceOption.astro
-│   │   │   ├── QuestionCard.astro
-│   │   │   └── ReflectionBox.astro
-│   │   ├── interventions/
-│   │   │   └── InterventionCard.astro
-│   │   ├── navigation/
-│   │   │   ├── Header.astro
-│   │   │   ├── MobileNav.astro
-│   │   │   ├── PageHeader.astro
-│   │   │   └── Sidebar.astro
-│   │   ├── privacy/
-│   │   │   └── PrivacyNotice.astro
-│   │   ├── ui/
-│   │   │   ├── Alert.astro
-│   │   │   ├── Avatar.astro
-│   │   │   ├── Badge.astro
-│   │   │   ├── Button.astro
-│   │   │   ├── Card.astro
-│   │   │   ├── DataTable.astro
-│   │   │   ├── EmptyState.astro
-│   │   │   ├── ErrorState.astro
-│   │   │   ├── FilterBar.astro
-│   │   │   ├── Input.astro
-│   │   │   ├── LoadingState.astro
-│   │   │   ├── MetricCard.astro
-│   │   │   ├── Modal.astro
-│   │   │   ├── Progress.astro
-│   │   │   ├── SearchField.astro
-│   │   │   ├── Select.astro
-│   │   │   ├── Textarea.astro
-│   │   │   └── Toast.astro
-│   │   └── wellness/
-│   │       ├── CategoryIndicator.astro
-│   │       ├── WellnessIndicator.astro
-│   │       ├── WellnessSnapshot.astro
-│   │       └── WellnessTrend.astro
-│   ├── env.d.ts
-│   ├── layouts/
-│   │   ├── AdminLayout.astro
-│   │   ├── CollegeLayout.astro
-│   │   ├── PublicLayout.astro
-│   │   ├── StudentLayout.astro
-│   │   └── SuperAdminLayout.astro
-│   ├── lib/
-│   │   ├── auth/
-│   │   │   └── session.ts
-│   │   ├── permissions/
-│   │   │   └── roles.ts
-│   │   ├── scoring/
-│   │   │   └── engine.ts
-│   │   ├── supabase/
-│   │   │   ├── client.ts
-│   │   │   └── server.ts
-│   │   └── validation/
-│   │       └── schemas.ts
-│   ├── middleware.ts
-│   ├── pages/
-│   │   ├── admin/
-│   │   │   └── dashboard.astro
-│   │   ├── college/
-│   │   │   └── dashboard.astro
-│   │   ├── index.astro
-│   │   ├── login.astro
-│   │   ├── privacy.astro
-│   │   ├── student/
-│   │   │   ├── check-in.astro
-│   │   │   ├── dashboard.astro
-│   │   │   ├── history.astro
-│   │   │   ├── profile.astro
-│   │   │   └── wellness/
-│   │   │       ├── [assessmentId].astro
-│   │   │       └── index.astro
-│   │   └── superadmin/
-│   │       └── dashboard.astro
-│   ├── services/
-│   │   ├── analytics.ts
-│   │   ├── assessments.ts
-│   │   ├── institutions.ts
-│   │   ├── interventions.ts
-│   │   └── users.ts
-│   ├── styles/
-│   │   ├── globals.css
-│   │   └── tokens.css
-│   └── types/
-│       ├── database.ts
-│       └── domain.ts
-└── supabase/
-    ├── migrations/
-    │   └── 20260812000000_initial_schema.sql
-    └── seed.sql
-```
+## F. Roles & Permission Boundaries
+
+| Role | Scope Access | Route Guard | Data Access Level |
+|---|---|---|---|
+| **`student`** | Self only | `/student/*` | Own reflections, scores & history only |
+| **`college_officer`** | Own Institution | `/college/*` | Anonymized aggregate institution metrics & interventions |
+| **`government_admin`** | Assigned Institutions (`government_admin_scopes`) | `/admin/*` | Scoped regional aggregate metrics & intervention oversight |
+| **`super_admin`** | System-wide / National | `/superadmin/*` | System configuration, institution directory & scope assignments |
 
 ---
 
-## G. Roles & Permission Boundaries
-1. **`student`**: Access to own profile, active check-in, personal wellness summary, check-in history, and own historical result details. Isolated from all other students' PII.
-2. **`college_officer`**: Access to institution-level aggregate insights and intervention management. Restricted from viewing individual student raw responses.
-3. **`government_admin`**: Access to state/district level aggregate adoption metrics and institutional compliance. Restricted from raw student response PII.
-4. **`super_admin`**: System configuration and tenant management.
+## G. Current Implemented Routes
 
----
-
-## H. Current Routes
-### Public Routes (Implemented)
+### Public Routes
 - `/` — Landing Page
-- `/login` — Demo Authentication Page
+- `/login` — Multi-Role Demo Authentication Page
+- `/logout` — Server-side Session Sign-out & Cookie Purge
 - `/privacy` — Privacy & Safety Framework
 
-### Student Domain (Implemented — Milestone 2 Scope)
+### Student Domain
 - `/student/dashboard` — Student Home Hub & Check-in Status Card
 - `/student/check-in` — Weekly Check-in Form (Base + Adaptive)
 - `/student/wellness` — Latest Wellness Summary & Recommendations
@@ -195,18 +90,28 @@ NSWEIS/
 - `/student/history` — Check-in History Timeline
 - `/student/profile` — Student Profile Overview
 
-### College Domain (Placeholder Layouts — Planned Milestone 3)
-- `/college/dashboard` — Institutional Overview Placeholder
+### College Domain
+- `/college/dashboard` — Institutional Overview (5 Core Questions & Privacy Threshold)
+- `/college/insights` — Detailed Analytical Breakdown
+- `/college/interventions` — Intervention Directory
+- `/college/interventions/new` — Schedule New Intervention Form
 
-### Government Domain (Placeholder Layouts — Planned Milestone 4)
-- `/admin/dashboard` — National Overview Placeholder
+### Government Domain (Milestone 4 Implemented)
+- `/admin/dashboard` — Regional Intelligence & Scope Overview
+- `/admin/institutions` — Authorized Institutions Directory
+- `/admin/institutions/[institutionId]` — Single Institution Aggregate Oversight (Scope Enforced)
+- `/admin/insights` — Cross-Institutional Category Breakdown & Trends
+- `/admin/interventions` — Regional Intervention Program Oversight
 
-### Super Admin Domain (Placeholder Layouts — Planned Milestone 5)
-- `/superadmin/dashboard` — System Control Placeholder
+### Super Admin Domain (Milestone 4 Implemented)
+- `/superadmin/dashboard` — National Ecosystem System Overview
+- `/superadmin/institutions` — Institution Management & Status Control
+- `/superadmin/scopes` — Government Admin Scope Authorization Control
+- `/superadmin/cycles` — National Assessment Cycles Overview
 
 ---
 
-## I. Database Architecture & Manual SQL Workflow
+## H. Database Architecture & Manual SQL Workflow
 
 ### Manual SQL Change Registry
 The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager using the Supabase Dashboard SQL Editor. Antigravity never connects directly to PostgreSQL or requests database credentials.
@@ -214,103 +119,42 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 | SQL File | Feature | Purpose | Dependency | Execution Status |
 |---|---|---|---|---|
 | `00_initial_schema.sql` | Initial Schema | Create enums, tables, FKs, indexes, RLS & functions | None | **PENDING MANUAL EXECUTION** |
-| `01_seed_demo_data.sql` | Demo Seed Data | Seed institutions, departments, cycle, questions, rules, recs | `00_initial_schema.sql` | **PENDING MANUAL EXECUTION** |
-| `02_demo_student_profile.sql` | Demo Student Link | Link Auth user UUID to public.profiles | `00_initial_schema.sql`, `01_seed_demo_data.sql` | **PENDING MANUAL EXECUTION** |
-| `03_college_institutional_intelligence.sql` | College Analytics & Interventions | Aggregation functions (>=10 threshold), RLS & interventions seed | `00..02` | **PENDING MANUAL EXECUTION** |
-
-### Database Tables Summary
-- `profiles`: Linked to `auth.users.id`. Stores user role, institution, department, and student details.
-- `institutions`: Higher education campus entities.
-- `departments`: Academic departments per institution.
-- `assessment_cycles`: Weekly check-in cycles.
-- `questions`: Base & follow-up questions with category, weight, and order index.
-- `question_options`: Choice options with numeric score values.
-- `question_rules`: Adaptive follow-up selection rules based on category indicator thresholds.
-- `assessments`: Student check-in session records with unique constraint `(student_id, cycle_id)`.
-- `assessment_responses`: Student responses with unique constraint `(assessment_id, question_id)` for idempotent updates.
-- `assessment_category_scores`: Calculated normalized category scores and bands.
-- `recommendations`: Non-clinical self-care recommendations.
-- `assessment_recommendations`: Recommended items linked to specific assessment completed sessions.
-- `interventions`: Institution-managed wellness intervention events.
-- `intervention_attendance`: Attendance tracking for interventions.
-- `intervention_feedback`: Anonymous student intervention feedback.
-- `audit_logs`: System activity audit records.
+| `01_seed_demo_data.sql` | Demo Seed Data | Seed institutions, departments, cycle, questions, rules, recs | `00` | **PENDING MANUAL EXECUTION** |
+| `02_demo_student_profile.sql` | Demo Student Link | Link Auth user UUID to public.profiles | `00`, `01` | **PENDING MANUAL EXECUTION** |
+| `03_college_institutional_intelligence.sql` | College Analytics | Aggregation functions (>=10 threshold), RLS & interventions seed | `00..02` | **PENDING MANUAL EXECUTION** |
+| `04_government_intelligence.sql` | Government Scope & Aggregation | `government_admin_scopes` table, RPC functions with >=10 threshold | `00..03` | **PENDING MANUAL EXECUTION** |
+| `05_demo_government_dataset.sql` | Synthetic Regional Dataset | Seed Institution 2, departments, gov admin & super admin profiles | `00..04` | **PENDING MANUAL EXECUTION** |
 
 ---
 
-## J. Assessment Engine
-1. **Cycle Check**: Loads current active cycle from `assessment_cycles`.
-2. **Session Initialization**: Creates or retrieves `in_progress` record in `assessments`.
-3. **Base Questions**: Loads active base questions from `questions` and `question_options`.
-4. **Normalized Adaptive Rules**: Evaluates `question_rules` against base response category signals normalized to 0–10. Triggers targeted follow-up questions if category indicator $\le 5.0$.
-5. **Response Persistence**: Atomic upsert to `assessment_responses`.
-6. **Scoring & Completion**: Calculates normalized category scores, maps overall indicator, assigns current band, matches recommendations, and sets `status = 'completed'`.
+## I. Privacy & Anonymity Architecture
+- **Minimum Reporting Threshold:** $\ge 10$ participating students required per department/institution. Groups under 10 return `is_suppressed = TRUE` and `'Insufficient group size for anonymous reporting.'`.
+- **Absolute Data Restrictions:** Government Admin and Super Admin APIs/services **never** query or expose individual student names, emails, roll numbers, reflections, or raw question responses.
+- **Server-Side Authorization Scoping:** Government Admin authorized institutions are derived server-side via `get_government_authorized_institutions(admin_id)`. Manually supplied `institutionId` parameters are strictly checked against the authorized scope before returning data.
 
 ---
 
-## K. Current Wellness Model
-
-### Current Wellness Band
-Calculated from the current completed assessment score:
-- **`8.0 – 10.0`** $\rightarrow$ `stable`
-- **`6.0 – <8.0`** $\rightarrow$ `watch`
-- **`4.0 – <6.0`** $\rightarrow$ `needs_attention`
-- **`0.0 – <4.0`** $\rightarrow$ `elevated`
-
-### Trend Calculation
-Calculated by comparing the current completed assessment overall indicator against the previous completed check-in:
-- $\Delta > +0.3 \longrightarrow \mathbf{improving}$
-- $|\Delta| \le 0.3 \longrightarrow \mathbf{stable}$
-- $\Delta < -0.3 \longrightarrow \mathbf{declining}$
-- No previous assessment $\longrightarrow \mathbf{first\_check\_in}$
+## J. Professional Icon System
+- **Lucide Icon Library (`@lucide/astro`):** Emojis have been completely eliminated from navigation, metric cards, buttons, badges, and headers across Student, College, Government, and Super Admin portals.
+- **Icon Standards:**
+  - Dashboard $\rightarrow$ `LayoutDashboard`
+  - Institutions $\rightarrow$ `Building2`
+  - Insights $\rightarrow$ `ChartNoAxesCombined`
+  - Interventions $\rightarrow$ `CalendarCheck`
+  - Participation / Scope $\rightarrow$ `UsersRound` / `UserCog`
+  - Well-being $\rightarrow$ `HeartPulse`
+  - Privacy / Security $\rightarrow$ `ShieldCheck` / `LockKeyhole`
+  - Trends $\rightarrow$ `TrendingUp` / `TrendingDown` / `Minus`
 
 ---
 
-## L. Privacy Model
-- **Row Level Security (RLS):** Enabled on all public tables.
-- **Student Data Isolation:** Policies enforce `student_id = auth.uid()`.
-- **Raw Response Isolation:** College officers and government admins cannot query individual student response rows.
-- **Service Role Protection:** `SUPABASE_SERVICE_ROLE_KEY` is restricted to server environments and never exposed to the client.
-- **Security Definer Functions:** All privileged database helper functions specify `SECURITY DEFINER SET search_path = public`.
+## K. Diagnostics & Build Verification
+- **`npx astro check`**: Passed cleanly (`Result (80 files): 0 errors, 0 warnings, 6 hints`).
+- **`npm run build`**: Production build succeeded in 5.94s with Vercel adapter compilation.
 
 ---
 
-## M. Design System
-- **Visual Reference:** Google Stitch visual language (light/white background, calm indigo/purple primary `#6366f1`, soft blue secondary `#0284c7`, Inter font, subtle elevation, moderate radius).
-- **Component Architecture:** Reusable Astro UI primitives in [`src/components/ui/`](file:///c:/Projects/YI/NSWEIS/src/components/ui/).
-- **Design Tokens:** Centralized CSS variables in [`src/styles/tokens.css`](file:///c:/Projects/YI/NSWEIS/src/styles/tokens.css).
-
----
-
-## N. Completed Milestones
-- **Milestone 1 — Foundation:** Project initialization, Astro SSR, Vercel adapter, Supabase SSR client, design system tokens, initial database migration, RLS baseline, and core UI components. (COMPLETED)
-- **Milestone 2 — Student Product Flow & Assessment Engine:** Full Student Vertical Slice, Student Dashboard, Check-in Form, Base + Adaptive Questions, Response Persistence, Deterministic Scoring, Current Band vs Trend calculation, Personalized Recommendations, Check-in History, and Authorized Historical Detail Routing. (LOCKED)
-
----
-
-## O. Current Test Readiness
-Ready for end-to-end testing of the complete Student Product Flow:
-1. Authentication (Login / Logout)
-2. Student Dashboard Status Card (`Not Started` / `In Progress` / `Completed`)
-3. Weekly Check-in Execution (Base Questions + Adaptive Follow-ups + Reflection)
-4. Result Submission & Scoring
-5. Wellness Summary & Recommendation display
-6. Check-in History & Historical Detail Routing (`/student/wellness/[assessmentId]`)
-
----
-
-## P. Known Issues
-- None. `npx astro check` passes with 0 errors and `npm run build` succeeds cleanly.
-
----
-
-## Q. Current Milestone
-**Milestone 3 — College Institutional Intelligence & Intervention Management**  
-*(Status: IN PROGRESS — Database schema change 03_college_institutional_intelligence.sql created and pending manual execution.)*
-
----
-
-## R. CTO Rules
+## L. CTO Rules & Directives
 1. Do not redesign architecture without CTO approval.
 2. Do not add features outside the current milestone.
 3. Do not weaken RLS to simplify implementation.

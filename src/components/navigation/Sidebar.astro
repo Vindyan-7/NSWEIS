@@ -2,7 +2,7 @@
 interface NavItem {
   label: string;
   href: string;
-  icon?: string;
+  icon?: any;
   active?: boolean;
 }
 
@@ -23,12 +23,19 @@ const { items, roleTitle = 'NSWEIS Ecosystem' } = Astro.props;
     </div>
   </div>
   <nav class="sidebar-nav">
-    {items.map((item) => (
-      <a href={item.href} class={`nav-link ${item.active ? 'is-active' : ''}`}>
-        {item.icon && <span class="nav-icon">{item.icon}</span>}
-        <span>{item.label}</span>
-      </a>
-    ))}
+    {items.map((item) => {
+      const IconComponent = typeof item.icon === 'function' || (typeof item.icon === 'object' && item.icon !== null) ? item.icon : null;
+      return (
+        <a href={item.href} class={`nav-link ${item.active ? 'is-active' : ''}`}>
+          {IconComponent ? (
+            <IconComponent class="nav-icon-svg" size={18} />
+          ) : (
+            item.icon && <span class="nav-icon">{item.icon}</span>
+          )}
+          <span>{item.label}</span>
+        </a>
+      );
+    })}
   </nav>
 </aside>
 

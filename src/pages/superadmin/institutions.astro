@@ -1,0 +1,246 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getAllInstitutions, createInstitution, updateInstitutionStatus } from '../../services/institutions';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  return Astro.redirect('/superadmin/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action')?.toString();
+
+    if (action === 'create') {
+      const name = formData.get('name')?.toString();
+      const code = formData.get('code')?.toString();
+      const state = formData.get('state')?.toString();
+      const type = formData.get('type')?.toString() as any;
+
+      if (!name || !code) {
+        message = 'Institution Name and Code are required.';
+        isError = true;
+      } else {
+        const res = await createInstitution(supabase, { name, code, state, type, active: true });
+        if (res.success) {
+          message = `Institution '${name}' registered successfully.`;
+        } else {
+          message = res.error || 'Failed to create institution.';
+          isError = true;
+        }
+      }
+    } else if (action === 'toggle') {
+      const instId = formData.get('institution_id')?.toString();
+      const currentActive = formData.get('current_active')?.toString() === 'true';
+      if (instId) {
+        const res = await updateInstitutionStatus(supabase, instId, !currentActive);
+        if (res.success) {
+          message = `Institution status updated successfully.`;
+        } else {
+          message = res.error || 'Failed to update status.';
+          isError = true;
+        }
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An error occurred.';
+    isError = true;
+  }
+}
+
+const institutions = await getAllInstitutions(supabase);
+---
+
+<SuperAdminLayout title="Institution Management" activePath="/superadmin/institutions">
+  <PageHeader
+    title="National Institution Management"
+    subtitle="Register new universities and colleges or toggle institutional active status"
+  >
+    <a href="/superadmin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+    </a>
+  </PageHeader>
+
+  <div class="superadmin-inst-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Error' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    {/* Registration Form */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Register New Institution</h3>
+      <p class="section-subtext">Add a new educational institution to the NSWEIS national ecosystem.</p>
+
+      <form method="POST" class="create-form">
+        <input type="hidden" name="action" value="create" />
+        <div class="form-row">
+          <Input label="Institution Name" name="name" placeholder="e.g. Imperial Institute of Technology" required />
+          <Input label="Short Code" name="code" placeholder="e.g. IIT01" required />
+        </div>
+        <div class="form-row">
+          <Input label="State / Region" name="state" placeholder="e.g. Maharashtra" />
+          <Select label="Institution Type" name="type">
+            <option value="university">University</option>
+            <option value="college" selected>College</option>
+            <option value="autonomous">Autonomous Institute</option>
+            <option value="polytechnic">Polytechnic</option>
+          </Select>
+        </div>
+        <div class="form-actions">
+          <Button variant="primary" type="submit">+ Register Institution</Button>
+        </div>
+      </form>
+    </Card>
+
+    {/* Institutions Table */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Registered Institutions Directory ({institutions.length})</h3>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Institution Name</th>
+              <th>Code</th>
+              <th>State</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {institutions.map((inst) => (
+              <tr>
+                <td class="font-medium">{inst.name}</td>
+                <td><span class="code-badge">{inst.code}</span></td>
+                <td>{inst.state || 'National'}</td>
+                <td class="capitalize">{inst.type || 'college'}</td>
+                <td>
+                  <Badge variant={inst.active ? 'stable' : 'neutral'} size="sm">
+                    {inst.active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </td>
+                <td>
+                  <form method="POST" style="display:inline;">
+                    <input type="hidden" name="action" value="toggle" />
+                    <input type="hidden" name="institution_id" value={inst.id} />
+                    <input type="hidden" name="current_active" value={inst.active ? 'true' : 'false'} />
+                    <Button variant="outline" size="sm" type="submit">
+                      {inst.active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</SuperAdminLayout>
+
+<style>
+  .superadmin-inst-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .create-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin-top: var(--space-4);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .code-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .capitalize {
+    text-transform: capitalize;
+  }
+</style>

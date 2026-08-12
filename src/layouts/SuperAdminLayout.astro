@@ -3,6 +3,7 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
+import { LayoutDashboard, Building2, UserCog, CalendarDays } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -14,11 +15,10 @@ const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 
 const superAdminNav = [
-  { label: 'Dashboard', href: '/superadmin/dashboard', icon: '⚡', active: activePath === '/superadmin/dashboard' },
-  { label: 'Users', href: '/superadmin/users', icon: '👥', active: activePath === '/superadmin/users' },
-  { label: 'Institutions', href: '/superadmin/institutions', icon: '🏫', active: activePath === '/superadmin/institutions' },
-  { label: 'Questions', href: '/superadmin/questions', icon: '❓', active: activePath === '/superadmin/questions' },
-  { label: 'Settings', href: '/superadmin/settings', icon: '⚙️', active: activePath === '/superadmin/settings' },
+  { label: 'System Overview', href: '/superadmin/dashboard', icon: LayoutDashboard, active: activePath === '/superadmin/dashboard' },
+  { label: 'Institutions', href: '/superadmin/institutions', icon: Building2, active: activePath === '/superadmin/institutions' },
+  { label: 'Admin Scopes', href: '/superadmin/scopes', icon: UserCog, active: activePath === '/superadmin/scopes' },
+  { label: 'Cycles', href: '/superadmin/cycles', icon: CalendarDays, active: activePath === '/superadmin/cycles' },
 ];
 ---
 
@@ -37,9 +37,9 @@ const superAdminNav = [
   </head>
   <body>
     <div class="app-layout">
-      <Sidebar items={superAdminNav} roleTitle="Super Admin" />
+      <Sidebar items={superAdminNav} roleTitle="System Super Admin" />
       <div class="app-main-area">
-        <Header userName={profile?.full_name || user?.email || 'Super Admin'} userRole="Super Admin" />
+        <Header userName={profile?.full_name || user?.email || 'Super Administrator'} userRole="Super Admin" />
         <main class="app-content container">
           <slot />
         </main>

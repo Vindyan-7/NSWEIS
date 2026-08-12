@@ -1,5 +1,6 @@
 ---
 import Alert from '../ui/Alert.astro';
+import { ShieldCheck } from '@lucide/astro';
 
 interface Props {
   variant?: 'compact' | 'full';
@@ -10,7 +11,7 @@ const { variant = 'compact' } = Astro.props;
 
 {variant === 'compact' ? (
   <div class="privacy-notice-compact">
-    <span class="privacy-icon">🛡️</span>
+    <ShieldCheck size={18} class="privacy-icon-svg" />
     <span class="privacy-text">
       <strong>Privacy Protection Enforced:</strong> Individual response PII is strictly isolated. Institutional dashboards receive aggregated insights only.
     </span>

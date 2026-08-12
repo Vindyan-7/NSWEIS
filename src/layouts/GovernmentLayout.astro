@@ -3,22 +3,22 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
-
-import { LayoutDashboard, ChartNoAxesCombined, CalendarCheck } from '@lucide/astro';
+import { LayoutDashboard, Building2, ChartNoAxesCombined, CalendarCheck } from '@lucide/astro';
 
 interface Props {
   title: string;
   activePath?: string;
 }
 
-const { title, activePath = '/college/dashboard' } = Astro.props;
+const { title, activePath = '/admin/dashboard' } = Astro.props;
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 
-const collegeNav = [
-  { label: 'Dashboard', href: '/college/dashboard', icon: LayoutDashboard, active: activePath === '/college/dashboard' },
-  { label: 'Aggregate Insights', href: '/college/insights', icon: ChartNoAxesCombined, active: activePath === '/college/insights' },
-  { label: 'Interventions', href: '/college/interventions', icon: CalendarCheck, active: activePath === '/college/interventions' },
+const govNav = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, active: activePath === '/admin/dashboard' },
+  { label: 'Institutions', href: '/admin/institutions', icon: Building2, active: activePath === '/admin/institutions' },
+  { label: 'Insights', href: '/admin/insights', icon: ChartNoAxesCombined, active: activePath === '/admin/insights' },
+  { label: 'Interventions', href: '/admin/interventions', icon: CalendarCheck, active: activePath === '/admin/interventions' },
 ];
 ---
 
@@ -27,7 +27,7 @@ const collegeNav = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title} — College Portal | NSWEIS</title>
+    <title>{title} — Government Intelligence | NSWEIS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -37,14 +37,14 @@ const collegeNav = [
   </head>
   <body>
     <div class="app-layout">
-      <Sidebar items={collegeNav} roleTitle="College Wellness Officer" />
+      <Sidebar items={govNav} roleTitle="Government Administrator" />
       <div class="app-main-area">
-        <Header userName={profile?.full_name || user?.email || 'Officer'} userRole="College Officer" />
+        <Header userName={profile?.full_name || user?.email || 'Government Officer'} userRole="Government Admin" />
         <main class="app-content container">
           <slot />
         </main>
       </div>
-      <MobileNav items={collegeNav} />
+      <MobileNav items={govNav} />
     </div>
   </body>
 </html>

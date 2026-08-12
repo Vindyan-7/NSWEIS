@@ -1,0 +1,187 @@
+---
+import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { Building2 } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getAuthorizedInstitutions } from '../../services/institutions';
+import { getInstitutionInterventions } from '../../services/interventions';
+import type { Intervention } from '../../types/domain';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+}
+
+const authorizedInstitutions = await getAuthorizedInstitutions(supabase, user.id);
+const instMap = new Map(authorizedInstitutions.map((i) => [i.id, i.name]));
+
+const allInterventions: (Intervention & { institution_name?: string })[] = [];
+
+for (const inst of authorizedInstitutions) {
+  const items = await getInstitutionInterventions(supabase, inst.id);
+  items.forEach((item) => {
+    allInterventions.push({
+      ...item,
+      institution_name: inst.name,
+    });
+  });
+}
+---
+
+<GovernmentLayout title="Intervention Oversight" activePath="/admin/interventions">
+  <PageHeader
+    title="Cross-Institutional Intervention Oversight"
+    subtitle="Monitor aggregate support programs and non-clinical wellness initiatives across authorized scope"
+  >
+    <a href="/admin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-interventions-layout">
+    <Card padding="lg">
+      <div class="section-header">
+        <h3 class="card-section-title">Institutional Support Programs ({allInterventions.length})</h3>
+        <Badge variant="neutral" size="sm">Oversight View Only</Badge>
+      </div>
+      <p class="section-subtext">Government oversight tracks program scheduling, aggregate attendance, and observed category indicator changes.</p>
+
+      {allInterventions.length === 0 ? (
+        <EmptyState
+          title="No Active Interventions Scheduled"
+          description="None of your authorized institutions currently have scheduled wellness interventions."
+        />
+      ) : (
+        <div class="interventions-list-grid">
+          {allInterventions.map((item) => (
+            <div class="gov-intervention-card">
+              <div class="card-header-row">
+                <span class="inst-tag"><Building2 size={14} /> {item.institution_name}</span>
+                <Badge variant={item.status === 'scheduled' ? 'primary' : 'neutral'} size="sm">
+                  {item.status}
+                </Badge>
+              </div>
+
+              <div class="card-body">
+                <span class="cat-pill">{item.category.replace('_', ' ')}</span>
+                <h4 class="program-title">{item.title}</h4>
+                <p class="program-desc">{item.description}</p>
+              </div>
+
+              <div class="card-footer">
+                <span class="meta">Location: <strong>{item.location}</strong></span>
+                <span class="meta">Scheduled: <strong>{new Date(item.scheduled_at).toLocaleDateString()}</strong></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</GovernmentLayout>
+
+<style>
+  .gov-interventions-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-6);
+  }
+
+  .interventions-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .gov-intervention-card {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-subtle);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .inst-tag {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+  }
+
+  .cat-pill {
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
+  .program-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-top: 0.125rem;
+    margin-bottom: var(--space-1);
+  }
+
+  .program-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+</style>
