@@ -206,7 +206,18 @@ NSWEIS/
 
 ---
 
-## I. Database Tables
+## I. Database Architecture & Manual SQL Workflow
+
+### Manual SQL Change Registry
+The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager using the Supabase Dashboard SQL Editor. Antigravity never connects directly to PostgreSQL or requests database credentials.
+
+| SQL File | Feature | Purpose | Dependency | Execution Status |
+|---|---|---|---|---|
+| `00_initial_schema.sql` | Initial Schema | Create enums, tables, FKs, indexes, RLS & functions | None | **PENDING MANUAL EXECUTION** |
+| `01_seed_demo_data.sql` | Demo Seed Data | Seed institutions, departments, cycle, questions, rules, recs | `00_initial_schema.sql` | **PENDING MANUAL EXECUTION** |
+| `02_demo_student_profile.sql` | Demo Student Link | Link Auth user UUID to public.profiles | `00_initial_schema.sql`, `01_seed_demo_data.sql` | **PENDING MANUAL EXECUTION** |
+
+### Database Tables Summary
 - `profiles`: Linked to `auth.users.id`. Stores user role, institution, department, and student details.
 - `institutions`: Higher education campus entities.
 - `departments`: Academic departments per institution.
