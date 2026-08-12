@@ -1,0 +1,47 @@
+---
+interface Props {
+  type?: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  id?: string;
+}
+
+const { type = 'info', message, id } = Astro.props;
+---
+
+<div id={id} class={`toast toast-${type}`}>
+  <span class="toast-message">{message}</span>
+</div>
+
+<style>
+  .toast {
+    position: fixed;
+    bottom: var(--space-6);
+    right: var(--space-6);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-lg);
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .toast-info {
+    background-color: var(--color-primary-900);
+    color: var(--color-text-inverse);
+  }
+  .toast-success {
+    background-color: var(--color-band-stable);
+    color: var(--color-text-inverse);
+  }
+  .toast-warning {
+    background-color: var(--color-band-attention);
+    color: var(--color-text-main);
+  }
+  .toast-error {
+    background-color: var(--color-band-elevated);
+    color: var(--color-text-inverse);
+  }
+</style>

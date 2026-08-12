@@ -1,0 +1,103 @@
+---
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  label?: string;
+  id?: string;
+  name?: string;
+  options: Option[];
+  value?: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  class?: string;
+}
+
+const {
+  label,
+  id,
+  name,
+  options = [],
+  value,
+  placeholder = 'Select an option',
+  required = false,
+  disabled = false,
+  error,
+  class: className = '',
+  ...rest
+} = Astro.props;
+---
+
+<div class={`select-wrapper ${className}`}>
+  {label && (
+    <label for={id || name} class="select-label">
+      {label} {required && <span class="required-star">*</span>}
+    </label>
+  )}
+  <select
+    id={id || name}
+    name={name}
+    required={required}
+    disabled={disabled}
+    class={`select-field ${error ? 'has-error' : ''}`}
+    {...rest}
+  >
+    {placeholder && <option value="" disabled selected={!value}>{placeholder}</option>}
+    {options.map((opt) => (
+      <option value={opt.value} selected={opt.value === value}>
+        {opt.label}
+      </option>
+    ))}
+  </select>
+  {error && <span class="select-error">{error}</span>}
+</div>
+
+<style>
+  .select-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 100%;
+  }
+
+  .select-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+
+  .required-star {
+    color: var(--color-band-elevated);
+  }
+
+  .select-field {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    font-size: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .select-field:focus {
+    border-color: var(--color-primary-500);
+    box-shadow: var(--focus-ring);
+  }
+
+  .select-field.has-error {
+    border-color: var(--color-band-elevated);
+  }
+
+  .select-error {
+    font-size: 0.8125rem;
+    color: var(--color-band-elevated);
+  }
+</style>

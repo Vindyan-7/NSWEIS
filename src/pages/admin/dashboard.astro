@@ -1,0 +1,21 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+---
+
+<AdminLayout title="Government Overview" activePath="/admin/dashboard">
+  <PageHeader
+    title="National Student Well-being Oversight"
+    subtitle="Statewide adoption, institutional adoption rates, and intervention compliance."
+  />
+
+  <PrivacyNotice variant="compact" />
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+    <MetricCard title="Participating Institutions" value="128" change="+12" changeType="positive" subtitle="Active higher education campuses" />
+    <MetricCard title="National Participation" value="79.2%" subtitle="Across all registered colleges" />
+    <MetricCard title="Total Interventions Managed" value="342" change="+45 this cycle" changeType="positive" subtitle="Targeted institutional programs" />
+  </div>
+</AdminLayout>

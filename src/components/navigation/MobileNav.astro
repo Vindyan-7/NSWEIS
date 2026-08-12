@@ -1,0 +1,68 @@
+---
+interface NavItem {
+  label: string;
+  href: string;
+  icon?: string;
+  active?: boolean;
+}
+
+interface Props {
+  items: NavItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<nav class="mobile-nav glass-panel">
+  {items.map((item) => (
+    <a href={item.href} class={`mobile-nav-item ${item.active ? 'is-active' : ''}`}>
+      {item.icon && <span class="mobile-nav-icon">{item.icon}</span>}
+      <span class="mobile-nav-label">{item.label}</span>
+    </a>
+  ))}
+</nav>
+
+<style>
+  .mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop-filter);
+    border-top: 1px solid var(--color-border-subtle);
+    z-index: 200;
+    padding: 0 var(--space-2);
+  }
+
+  @media (max-width: 768px) {
+    .mobile-nav {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .mobile-nav-item.is-active {
+    color: var(--color-primary-600);
+    font-weight: 600;
+  }
+
+  .mobile-nav-icon {
+    font-size: 1.25rem;
+  }
+</style>

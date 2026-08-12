@@ -1,0 +1,57 @@
+---
+interface Props {
+  type?: 'info' | 'success' | 'warning' | 'error';
+  title?: string;
+  class?: string;
+}
+
+const { type = 'info', title, class: className = '' } = Astro.props;
+---
+
+<div class={`alert alert-${type} ${className}`} role="alert">
+  {title && <h5 class="alert-title">{title}</h5>}
+  <div class="alert-content">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .alert {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    border: 1px solid transparent;
+  }
+
+  .alert-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .alert-info {
+    background-color: var(--color-primary-50);
+    border-color: var(--color-primary-200);
+    color: var(--color-primary-900);
+  }
+
+  .alert-success {
+    background-color: var(--color-band-stable-bg);
+    border-color: var(--color-band-stable-border);
+    color: #065f46;
+  }
+
+  .alert-warning {
+    background-color: var(--color-band-attention-bg);
+    border-color: var(--color-band-attention-border);
+    color: #92400e;
+  }
+
+  .alert-error {
+    background-color: var(--color-band-elevated-bg);
+    border-color: var(--color-band-elevated-border);
+    color: #991b1b;
+  }
+</style>

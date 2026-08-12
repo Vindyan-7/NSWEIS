@@ -1,0 +1,53 @@
+---
+import Alert from '../ui/Alert.astro';
+
+interface Props {
+  variant?: 'compact' | 'full';
+}
+
+const { variant = 'compact' } = Astro.props;
+---
+
+{variant === 'compact' ? (
+  <div class="privacy-notice-compact">
+    <span class="privacy-icon">🛡️</span>
+    <span class="privacy-text">
+      <strong>Privacy Protection Enforced:</strong> Individual response PII is strictly isolated. Institutional dashboards receive aggregated insights only.
+    </span>
+  </div>
+) : (
+  <Alert type="info" title="Privacy Architecture & Safety Guarantee">
+    <p>
+      NSWEIS is a student well-being early-intervention platform designed with strict privacy boundaries:
+    </p>
+    <ul class="privacy-list">
+      <li><strong>No Clinical Diagnostic Claim:</strong> Indicators measure subjective well-being trends, not psychiatric diagnoses.</li>
+      <li><strong>Strict Row Isolation:</strong> Individual student responses are secured by PostgreSQL Row Level Security (RLS).</li>
+      <li><strong>Aggregation Only:</strong> College officers and government administrators view anonymized, aggregate metrics only.</li>
+    </ul>
+  </Alert>
+)}
+
+<style>
+  .privacy-notice-compact {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: var(--color-primary-900);
+  }
+
+  .privacy-icon {
+    font-size: 1rem;
+  }
+
+  .privacy-list {
+    margin-top: var(--space-2);
+    padding-left: var(--space-4);
+    line-height: 1.6;
+  }
+</style>

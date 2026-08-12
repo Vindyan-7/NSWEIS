@@ -1,0 +1,60 @@
+---
+import Textarea from '../ui/Textarea.astro';
+
+interface Props {
+  id?: string;
+  name?: string;
+  value?: string;
+  placeholder?: string;
+}
+
+const {
+  id = 'reflection_text',
+  name = 'reflection_text',
+  value,
+  placeholder = 'Optional self-reflection notes (strictly private to your account)...',
+} = Astro.props;
+---
+
+<div class="reflection-box">
+  <div class="reflection-header">
+    <span class="reflection-icon">🔒</span>
+    <span class="reflection-privacy">Strictly Confidential & Private</span>
+  </div>
+  <Textarea
+    id={id}
+    name={name}
+    value={value}
+    placeholder={placeholder}
+    rows={3}
+    label="Private Self-Reflection"
+    helperText="Your private reflection notes are never shared with institutional administrators or government dashboards."
+  />
+</div>
+
+<style>
+  .reflection-box {
+    background-color: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-4);
+    margin-top: var(--space-6);
+  }
+
+  .reflection-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .reflection-icon {
+    font-size: 0.875rem;
+  }
+
+  .reflection-privacy {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+  }
+</style>

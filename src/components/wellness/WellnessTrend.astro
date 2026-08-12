@@ -1,0 +1,109 @@
+---
+import Card from '../ui/Card.astro';
+
+interface TrendPoint {
+  week: string;
+  score: number;
+}
+
+interface Props {
+  points?: TrendPoint[];
+  title?: string;
+}
+
+const {
+  points = [
+    { week: 'W1', score: 6.5 },
+    { week: 'W2', score: 7.0 },
+    { week: 'W3', score: 7.2 },
+    { week: 'W4', score: 7.8 },
+  ],
+  title = 'Wellness Trend',
+} = Astro.props;
+---
+
+<Card padding="md">
+  <div class="trend-header">
+    <h4 class="trend-title">{title}</h4>
+    <span class="trend-tag">4-Week Progression</span>
+  </div>
+  <div class="trend-chart">
+    {points.map((p) => {
+      const heightPercent = Math.min(Math.max((p.score / 10) * 100, 10), 100);
+      return (
+        <div class="trend-bar-wrapper">
+          <div class="trend-bar-track">
+            <div class="trend-bar-fill" style={`height: ${heightPercent}%;`}></div>
+          </div>
+          <span class="trend-bar-val">{p.score}</span>
+          <span class="trend-bar-label">{p.week}</span>
+        </div>
+      );
+    })}
+  </div>
+</Card>
+
+<style>
+  .trend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .trend-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .trend-tag {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .trend-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 120px;
+    padding-top: var(--space-4);
+  }
+
+  .trend-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    height: 100%;
+    width: 2.5rem;
+  }
+
+  .trend-bar-track {
+    flex: 1;
+    width: 0.75rem;
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+
+  .trend-bar-fill {
+    width: 100%;
+    background-color: var(--color-primary-600);
+    border-radius: var(--radius-full);
+    transition: height var(--transition-normal);
+  }
+
+  .trend-bar-val {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .trend-bar-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+</style>

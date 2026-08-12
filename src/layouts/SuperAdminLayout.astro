@@ -1,0 +1,70 @@
+---
+import '../styles/globals.css';
+import Header from '../components/navigation/Header.astro';
+import Sidebar from '../components/navigation/Sidebar.astro';
+import MobileNav from '../components/navigation/MobileNav.astro';
+
+interface Props {
+  title: string;
+  activePath?: string;
+}
+
+const { title, activePath = '/superadmin/dashboard' } = Astro.props;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+const superAdminNav = [
+  { label: 'Dashboard', href: '/superadmin/dashboard', icon: '⚡', active: activePath === '/superadmin/dashboard' },
+  { label: 'Users', href: '/superadmin/users', icon: '👥', active: activePath === '/superadmin/users' },
+  { label: 'Institutions', href: '/superadmin/institutions', icon: '🏫', active: activePath === '/superadmin/institutions' },
+  { label: 'Questions', href: '/superadmin/questions', icon: '❓', active: activePath === '/superadmin/questions' },
+  { label: 'Settings', href: '/superadmin/settings', icon: '⚙️', active: activePath === '/superadmin/settings' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — Super Admin Portal | NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar items={superAdminNav} roleTitle="Super Admin" />
+      <div class="app-main-area">
+        <Header userName={profile?.full_name || user?.email || 'Super Admin'} userRole="Super Admin" />
+        <main class="app-content container">
+          <slot />
+        </main>
+      </div>
+      <MobileNav items={superAdminNav} />
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .app-content {
+    flex: 1;
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-16);
+  }
+</style>

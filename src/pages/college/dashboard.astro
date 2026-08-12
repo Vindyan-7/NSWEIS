@@ -1,0 +1,21 @@
+---
+import CollegeLayout from '../../layouts/CollegeLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+---
+
+<CollegeLayout title="College Dashboard" activePath="/college/dashboard">
+  <PageHeader
+    title="College Institutional Wellness Dashboard"
+    subtitle="Aggregate insights & active preventative intervention programs."
+  />
+
+  <PrivacyNotice variant="compact" />
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+    <MetricCard title="Student Participation Rate" value="84.5%" change="+3.2%" changeType="positive" subtitle="Active weekly cycle" />
+    <MetricCard title="Institutional Wellness Index" value="7.4 / 10" change="Stable" changeType="neutral" subtitle="Category aggregate" />
+    <MetricCard title="Active Interventions" value="4" subtitle="Scheduled this month" />
+  </div>
+</CollegeLayout>

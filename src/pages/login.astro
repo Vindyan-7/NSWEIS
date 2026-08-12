@@ -1,0 +1,171 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import Card from '../components/ui/Card.astro';
+import Input from '../components/ui/Input.astro';
+import Button from '../components/ui/Button.astro';
+import Alert from '../components/ui/Alert.astro';
+import { createSupabaseServerClient } from '../lib/supabase/server';
+import { validateLoginInput } from '../lib/validation/schemas';
+import { getDashboardForRole } from '../lib/permissions/roles';
+
+let errorMessage = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const validation = validateLoginInput(formData);
+
+    if (!validation.success) {
+      errorMessage = Object.values(validation.errors || {})[0] || 'Invalid credentials';
+    } else {
+      const { email, password } = validation.data!;
+      const supabase = createSupabaseServerClient(Astro);
+
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError || !authData.user) {
+        errorMessage = authError?.message || 'Authentication failed. Please check your credentials.';
+      } else {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profile) {
+          return Astro.redirect(getDashboardForRole((profile as any).role));
+        } else {
+          return Astro.redirect('/student/dashboard');
+        }
+      }
+    }
+  } catch (err: any) {
+    errorMessage = err?.message || 'An unexpected error occurred.';
+  }
+}
+---
+
+<PublicLayout title="Login — NSWEIS">
+  <div class="login-container">
+    <Card padding="lg" class="login-card glass-panel">
+      <div class="login-header">
+        <h2 class="login-title">Sign In</h2>
+        <p class="login-sub">Access your NSWEIS portal role dashboard</p>
+      </div>
+
+      {errorMessage && <Alert type="error" title="Login Failed">{errorMessage}</Alert>}
+
+      <form method="POST" class="login-form">
+        <Input
+          label="Email Address"
+          type="email"
+          name="email"
+          placeholder="student@demo.nsweis.gov.in"
+          required
+        />
+        <Input
+          label="Password"
+          type="password"
+          name="password"
+          placeholder="••••••••"
+          required
+        />
+        <Button type="submit" variant="primary" class="login-submit">
+          Sign In &rarr;
+        </Button>
+      </form>
+
+      <div class="demo-hints">
+        <p class="hints-title">Demo Role Credentials:</p>
+        <ul>
+          <li><strong>Student:</strong> <code>student@demo.nsweis.gov.in</code></li>
+          <li><strong>College Officer:</strong> <code>college@demo.nsweis.gov.in</code></li>
+          <li><strong>Government Admin:</strong> <code>admin@demo.nsweis.gov.in</code></li>
+          <li><strong>Super Admin:</strong> <code>super@demo.nsweis.gov.in</code></li>
+        </ul>
+        <p class="hint-pass">Password: <code>DemoPass2026!</code></p>
+      </div>
+    </Card>
+  </div>
+</PublicLayout>
+
+<style>
+  .login-container {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .login-header {
+    text-align: center;
+  }
+
+  .login-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .login-sub {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .login-submit {
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+
+  .demo-hints {
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .hints-title {
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .demo-hints ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .demo-hints code {
+    background-color: var(--color-bg-surface);
+    padding: 0.1rem 0.3rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+  }
+
+  .hint-pass {
+    margin-top: var(--space-2);
+    font-size: 0.8125rem;
+  }
+</style>

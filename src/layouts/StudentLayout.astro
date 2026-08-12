@@ -1,0 +1,70 @@
+---
+import '../styles/globals.css';
+import Header from '../components/navigation/Header.astro';
+import Sidebar from '../components/navigation/Sidebar.astro';
+import MobileNav from '../components/navigation/MobileNav.astro';
+
+interface Props {
+  title: string;
+  activePath?: string;
+}
+
+const { title, activePath = '/student/dashboard' } = Astro.props;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+const studentNav = [
+  { label: 'Dashboard', href: '/student/dashboard', icon: '🏠', active: activePath === '/student/dashboard' },
+  { label: 'Weekly Check-in', href: '/student/check-in', icon: '📋', active: activePath === '/student/check-in' },
+  { label: 'Wellness Summary', href: '/student/wellness', icon: '💚', active: activePath === '/student/wellness' },
+  { label: 'History', href: '/student/history', icon: '📜', active: activePath === '/student/history' },
+  { label: 'Profile', href: '/student/profile', icon: '👤', active: activePath === '/student/profile' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — Student Portal | NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar items={studentNav} roleTitle="Student Portal" />
+      <div class="app-main-area">
+        <Header userName={profile?.full_name || user?.email || 'Student'} userRole="Student" />
+        <main class="app-content container">
+          <slot />
+        </main>
+      </div>
+      <MobileNav items={studentNav} />
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .app-content {
+    flex: 1;
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-16);
+  }
+</style>

@@ -1,0 +1,147 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Alert from '../../components/ui/Alert.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import QuestionCard from '../../components/assessment/QuestionCard.astro';
+import ReflectionBox from '../../components/assessment/ReflectionBox.astro';
+import AssessmentProgress from '../../components/assessment/AssessmentProgress.astro';
+import AssessmentNavigation from '../../components/assessment/AssessmentNavigation.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import {
+  getActiveAssessmentCycle,
+  getOrCreateStudentAssessment,
+  getBaseQuestions,
+  submitAssessmentResponsesAndScore,
+} from '../../services/assessments';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+let errorMessage = '';
+
+const activeCycle = await getActiveAssessmentCycle(supabase);
+
+if (!activeCycle) {
+  errorMessage = 'No active assessment cycle is open at this time.';
+}
+
+const assessment = user && activeCycle ? await getOrCreateStudentAssessment(supabase, user.id, activeCycle.id) : null;
+
+const baseQuestions = await getBaseQuestions(supabase);
+
+// Handle POST Submission
+if (Astro.request.method === 'POST' && user && assessment) {
+  try {
+    const formData = await Astro.request.formData();
+    const rawResponses: Array<{
+      questionId: string;
+      category: any;
+      selectedOptionId?: string;
+      score: number;
+      weight: number;
+      textResponse?: string;
+    }> = [];
+
+    // Parse base questions and follow-ups
+    for (const [key, val] of formData.entries()) {
+      if (key.startsWith('q_')) {
+        const questionId = key.replace('q_', '');
+        const selectedOptionId = val as string;
+        
+        // Find question in base or all questions
+        const q = baseQuestions.find((item) => item.id === questionId);
+        if (q && q.options) {
+          const opt = q.options.find((o) => o.id === selectedOptionId);
+          if (opt) {
+            rawResponses.push({
+              questionId,
+              category: q.category,
+              selectedOptionId,
+              score: Number(opt.score),
+              weight: Number(q.weight || 1.0),
+            });
+          }
+        }
+      }
+    }
+
+    const reflectionText = (formData.get('reflection_text') as string || '').trim();
+    if (reflectionText && rawResponses.length > 0) {
+      rawResponses[0].textResponse = reflectionText;
+    }
+
+    const submitResult = await submitAssessmentResponsesAndScore(
+      supabase,
+      assessment.id,
+      rawResponses
+    );
+
+    if (submitResult.success) {
+      return Astro.redirect('/student/wellness');
+    } else {
+      errorMessage = submitResult.error || 'Failed to submit check-in.';
+    }
+  } catch (err: any) {
+    errorMessage = err?.message || 'An unexpected error occurred during submission.';
+  }
+}
+---
+
+<StudentLayout title="Weekly Check-in" activePath="/student/check-in">
+  <PageHeader
+    title="Weekly Well-being Reflection"
+    subtitle="Confidential self-reflection check-in"
+  />
+
+  {errorMessage && <Alert type="error" title="Assessment Notice">{errorMessage}</Alert>}
+
+  {!activeCycle ? (
+    <Card padding="lg">
+      <p>There are no active weekly check-in cycles available currently. Please check back soon.</p>
+    </Card>
+  ) : (
+    <div class="assessment-container">
+      <Card padding="lg" class="assessment-card glass-panel">
+        <form method="POST" id="checkin-form">
+          <AssessmentProgress currentStep={1} totalSteps={baseQuestions.length + 1} stepName="Base Self-Reflection" />
+
+          <div class="questions-list">
+            {baseQuestions.map((q, idx) => (
+              <QuestionCard
+                question={q}
+                questionNumber={idx + 1}
+              />
+            ))}
+          </div>
+
+          <ReflectionBox />
+
+          <PrivacyNotice variant="compact" />
+
+          <AssessmentNavigation isLastStep={true} isSubmitting={false} />
+        </form>
+      </Card>
+    </div>
+  )}
+</StudentLayout>
+
+<style>
+  .assessment-container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .assessment-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+</style>

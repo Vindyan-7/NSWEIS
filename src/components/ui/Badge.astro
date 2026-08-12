@@ -1,0 +1,83 @@
+---
+interface Props {
+  variant?: 'stable' | 'watch' | 'needs_attention' | 'elevated' | 'improving' | 'declining' | 'neutral' | 'primary';
+  size?: 'sm' | 'md';
+  class?: string;
+}
+
+const { variant = 'neutral', size = 'md', class: className = '' } = Astro.props;
+---
+
+<span class={`badge badge-${variant} badge-${size} ${className}`}>
+  <slot />
+</span>
+
+<style>
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .badge-sm {
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .badge-md {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .badge-stable {
+    background-color: var(--color-band-stable-bg);
+    color: var(--color-band-stable);
+    border: 1px solid var(--color-band-stable-border);
+  }
+
+  .badge-watch {
+    background-color: var(--color-band-improving-bg);
+    color: var(--color-band-improving);
+    border: 1px solid var(--color-band-improving-border);
+  }
+
+  .badge-improving {
+    background-color: var(--color-band-stable-bg);
+    color: var(--color-band-stable);
+    border: 1px solid var(--color-band-stable-border);
+  }
+
+  .badge-declining {
+    background-color: var(--color-band-attention-bg);
+    color: var(--color-band-attention);
+    border: 1px solid var(--color-band-attention-border);
+  }
+
+  .badge-needs_attention {
+    background-color: var(--color-band-attention-bg);
+    color: var(--color-band-attention);
+    border: 1px solid var(--color-band-attention-border);
+  }
+
+  .badge-elevated {
+    background-color: var(--color-band-elevated-bg);
+    color: var(--color-band-elevated);
+    border: 1px solid var(--color-band-elevated-border);
+  }
+
+  .badge-neutral {
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .badge-primary {
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-600);
+    border: 1px solid var(--color-primary-200);
+  }
+</style>

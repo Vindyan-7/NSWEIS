@@ -1,0 +1,101 @@
+---
+interface Props {
+  label?: string;
+  id?: string;
+  name?: string;
+  value?: string;
+  placeholder?: string;
+  rows?: number;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  helperText?: string;
+  class?: string;
+}
+
+const {
+  label,
+  id,
+  name,
+  value,
+  placeholder,
+  rows = 4,
+  required = false,
+  disabled = false,
+  error,
+  helperText,
+  class: className = '',
+  ...rest
+} = Astro.props;
+---
+
+<div class={`textarea-wrapper ${className}`}>
+  {label && (
+    <label for={id || name} class="textarea-label">
+      {label} {required && <span class="required-star">*</span>}
+    </label>
+  )}
+  <textarea
+    id={id || name}
+    name={name}
+    rows={rows}
+    placeholder={placeholder}
+    required={required}
+    disabled={disabled}
+    class={`textarea-field ${error ? 'has-error' : ''}`}
+    {...rest}
+  >{value}</textarea>
+  {error && <span class="textarea-error">{error}</span>}
+  {!error && helperText && <span class="textarea-helper">{helperText}</span>}
+</div>
+
+<style>
+  .textarea-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 100%;
+  }
+
+  .textarea-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+
+  .required-star {
+    color: var(--color-band-elevated);
+  }
+
+  .textarea-field {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    font-size: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    outline: none;
+    resize: vertical;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .textarea-field:focus {
+    border-color: var(--color-primary-500);
+    box-shadow: var(--focus-ring);
+  }
+
+  .textarea-field.has-error {
+    border-color: var(--color-band-elevated);
+  }
+
+  .textarea-error {
+    font-size: 0.8125rem;
+    color: var(--color-band-elevated);
+  }
+
+  .textarea-helper {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+</style>

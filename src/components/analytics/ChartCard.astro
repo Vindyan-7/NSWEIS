@@ -1,0 +1,48 @@
+---
+import Card from '../ui/Card.astro';
+
+interface Props {
+  title: string;
+  subtitle?: string;
+  class?: string;
+}
+
+const { title, subtitle, class: className = '' } = Astro.props;
+---
+
+<Card padding="md" class={className}>
+  <div class="chart-header">
+    <div>
+      <h4 class="chart-title">{title}</h4>
+      {subtitle && <p class="chart-subtitle">{subtitle}</p>}
+    </div>
+  </div>
+  <div class="chart-content">
+    <slot />
+  </div>
+</Card>
+
+<style>
+  .chart-header {
+    margin-bottom: var(--space-4);
+  }
+
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .chart-subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .chart-content {
+    width: 100%;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style>

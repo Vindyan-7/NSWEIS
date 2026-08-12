@@ -1,0 +1,134 @@
+---
+import '../styles/globals.css';
+import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="public-layout">
+      <header class="public-nav glass-panel">
+        <div class="container nav-content">
+          <a href="/" class="nav-brand">
+            <div class="logo">NS</div>
+            <span class="brand-title">NSWEIS</span>
+          </a>
+          <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/login" class="nav-login-btn">Login</a>
+          </div>
+        </div>
+      </header>
+      <main class="public-main">
+        <slot />
+      </main>
+      <footer class="public-footer">
+        <div class="container footer-content">
+          <PrivacyNotice variant="compact" />
+          <p class="footer-copy">&copy; 2026 National Student Well-being Early Intervention System (NSWEIS). Non-clinical early-intervention ecosystem.</p>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
+
+<style>
+  .public-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .public-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .nav-content {
+    height: 4rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    background-color: var(--color-primary-600);
+    color: var(--color-text-inverse);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+
+  .brand-title {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--color-text-main);
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    font-weight: 500;
+  }
+
+  .nav-login-btn {
+    background-color: var(--color-primary-600);
+    color: var(--color-text-inverse) !important;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .public-main {
+    flex: 1;
+  }
+
+  .public-footer {
+    padding: var(--space-8) 0;
+    border-top: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-surface);
+  }
+
+  .footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    text-align: center;
+  }
+
+  .footer-copy {
+    font-size: 0.8125rem;
+    color: var(--color-text-subtle);
+  }
+</style>

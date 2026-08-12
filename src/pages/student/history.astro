@@ -1,0 +1,114 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Button from '../../components/ui/Button.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getStudentAssessmentHistory } from '../../services/assessments';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+const history = user ? await getStudentAssessmentHistory(supabase, user.id) : [];
+---
+
+<StudentLayout title="Check-in History" activePath="/student/history">
+  <PageHeader
+    title="Weekly Check-in History"
+    subtitle="Review your previous self-reflections and well-being progression"
+  />
+
+  {history.length === 0 ? (
+    <Card padding="lg">
+      <EmptyState
+        title="No completed check-in history"
+        description="Your completed weekly check-ins will appear here over time."
+      >
+        <a href="/student/check-in">
+          <Button variant="primary">Start Your First Check-in</Button>
+        </a>
+      </EmptyState>
+    </Card>
+  ) : (
+    <div class="history-list">
+      {history.map((item: any) => (
+        <Card padding="md" class="history-card">
+          <div class="history-header">
+            <div>
+              <h4 class="history-title">{item.cycle?.name || 'Weekly Check-in'}</h4>
+              <span class="history-date">
+                Completed on {new Date(item.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+            <div class="history-meta">
+              <Badge variant={item.overall_band || 'stable'}>
+                {(item.overall_band || 'stable').replace('_', ' ')}
+              </Badge>
+              <span class="history-score">{item.overall_indicator ? item.overall_indicator.toFixed(1) : '--'} / 10</span>
+            </div>
+          </div>
+          <div class="history-footer">
+            <a href={`/student/wellness/${item.id}`}>
+              <Button variant="outline" size="sm">View Result Details &rarr;</Button>
+            </a>
+          </div>
+        </Card>
+      ))}
+
+      <PrivacyNotice variant="compact" />
+    </div>
+  )}
+</StudentLayout>
+
+<style>
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .history-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .history-title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .history-date {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .history-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .history-score {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--color-primary-600);
+  }
+
+  .history-footer {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--color-border-subtle);
+    padding-top: var(--space-3);
+  }
+</style>

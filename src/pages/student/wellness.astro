@@ -1,0 +1,245 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import WellnessSnapshot from '../../components/wellness/WellnessSnapshot.astro';
+import CategoryIndicator from '../../components/wellness/CategoryIndicator.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { calculateTrend } from '../../lib/scoring/engine';
+import {
+  getLatestCompletedAssessment,
+  getStudentAssessmentHistory,
+  getRecommendationsForAssessment,
+} from '../../services/assessments';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+const latestData = user ? await getLatestCompletedAssessment(supabase, user.id) : null;
+const history = user ? await getStudentAssessmentHistory(supabase, user.id) : [];
+
+const previousAssessment = history.length > 1 ? history[1] : null;
+
+const trend = calculateTrend(
+  latestData?.assessment.overall_indicator || 7.5,
+  previousAssessment?.overall_indicator
+);
+
+let recommendations: any[] = [];
+if (latestData && latestData.scores) {
+  const categoriesToRecommend = latestData.scores
+    .filter((s) => s.band === 'needs_attention' || s.band === 'elevated' || s.band === 'watch')
+    .map((s) => s.category);
+
+  recommendations = await getRecommendationsForAssessment(
+    supabase,
+    categoriesToRecommend.length > 0 ? categoriesToRecommend : ['academic', 'sleep_rest', 'emotional_wellbeing']
+  );
+}
+---
+
+<StudentLayout title="Wellness Summary" activePath="/student/wellness">
+  <PageHeader
+    title="Wellness Summary & Recommendations"
+    subtitle="Personalized self-reflection results and non-clinical recommendations"
+  />
+
+  {!latestData ? (
+    <Card padding="lg">
+      <EmptyState
+        title="No completed check-ins found"
+        description="Complete your weekly check-in to view your wellness summary and recommendations."
+      >
+        <a href="/student/check-in">
+          <Button variant="primary">Start Check-in Now</Button>
+        </a>
+      </EmptyState>
+    </Card>
+  ) : (
+    <div class="wellness-summary-layout">
+      {/* Wellness Snapshot */}
+      <WellnessSnapshot
+        score={latestData.assessment.overall_indicator || 7.5}
+        band={latestData.assessment.overall_band || 'stable'}
+        lastCheckInDate={new Date(latestData.assessment.completed_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        totalCheckIns={history.length}
+      />
+
+      {/* What Changed Section */}
+      <Card padding="lg">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h3 class="card-section-title" style="margin-bottom: 0;">What Changed</h3>
+          <Badge variant={trend === 'improving' ? 'improving' : trend === 'declining' ? 'declining' : 'neutral'}>
+            Trend: {trend.replace('_', ' ')}
+          </Badge>
+        </div>
+        {previousAssessment ? (
+          <p class="comparison-text">
+            Compared with your previous check-in on {new Date(previousAssessment.completed_at || '').toLocaleDateString()}, your overall indicator changed from <strong>{previousAssessment.overall_indicator}</strong> to <strong>{latestData.assessment.overall_indicator}</strong> ({trend}).
+          </p>
+        ) : (
+          <p class="comparison-text">
+            This is your first completed check-in. Future check-ins will track your progress over time.
+          </p>
+        )}
+      </Card>
+
+      {/* Category Breakdown */}
+      <div class="category-breakdown-section">
+        <h3 class="card-section-title">Category Breakdown</h3>
+        <div class="category-grid">
+          {latestData.scores.map((cs) => (
+            <CategoryIndicator
+              category={cs.category}
+              score={cs.score}
+              band={cs.band}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      <Card padding="lg" class="recommendations-card">
+        <h3 class="card-section-title">Preventative & Preventive Recommendations</h3>
+        <p class="section-subtext">Practical non-clinical self-care strategies based on your check-in focus areas.</p>
+        
+        <div class="recommendations-list">
+          {recommendations.length > 0 ? (
+            recommendations.map((rec) => (
+              <div class="recommendation-item">
+                <div class="rec-header">
+                  <span class="rec-cat">{rec.category.replace('_', ' ')}</span>
+                  <Badge variant="primary" size="sm">Priority {rec.priority}</Badge>
+                </div>
+                <h4 class="rec-title">{rec.title}</h4>
+                <p class="rec-desc">{rec.description}</p>
+              </div>
+            ))
+          ) : (
+            <p class="empty-rec">Your indicators look stable! Maintain your regular sleep and study habits.</p>
+          )}
+        </div>
+      </Card>
+
+      {/* Institutional Support Pathways */}
+      <Card padding="lg" class="support-card">
+        <h3 class="card-section-title">Institutional Student Support Pathways</h3>
+        <p class="section-subtext">Access voluntary student welfare resources provided by your campus.</p>
+        <div class="support-grid">
+          <div class="support-item">
+            <h5>📚 Academic Mentorship</h5>
+            <p>Peer tutoring, academic advising, and exam preparation assistance.</p>
+          </div>
+          <div class="support-item">
+            <h5>🧘 Student Welfare Office</h5>
+            <p>Campus life advisory, residence guidance, and student activities.</p>
+          </div>
+        </div>
+      </Card>
+
+      <PrivacyNotice variant="full" />
+    </div>
+  )}
+</StudentLayout>
+
+<style>
+  .wellness-summary-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .comparison-text {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .recommendations-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .recommendation-item {
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border-left: 4px solid var(--color-primary-600);
+  }
+
+  .rec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .rec-cat {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+  }
+
+  .rec-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .rec-desc {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .support-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+  }
+
+  .support-item {
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .support-item h5 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .support-item p {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+</style>

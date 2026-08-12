@@ -1,0 +1,94 @@
+---
+import Card from '../ui/Card.astro';
+import WellnessIndicator from './WellnessIndicator.astro';
+import type { WellnessBand } from '../../types/domain';
+
+interface Props {
+  score: number;
+  band: WellnessBand;
+  lastCheckInDate?: string;
+  totalCheckIns?: number;
+}
+
+const { score, band, lastCheckInDate = 'Recent', totalCheckIns = 1 } = Astro.props;
+---
+
+<Card padding="lg">
+  <div class="snapshot-header">
+    <div>
+      <h3 class="snapshot-title">Personal Wellness Snapshot</h3>
+      <p class="snapshot-sub">Non-clinical self-reflection summary</p>
+    </div>
+    <span class="snapshot-date">Last updated: {lastCheckInDate}</span>
+  </div>
+  <div class="snapshot-body">
+    <WellnessIndicator score={score} band={band} size="lg" />
+    <div class="snapshot-stats">
+      <div class="stat-item">
+        <span class="stat-label">Total Weekly Check-ins</span>
+        <span class="stat-val">{totalCheckIns}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Status Band</span>
+        <span class="stat-val capitalize">{band.replace('_', ' ')}</span>
+      </div>
+    </div>
+  </div>
+</Card>
+
+<style>
+  .snapshot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+  }
+
+  .snapshot-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .snapshot-sub {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .snapshot-date {
+    font-size: 0.8125rem;
+    color: var(--color-text-subtle);
+  }
+
+  .snapshot-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .snapshot-stats {
+    display: flex;
+    gap: var(--space-6);
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .stat-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .capitalize {
+    text-transform: capitalize;
+  }
+</style>

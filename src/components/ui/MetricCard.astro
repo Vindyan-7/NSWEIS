@@ -1,0 +1,82 @@
+---
+interface Props {
+  title: string;
+  value: string | number;
+  change?: string;
+  changeType?: 'positive' | 'negative' | 'neutral';
+  icon?: string;
+  subtitle?: string;
+}
+
+const { title, value, change, changeType = 'neutral', icon, subtitle } = Astro.props;
+---
+
+<div class="metric-card">
+  <div class="metric-header">
+    <span class="metric-title">{title}</span>
+    {icon && <span class="metric-icon">{icon}</span>}
+  </div>
+  <div class="metric-value">{value}</div>
+  {(change || subtitle) && (
+    <div class="metric-footer">
+      {change && <span class={`metric-change change-${changeType}`}>{change}</span>}
+      {subtitle && <span class="metric-subtitle">{subtitle}</span>}
+    </div>
+  )}
+</div>
+
+<style>
+  .metric-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .metric-title {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    line-height: 1.2;
+  }
+
+  .metric-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: 0.875rem;
+  }
+
+  .change-positive {
+    color: var(--color-band-stable);
+    font-weight: 600;
+  }
+
+  .change-negative {
+    color: var(--color-band-elevated);
+    font-weight: 600;
+  }
+
+  .change-neutral {
+    color: var(--color-text-muted);
+  }
+
+  .metric-subtitle {
+    color: var(--color-text-subtle);
+  }
+</style>

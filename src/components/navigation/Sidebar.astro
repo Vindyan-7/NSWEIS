@@ -1,0 +1,114 @@
+---
+interface NavItem {
+  label: string;
+  href: string;
+  icon?: string;
+  active?: boolean;
+}
+
+interface Props {
+  items: NavItem[];
+  roleTitle?: string;
+}
+
+const { items, roleTitle = 'NSWEIS Ecosystem' } = Astro.props;
+---
+
+<aside class="sidebar glass-panel">
+  <div class="sidebar-brand">
+    <div class="brand-logo">NS</div>
+    <div class="brand-text">
+      <span class="brand-name">NSWEIS</span>
+      <span class="brand-role">{roleTitle}</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    {items.map((item) => (
+      <a href={item.href} class={`nav-link ${item.active ? 'is-active' : ''}`}>
+        {item.icon && <span class="nav-icon">{item.icon}</span>}
+        <span>{item.label}</span>
+      </a>
+    ))}
+  </nav>
+</aside>
+
+<style>
+  .sidebar {
+    width: 260px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-6) var(--space-4);
+    border-right: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-bottom: var(--space-6);
+    border-bottom: 1px solid var(--color-border-subtle);
+    margin-bottom: var(--space-6);
+  }
+
+  .brand-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    background-color: var(--color-primary-600);
+    color: var(--color-text-inverse);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-text-main);
+  }
+
+  .brand-role {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: all var(--transition-fast);
+  }
+
+  .nav-link:hover {
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-700);
+  }
+
+  .nav-link.is-active {
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+    font-weight: 600;
+  }
+</style>

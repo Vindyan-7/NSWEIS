@@ -1,0 +1,42 @@
+---
+import Button from '../ui/Button.astro';
+
+interface Props {
+  canGoBack?: boolean;
+  isLastStep?: boolean;
+  isSubmitting?: boolean;
+}
+
+const { canGoBack = true, isLastStep = false, isSubmitting = false } = Astro.props;
+---
+
+<div class="assessment-nav">
+  {canGoBack && (
+    <Button variant="outline" type="button" id="btn-prev">
+      &larr; Previous
+    </Button>
+  )}
+  <div class="nav-spacer"></div>
+  {isLastStep ? (
+    <Button variant="primary" type="submit" disabled={isSubmitting}>
+      {isSubmitting ? 'Submitting...' : 'Submit Check-in'}
+    </Button>
+  ) : (
+    <Button variant="primary" type="button" id="btn-next">
+      Continue &rarr;
+    </Button>
+  )}
+</div>
+
+<style>
+  .assessment-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--space-8);
+  }
+
+  .nav-spacer {
+    flex: 1;
+  }
+</style>

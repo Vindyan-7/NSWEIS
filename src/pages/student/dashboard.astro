@@ -1,0 +1,191 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import WellnessSnapshot from '../../components/wellness/WellnessSnapshot.astro';
+import WellnessTrend from '../../components/wellness/WellnessTrend.astro';
+import CategoryIndicator from '../../components/wellness/CategoryIndicator.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import {
+  getActiveAssessmentCycle,
+  getStudentAssessmentForCycle,
+  getLatestCompletedAssessment,
+  getStudentAssessmentHistory,
+} from '../../services/assessments';
+
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+const supabase = createSupabaseServerClient(Astro);
+
+// Load DB data
+const activeCycle = await getActiveAssessmentCycle(supabase);
+const currentAssessment = activeCycle && user ? await getStudentAssessmentForCycle(supabase, user.id, activeCycle.id) : null;
+const latestData = user ? await getLatestCompletedAssessment(supabase, user.id) : null;
+const history = user ? await getStudentAssessmentHistory(supabase, user.id) : [];
+
+const checkInStatus = currentAssessment ? currentAssessment.status : 'not_started';
+
+const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
+  week: `W${idx + 1}`,
+  score: h.overall_indicator || 7.0,
+}));
+---
+
+<StudentLayout title="Student Dashboard" activePath="/student/dashboard">
+  <PageHeader
+    title={`Good morning, ${profile?.full_name || 'Alex'}`}
+    subtitle="Your personal, non-clinical wellness check-in dashboard."
+  />
+
+  <div class="dashboard-grid">
+    {/* Weekly Check-in Status Card */}
+    <Card padding="lg" class="checkin-status-card glass-panel">
+      <div class="card-status-header">
+        <span class="status-cycle-tag">{activeCycle ? activeCycle.name : 'Weekly Reflection Cycle'}</span>
+        {checkInStatus === 'completed' && <Badge variant="stable">Completed</Badge>}
+        {checkInStatus === 'in_progress' && <Badge variant="improving">In Progress</Badge>}
+        {checkInStatus === 'not_started' && <Badge variant="neutral">Ready</Badge>}
+      </div>
+
+      <div class="status-content">
+        {checkInStatus === 'not_started' && (
+          <>
+            <h3 class="status-title">Your weekly check-in is ready</h3>
+            <p class="status-desc">Take 3 minutes to reflect on your week. Your individual responses are private and confidential.</p>
+            <a href="/student/check-in" class="status-cta">
+              <Button variant="primary" size="lg">Start Check-in &rarr;</Button>
+            </a>
+          </>
+        )}
+
+        {checkInStatus === 'in_progress' && (
+          <>
+            <h3 class="status-title">Continue your weekly check-in</h3>
+            <p class="status-desc">You have an active check-in in progress. Complete your self-reflection to update your wellness snapshot.</p>
+            <a href="/student/check-in" class="status-cta">
+              <Button variant="primary" size="lg">Continue Check-in &rarr;</Button>
+            </a>
+          </>
+        )}
+
+        {checkInStatus === 'completed' && (
+          <>
+            <h3 class="status-title">Your check-in is complete for this cycle</h3>
+            <p class="status-desc">Thank you for taking time to reflect. You can review your wellness summary and personalized recommendations anytime.</p>
+            <a href="/student/wellness" class="status-cta">
+              <Button variant="secondary" size="lg">View Your Results &rarr;</Button>
+            </a>
+          </>
+        )}
+      </div>
+    </Card>
+
+    {/* Personal Wellness Snapshot */}
+    {latestData ? (
+      <WellnessSnapshot
+        score={latestData.assessment.overall_indicator || 7.5}
+        band={latestData.assessment.overall_band || 'stable'}
+        lastCheckInDate={new Date(latestData.assessment.completed_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        totalCheckIns={history.length}
+      />
+    ) : (
+      <Card padding="lg">
+        <EmptyState
+          title="No completed check-ins yet"
+          description="Complete your first weekly check-in to generate your personal wellness snapshot."
+        >
+          <a href="/student/check-in">
+            <Button variant="primary">Start First Check-in</Button>
+          </a>
+        </EmptyState>
+      </Card>
+    )}
+
+    {/* Category Scores Breakdown */}
+    {latestData && latestData.scores.length > 0 && (
+      <div class="category-grid-section">
+        <h3 class="section-heading">Recent Category Breakdown</h3>
+        <div class="category-grid">
+          {latestData.scores.map((cs) => (
+            <CategoryIndicator
+              category={cs.category}
+              score={cs.score}
+              band={cs.band}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* Wellness Trend */}
+    {trendPoints.length > 1 ? (
+      <WellnessTrend points={trendPoints} title="Your Recent Wellness Trend" />
+    ) : null}
+
+    {/* Privacy Guarantee Notice */}
+    <PrivacyNotice variant="full" />
+  </div>
+</StudentLayout>
+
+<style>
+  .dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .checkin-status-card {
+    background: linear-gradient(135deg, #ffffff 0%, var(--color-primary-50) 100%);
+  }
+
+  .card-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+
+  .status-cycle-tag {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .status-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .status-desc {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    max-width: 600px;
+    margin-bottom: var(--space-5);
+  }
+
+  .status-cta {
+    display: inline-block;
+  }
+
+  .section-heading {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-3);
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-4);
+  }
+</style>

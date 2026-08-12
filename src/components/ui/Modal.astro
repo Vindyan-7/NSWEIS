@@ -1,0 +1,77 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  isOpen?: boolean;
+}
+
+const { id, title, isOpen = false } = Astro.props;
+---
+
+<dialog id={id} class="modal-dialog" open={isOpen}>
+  <div class="modal-content glass-panel">
+    <div class="modal-header">
+      <h3 class="modal-title">{title}</h3>
+      <button type="button" class="modal-close" aria-label="Close modal" onclick={`document.getElementById('${id}').close()`}>
+        &times;
+      </button>
+    </div>
+    <div class="modal-body">
+      <slot />
+    </div>
+    <div class="modal-footer">
+      <slot name="footer" />
+    </div>
+  </div>
+</dialog>
+
+<style>
+  .modal-dialog {
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: auto;
+    max-width: 540px;
+    width: 90%;
+  }
+
+  .modal-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    padding: var(--space-6);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .modal-body {
+    margin-bottom: var(--space-6);
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+</style>

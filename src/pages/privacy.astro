@@ -1,0 +1,66 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import PageHeader from '../components/navigation/PageHeader.astro';
+import Card from '../components/ui/Card.astro';
+import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+---
+
+<PublicLayout title="Privacy & Security — NSWEIS">
+  <div class="container privacy-page">
+    <PageHeader
+      title="Privacy Policy & Security Framework"
+      subtitle="Strict data isolation, non-clinical early-intervention boundaries, and government privacy compliance."
+    />
+
+    <div class="privacy-content">
+      <PrivacyNotice variant="full" />
+
+      <Card padding="lg" class="policy-card">
+        <h3>1. Privacy-Conscious Ecosystem Principles</h3>
+        <p>
+          NSWEIS is designed from the ground up around strict privacy boundaries. Individual check-in answers, category scores, and self-reflection notes are linked to student profiles protected by PostgreSQL Row Level Security (RLS).
+        </p>
+
+        <h3>2. Aggregate Institutional Insights</h3>
+        <p>
+          College officers and government oversight administrators access anonymized aggregate metrics only. They cannot view individual student responses or individual wellness indicators through standard application workflows.
+        </p>
+
+        <h3>3. Non-Clinical Early-Intervention Boundary</h3>
+        <p>
+          NSWEIS does not diagnose mental illness, compute psychiatric risk scores, or replace licensed medical professionals. Indicators provide self-reflection guidance and enable proactive institutional support.
+        </p>
+      </Card>
+    </div>
+  </div>
+</PublicLayout>
+
+<style>
+  .privacy-page {
+    padding: var(--space-8) 0 var(--space-16);
+  }
+
+  .privacy-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .policy-card h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-2);
+    color: var(--color-text-main);
+  }
+
+  .policy-card h3:first-child {
+    margin-top: 0;
+  }
+
+  .policy-card p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+</style>

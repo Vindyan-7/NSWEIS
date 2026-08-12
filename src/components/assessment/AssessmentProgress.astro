@@ -1,0 +1,44 @@
+---
+import Progress from '../ui/Progress.astro';
+
+interface Props {
+  currentStep: number;
+  totalSteps: number;
+  stepName?: string;
+}
+
+const { currentStep, totalSteps, stepName } = Astro.props;
+const percentage = Math.round((currentStep / totalSteps) * 100);
+---
+
+<div class="assessment-progress">
+  <div class="step-meta">
+    <span class="step-count">Step {currentStep} of {totalSteps}</span>
+    {stepName && <span class="step-name">{stepName}</span>}
+  </div>
+  <Progress value={percentage} variant="primary" />
+</div>
+
+<style>
+  .assessment-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+  }
+
+  .step-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+  }
+
+  .step-count {
+    font-weight: 600;
+    color: var(--color-primary-600);
+  }
+
+  .step-name {
+    color: var(--color-text-muted);
+  }
+</style>

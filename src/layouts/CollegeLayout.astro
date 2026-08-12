@@ -1,0 +1,69 @@
+---
+import '../styles/globals.css';
+import Header from '../components/navigation/Header.astro';
+import Sidebar from '../components/navigation/Sidebar.astro';
+import MobileNav from '../components/navigation/MobileNav.astro';
+
+interface Props {
+  title: string;
+  activePath?: string;
+}
+
+const { title, activePath = '/college/dashboard' } = Astro.props;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+const collegeNav = [
+  { label: 'Dashboard', href: '/college/dashboard', icon: '📊', active: activePath === '/college/dashboard' },
+  { label: 'Aggregate Insights', href: '/college/insights', icon: '📈', active: activePath === '/college/insights' },
+  { label: 'Interventions', href: '/college/interventions', icon: '🎯', active: activePath === '/college/interventions' },
+  { label: 'Reports', href: '/college/reports', icon: '📁', active: activePath === '/college/reports' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — College Portal | NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar items={collegeNav} roleTitle="College Wellness Officer" />
+      <div class="app-main-area">
+        <Header userName={profile?.full_name || user?.email || 'Officer'} userRole="College Officer" />
+        <main class="app-content container">
+          <slot />
+        </main>
+      </div>
+      <MobileNav items={collegeNav} />
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .app-content {
+    flex: 1;
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-16);
+  }
+</style>

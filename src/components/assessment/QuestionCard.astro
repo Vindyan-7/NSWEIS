@@ -1,0 +1,76 @@
+---
+import type { Question } from '../../types/domain';
+import Card from '../ui/Card.astro';
+import ChoiceOption from './ChoiceOption.astro';
+
+interface Props {
+  question: Question;
+  questionNumber: number;
+  selectedOptionId?: string;
+  id?: string;
+}
+
+const { question, questionNumber, selectedOptionId, id } = Astro.props;
+---
+
+<Card id={id} padding="lg" class="question-card">
+  <div class="question-header">
+    <span class="question-num">Question {questionNumber}</span>
+    <span class="question-cat">{question.category.replace('_', ' ')}</span>
+  </div>
+  <h3 class="question-text">{question.text}</h3>
+  <div class="question-options">
+    {question.options?.map((opt) => (
+      <ChoiceOption
+        id={`opt-${opt.id}`}
+        name={`q_${question.id}`}
+        value={opt.id}
+        label={opt.label}
+        checked={opt.id === selectedOptionId}
+      />
+    ))}
+  </div>
+</Card>
+
+<style>
+  .question-card {
+    margin-bottom: var(--space-6);
+  }
+
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+
+  .question-num {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .question-cat {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+  }
+
+  .question-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-5);
+  }
+
+  .question-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+</style>

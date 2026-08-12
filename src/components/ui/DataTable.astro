@@ -1,0 +1,88 @@
+---
+interface Column {
+  key: string;
+  header: string;
+}
+
+interface Props {
+  columns: Column[];
+  data: Record<string, any>[];
+  emptyText?: string;
+}
+
+const { columns, data, emptyText = 'No records found' } = Astro.props;
+---
+
+<div class="data-table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        {columns.map((col) => (
+          <th>{col.header}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {data.length === 0 ? (
+        <tr>
+          <td colspan={columns.length} class="empty-cell">
+            {emptyText}
+          </td>
+        </tr>
+      ) : (
+        data.map((row) => (
+          <tr>
+            {columns.map((col) => (
+              <td>{row[col.key]}</td>
+            ))}
+          </tr>
+        ))
+      )}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .data-table-container {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-bg-surface);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+
+  .data-table th {
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-main);
+  }
+
+  .data-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tbody tr:hover {
+    background-color: var(--color-bg-subtle);
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-text-subtle);
+    padding: var(--space-8);
+  }
+</style>

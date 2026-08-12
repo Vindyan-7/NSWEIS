@@ -1,0 +1,116 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Avatar from '../../components/ui/Avatar.astro';
+import Badge from '../../components/ui/Badge.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+---
+
+<StudentLayout title="Student Profile" activePath="/student/profile">
+  <PageHeader
+    title="Student Profile & Account Settings"
+    subtitle="Manage your profile information and privacy settings"
+  />
+
+  <div class="profile-layout">
+    <Card padding="lg" class="profile-card">
+      <div class="profile-header">
+        <Avatar name={profile?.full_name || 'Student'} size="lg" />
+        <div class="profile-meta">
+          <h3 class="profile-name">{profile?.full_name || 'Alex Student'}</h3>
+          <span class="profile-email">{user?.email || 'student@demo.nsweis.gov.in'}</span>
+          <Badge variant="primary" size="sm">Student Account</Badge>
+        </div>
+      </div>
+
+      <div class="profile-details-grid">
+        <div class="detail-item">
+          <span class="detail-label">Roll Number / Student ID</span>
+          <span class="detail-val">{profile?.student_roll_no || 'STU-2026-0842'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Year Level</span>
+          <span class="detail-val">Year {profile?.year_level || 2}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Department</span>
+          <span class="detail-val">Computer Science & Engineering</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Institution</span>
+          <span class="detail-val">National Institute of Technology, Apex</span>
+        </div>
+      </div>
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</StudentLayout>
+
+<style>
+  .profile-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    max-width: 720px;
+  }
+
+  .profile-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .profile-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .profile-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .profile-email {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .profile-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .detail-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .detail-val {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+</style>

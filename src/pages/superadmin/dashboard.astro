@@ -1,0 +1,18 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+---
+
+<SuperAdminLayout title="Super Admin System Control" activePath="/superadmin/dashboard">
+  <PageHeader
+    title="System Configuration & Management"
+    subtitle="Configure assessment cycles, questions, rules, institutions, and demo accounts."
+  />
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+    <MetricCard title="System Users" value="1,254" subtitle="All roles" />
+    <MetricCard title="Active Institutions" value="128" subtitle="System tenants" />
+    <MetricCard title="Active Questions" value="25" subtitle="Base & adaptive rules" />
+  </div>
+</SuperAdminLayout>

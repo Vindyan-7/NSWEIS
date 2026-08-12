@@ -1,0 +1,120 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+---
+
+<PublicLayout title="National Student Well-being Early Intervention System">
+  <section class="hero-section">
+    <div class="container hero-content">
+      <div class="hero-text">
+        <span class="hero-badge">Government Early-Intervention Ecosystem</span>
+        <h1 class="hero-title">National Student Well-being Early Intervention System</h1>
+        <p class="hero-desc">
+          A privacy-conscious, non-clinical ecosystem empowering students through self-reflection, providing higher education institutions with aggregate wellness insights, and enabling targeted preventative interventions.
+        </p>
+        <div class="hero-cta">
+          <a href="/login">
+            <Button variant="primary" size="lg">Access Ecosystem &rarr;</Button>
+          </a>
+          <a href="/privacy">
+            <Button variant="outline" size="lg">Privacy Principles</Button>
+          </a>
+        </div>
+      </div>
+      <div class="hero-card-grid">
+        <Card padding="lg">
+          <h4>🎓 Students</h4>
+          <p>Complete confidential weekly check-ins, receive instant personal wellness insights, and access tailored non-clinical recommendations.</p>
+        </Card>
+        <Card padding="lg">
+          <h4>🏫 Colleges</h4>
+          <p>Monitor institution-wide aggregate wellness trends and organize proactive wellness interventions without compromising student PII.</p>
+        </Card>
+        <Card padding="lg">
+          <h4>🏛️ Government</h4>
+          <p>Oversight dashboards monitoring adoption, district/state wellness signals, and institutional intervention compliance.</p>
+        </Card>
+      </div>
+    </div>
+  </section>
+
+  <section class="container privacy-section">
+    <PrivacyNotice variant="full" />
+  </section>
+</PublicLayout>
+
+<style>
+  .hero-section {
+    padding: var(--space-16) 0 var(--space-12);
+    background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-bg-app) 100%);
+  }
+
+  .hero-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+    align-items: center;
+  }
+
+  .hero-text {
+    text-align: center;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .hero-badge {
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+    padding: var(--space-1) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .hero-title {
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    line-height: 1.15;
+  }
+
+  .hero-desc {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .hero-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-6);
+    width: 100%;
+  }
+
+  .hero-card-grid h4 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+  }
+
+  .hero-card-grid p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .privacy-section {
+    margin-bottom: var(--space-16);
+  }
+</style>

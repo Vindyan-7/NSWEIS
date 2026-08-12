@@ -1,0 +1,43 @@
+---
+interface Props {
+  message?: string;
+}
+
+const { message = 'Loading...' } = Astro.props;
+---
+
+<div class="loading-state">
+  <div class="spinner"></div>
+  <p class="loading-text">{message}</p>
+</div>
+
+<style>
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-12);
+    gap: var(--space-3);
+  }
+
+  .spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid var(--color-primary-100);
+    border-top-color: var(--color-primary-600);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-text {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+</style>
