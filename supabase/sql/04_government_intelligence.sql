@@ -1,7 +1,7 @@
 -- NSWEIS SQL MIGRATION
 -- ID: 04
 -- Feature: Government Intelligence & Scope Authorization (Idempotent)
--- Purpose: Create government_admin_scopes table, RPC aggregation functions with privacy threshold (>= 10), and demo scope assignments
+-- Purpose: Create government_admin_scopes table, RPC aggregation functions with unbypassable auth.uid() authorization and REVOKE/GRANT security controls
 -- Execution: Safe for repeated manual execution in Supabase SQL Editor
 -- Dependencies: 00_initial_schema.sql, 01_seed_demo_data.sql, 02_demo_student_profile.sql, 03_college_institutional_intelligence.sql
 -- Status: PENDING MANUAL EXECUTION
@@ -40,7 +40,7 @@ CREATE POLICY "Super admins manage scopes"
     )
   );
 
--- 2. Function: Get Authorized Institutions for Government Admin / Super Admin
+-- 2. Function: Get Authorized Institutions for Government Admin / Super Admin (Caller Authorized)
 CREATE OR REPLACE FUNCTION public.get_government_authorized_institutions(
   p_admin_id UUID
 )
@@ -51,25 +51,39 @@ RETURNS TABLE (
   state TEXT
 ) AS $$
 DECLARE
-  v_role user_role;
+  v_caller_id UUID;
+  v_caller_role user_role;
+  v_target_role user_role;
 BEGIN
-  SELECT role INTO v_role FROM public.profiles WHERE id = p_admin_id;
+  -- Unbypassable RPC Caller Authorization Verification
+  v_caller_id := auth.uid();
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'Access denied: authentication required.' USING ERRCODE = '42501';
+  END IF;
 
-  IF v_role = 'super_admin' THEN
-    -- Super Admin has access to all active institutions
+  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id;
+  IF v_caller_role IS NULL OR v_caller_role NOT IN ('government_admin', 'super_admin') THEN
+    RAISE EXCEPTION 'Access denied: caller is unauthorized for government aggregation.' USING ERRCODE = '42501';
+  END IF;
+
+  IF v_caller_role != 'super_admin' AND v_caller_id != p_admin_id THEN
+    RAISE EXCEPTION 'Access denied: cannot query scope of another administrator.' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT role INTO v_target_role FROM public.profiles WHERE id = p_admin_id;
+
+  IF v_target_role = 'super_admin' THEN
     RETURN QUERY
     SELECT i.id, i.name, i.code, i.state
     FROM public.institutions i
     WHERE i.active = TRUE;
-  ELSIF v_role = 'government_admin' THEN
-    -- Government Admin has access to assigned scopes
+  ELSIF v_target_role = 'government_admin' THEN
     RETURN QUERY
     SELECT i.id, i.name, i.code, i.state
     FROM public.institutions i
     JOIN public.government_admin_scopes gas ON gas.institution_id = i.id
     WHERE gas.admin_profile_id = p_admin_id AND i.active = TRUE;
   ELSE
-    -- Other roles receive empty set
     RETURN QUERY
     SELECT i.id, i.name, i.code, i.state
     FROM public.institutions i
@@ -78,7 +92,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 3. Function: Government Scope Participation Metrics
+-- 3. Function: Government Scope Participation Metrics (Caller Authorized)
 CREATE OR REPLACE FUNCTION public.get_government_participation_metrics(
   p_admin_id UUID,
   p_cycle_id UUID DEFAULT NULL
@@ -92,6 +106,8 @@ RETURNS TABLE (
   active_cycle_name TEXT
 ) AS $$
 DECLARE
+  v_caller_id UUID;
+  v_caller_role user_role;
   v_cycle_id UUID;
   v_cycle_name TEXT;
   v_auth_inst_count BIGINT;
@@ -99,6 +115,21 @@ DECLARE
   v_eligible BIGINT;
   v_participating BIGINT;
 BEGIN
+  -- Unbypassable RPC Caller Authorization Verification
+  v_caller_id := auth.uid();
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'Access denied: authentication required.' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id;
+  IF v_caller_role IS NULL OR v_caller_role NOT IN ('government_admin', 'super_admin') THEN
+    RAISE EXCEPTION 'Access denied: caller is unauthorized for government aggregation.' USING ERRCODE = '42501';
+  END IF;
+
+  IF v_caller_role != 'super_admin' AND v_caller_id != p_admin_id THEN
+    RAISE EXCEPTION 'Access denied: cannot query scope of another administrator.' USING ERRCODE = '42501';
+  END IF;
+
   IF p_cycle_id IS NULL THEN
     SELECT id, name INTO v_cycle_id, v_cycle_name
     FROM public.assessment_cycles
@@ -110,17 +141,14 @@ BEGIN
     WHERE id = p_cycle_id;
   END IF;
 
-  -- Count total authorized institutions
   SELECT COUNT(*) INTO v_auth_inst_count
   FROM public.get_government_authorized_institutions(p_admin_id);
 
-  -- Count eligible students within authorized institutions
   SELECT COUNT(*) INTO v_eligible
   FROM public.profiles p
   JOIN public.get_government_authorized_institutions(p_admin_id) ai ON ai.institution_id = p.institution_id
   WHERE p.role = 'student' AND p.active = TRUE;
 
-  -- Count participating students & active reporting institutions in cycle
   SELECT 
     COUNT(DISTINCT a.student_id),
     COUNT(DISTINCT p.institution_id)
@@ -140,7 +168,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 4. Function: Government Category Summary Across Authorized Scope (Privacy Threshold >= 10)
+-- 4. Function: Government Category Summary Across Authorized Scope (Privacy Threshold >= 10, Zero Info Leakage)
 CREATE OR REPLACE FUNCTION public.get_government_category_summary(
   p_admin_id UUID,
   p_cycle_id UUID DEFAULT NULL
@@ -153,9 +181,26 @@ RETURNS TABLE (
   is_suppressed BOOLEAN
 ) AS $$
 DECLARE
+  v_caller_id UUID;
+  v_caller_role user_role;
   v_cycle_id UUID;
   v_total_participating BIGINT;
 BEGIN
+  -- Unbypassable RPC Caller Authorization Verification
+  v_caller_id := auth.uid();
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'Access denied: authentication required.' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id;
+  IF v_caller_role IS NULL OR v_caller_role NOT IN ('government_admin', 'super_admin') THEN
+    RAISE EXCEPTION 'Access denied: caller is unauthorized for government aggregation.' USING ERRCODE = '42501';
+  END IF;
+
+  IF v_caller_role != 'super_admin' AND v_caller_id != p_admin_id THEN
+    RAISE EXCEPTION 'Access denied: cannot query scope of another administrator.' USING ERRCODE = '42501';
+  END IF;
+
   IF p_cycle_id IS NULL THEN
     SELECT id INTO v_cycle_id FROM public.assessment_cycles WHERE status = 'active' ORDER BY starts_at DESC LIMIT 1;
   ELSE
@@ -169,12 +214,13 @@ BEGIN
   WHERE a.cycle_id = v_cycle_id AND a.status = 'completed';
 
   IF v_total_participating < 10 THEN
+    -- Return suppressed rows with NULL count to eliminate information leakage
     RETURN QUERY
     SELECT 
       c.cat::wellness_category,
       NULL::NUMERIC(3,1),
       NULL::wellness_band,
-      v_total_participating,
+      NULL::BIGINT, -- Count set to NULL for strict anonymity
       TRUE
     FROM unnest(ENUM_RANGE(NULL::wellness_category)) AS c(cat);
   ELSE
@@ -200,19 +246,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 5. Seed Initial Scope Assignments for Demo Government Admin (Idempotent)
-DO $$
-DECLARE
-  v_gov_admin_id UUID;
-BEGIN
-  -- Search for existing government_admin profile or default placeholder
-  SELECT id INTO v_gov_admin_id FROM public.profiles WHERE role = 'government_admin' LIMIT 1;
+-- 5. Revoke Execution from PUBLIC and anon, Grant to authenticated
+REVOKE EXECUTE ON FUNCTION public.get_government_authorized_institutions(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.get_government_participation_metrics(UUID, UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.get_government_category_summary(UUID, UUID) FROM PUBLIC, anon;
 
-  IF v_gov_admin_id IS NOT NULL THEN
-    INSERT INTO public.government_admin_scopes (admin_profile_id, institution_id)
-    VALUES
-      (v_gov_admin_id, '11111111-1111-1111-1111-111111111111'),
-      (v_gov_admin_id, '22222222-2222-2222-2222-222222222222')
-    ON CONFLICT (admin_profile_id, institution_id) DO NOTHING;
-  END IF;
-END $$;
+GRANT EXECUTE ON FUNCTION public.get_government_authorized_institutions(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_government_participation_metrics(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_government_category_summary(UUID, UUID) TO authenticated;
+
+-- 6. Scope Assignment for Existing Demo Government Admin (96ee2b52-1628-4e7e-b247-6cf37032dc16)
+INSERT INTO public.government_admin_scopes (admin_profile_id, institution_id)
+VALUES
+  ('96ee2b52-1628-4e7e-b247-6cf37032dc16', '11111111-1111-1111-1111-111111111111'),
+  ('96ee2b52-1628-4e7e-b247-6cf37032dc16', '22222222-2222-2222-2222-222222222222')
+ON CONFLICT (admin_profile_id, institution_id) DO NOTHING;

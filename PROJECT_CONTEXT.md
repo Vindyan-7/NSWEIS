@@ -57,6 +57,9 @@ Dependencies sourced directly from [`package.json`](file:///c:/Projects/YI/NSWEI
 - **Database Authorization:** PostgreSQL Row Level Security (RLS) on all exposed tables.
 - **Authentication & Middleware:** Cookie-based session management using `@supabase/ssr` inside [`src/middleware.ts`](file:///c:/Projects/YI/NSWEIS/src/middleware.ts), verifying user roles and enforcing route guards.
 - **Government Scope Authorization Model:** Explicit institution assignment via `government_admin_scopes` table (`admin_profile_id` $\rightarrow$ `institution_id`). Super Admins have system-wide visibility.
+- **Authentic Supabase Auth User UUID Mappings:**
+  - **Government Admin:** `96ee2b52-1628-4e7e-b247-6cf37032dc16`
+  - **Super Admin:** `d4068972-4be2-4b76-ae26-dd75022ffbe7`
 - **Service Layer Pattern:** Business operations encapsulated in [`src/services/`](file:///c:/Projects/YI/NSWEIS/src/services/) (`assessments.ts`, `users.ts`, `institutions.ts`, `interventions.ts`, `analytics.ts`).
 - **Scoring Engine:** Deterministic normalized category scoring engine in [`src/lib/scoring/engine.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/scoring/engine.ts).
 - **Validation Layer:** Input validation helpers in [`src/lib/validation/schemas.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/validation/schemas.ts).
@@ -128,8 +131,11 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 ---
 
 ## I. Privacy & Anonymity Architecture
-- **Minimum Reporting Threshold:** $\ge 10$ participating students required per department/institution. Groups under 10 return `is_suppressed = TRUE` and `'Insufficient group size for anonymous reporting.'`.
+- **Minimum Reporting Threshold:** $\ge 10$ participating students required per department/institution. Groups under 10 return `is_suppressed = TRUE`, `average_score = NULL`, `dominant_band = NULL`, `participating_student_count = NULL` (zero count leakage), displaying `'Insufficient group size for anonymous reporting.'`.
+- **Small-Group Participation Privacy (<10 Students):** When authorized participating population is below 10, exact participating student counts, eligible counts, participation rates, and reporting active institution counts are suppressed and displayed as `"Insufficient data"`.
+- **Areas of Concern Semantic Control:** Suppressed analytics ($<10$ participants) return `"Insufficient data"` for Areas of Concern rather than zero (`0`). Unavailable data is never interpreted as zero concern.
 - **Absolute Data Restrictions:** Government Admin and Super Admin APIs/services **never** query or expose individual student names, emails, roll numbers, reflections, or raw question responses.
+- **RPC Security Hardening (`SECURITY DEFINER`):** Functions verify `auth.uid() IS NOT NULL`, enforce caller role eligibility (`government_admin` / `super_admin`), check caller ID equality (`auth.uid() = p_admin_id`), and explicitly `REVOKE` execution from `PUBLIC, anon` while `GRANT`ing only to `authenticated`.
 - **Server-Side Authorization Scoping:** Government Admin authorized institutions are derived server-side via `get_government_authorized_institutions(admin_id)`. Manually supplied `institutionId` parameters are strictly checked against the authorized scope before returning data.
 
 ---

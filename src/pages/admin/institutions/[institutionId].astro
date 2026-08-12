@@ -72,8 +72,8 @@ const interventions = await getInstitutionInterventions(supabase, institutionId)
     <div class="metrics-grid">
       <MetricCard
         title="Check-in Participation"
-        value={`${metrics.participation_rate.toFixed(1)}%`}
-        change={`${metrics.participating_students} Students Checked-in`}
+        value={metrics.participating_students < 10 ? "Insufficient data" : `${metrics.participation_rate.toFixed(1)}%`}
+        change={metrics.participating_students < 10 ? "Privacy threshold: ≥10 students required" : `${metrics.participating_students} Students Checked-in`}
         changeType="neutral"
       />
       <MetricCard

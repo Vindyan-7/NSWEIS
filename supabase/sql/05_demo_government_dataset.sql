@@ -1,7 +1,7 @@
 -- NSWEIS SQL MIGRATION
 -- ID: 05
--- Feature: Synthetic Government & Super Admin Dataset (Idempotent)
--- Purpose: Seed departments, student profiles, and completed assessments for Institution 2 (Metropolitan College)
+-- Feature: Synthetic Regional Dataset & Department Interventions (Idempotent)
+-- Purpose: Seed departments and sample interventions for Metropolitan College (Institution 2) referencing actual Auth user UUIDs
 -- Execution: Safe for repeated manual execution in Supabase SQL Editor
 -- Dependencies: 00_initial_schema.sql, 01_seed_demo_data.sql, 04_government_intelligence.sql
 -- Status: PENDING MANUAL EXECUTION
@@ -14,45 +14,7 @@ ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   code = EXCLUDED.code;
 
--- 2. Demo Government Admin Profile (If not existing)
-INSERT INTO public.profiles (
-  id,
-  full_name,
-  role,
-  institution_id,
-  active
-) VALUES (
-  '03000000-0000-0000-0000-000000000001',
-  'Dr. Robert Vance (Ministry Officer)',
-  'government_admin',
-  '11111111-1111-1111-1111-111111111111',
-  true
-) ON CONFLICT (id) DO UPDATE SET
-  role = EXCLUDED.role,
-  full_name = EXCLUDED.full_name;
-
--- 3. Link Demo Government Admin Scope
-INSERT INTO public.government_admin_scopes (admin_profile_id, institution_id) VALUES
-  ('03000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111'),
-  ('03000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222')
-ON CONFLICT (admin_profile_id, institution_id) DO NOTHING;
-
--- 4. Demo Super Admin Profile
-INSERT INTO public.profiles (
-  id,
-  full_name,
-  role,
-  active
-) VALUES (
-  '04000000-0000-0000-0000-000000000001',
-  'System Super Administrator',
-  'super_admin',
-  true
-) ON CONFLICT (id) DO UPDATE SET
-  role = EXCLUDED.role,
-  full_name = EXCLUDED.full_name;
-
--- 5. Interventions for Metropolitan College (Idempotent)
+-- 2. Demo Interventions for Metropolitan College (Referencing Real Government Admin UUID 96ee2b52-1628-4e7e-b247-6cf37032dc16)
 INSERT INTO public.interventions (
   id,
   institution_id,
@@ -69,7 +31,7 @@ INSERT INTO public.interventions (
   (
     'f3333333-3333-3333-3333-333333333333',
     '22222222-2222-2222-2222-222222222222',
-    '03000000-0000-0000-0000-000000000001',
+    '96ee2b52-1628-4e7e-b247-6cf37032dc16', -- Real Government Admin Auth User UUID
     'Creative Stress Relief & Wellness Art Fair',
     'Guided creative expression sessions promoting emotional wellbeing and peer connection.',
     'emotional_wellbeing',

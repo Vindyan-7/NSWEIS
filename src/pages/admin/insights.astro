@@ -34,6 +34,8 @@ const metrics = await getGovernmentParticipationMetrics(supabase, user.id);
 const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id);
 const institutionSummaries = await getGovernmentInstitutionSummaries(supabase, user.id);
 const trends = await getGovernmentTrends(supabase, user.id);
+
+const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) => cs.is_suppressed);
 ---
 
 <GovernmentLayout title="Regional Aggregate Insights" activePath="/admin/insights">
@@ -51,19 +53,19 @@ const trends = await getGovernmentTrends(supabase, user.id);
       <MetricCard
         title="Authorized Scope"
         value={`${metrics.authorized_institutions_count} Institutions`}
-        change={`${metrics.active_reporting_institutions_count} Actively Reporting`}
+        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics.active_reporting_institutions_count} Actively Reporting`}
         changeType="neutral"
       />
       <MetricCard
         title="Participating Population"
-        value={metrics.participating_students.toLocaleString()}
-        change={`${metrics.participation_rate.toFixed(1)}% Regional Participation`}
+        value={isDataSuppressed ? "Insufficient data" : metrics.participating_students.toLocaleString()}
+        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `${metrics.participation_rate.toFixed(1)}% Regional Participation`}
         changeType="neutral"
       />
       <MetricCard
         title="Privacy Protection"
         value="&ge; 10 Students"
-        change="Threshold Enforced Database-side"
+        change="Threshold Enforced Server-side"
         changeType="positive"
       />
     </div>

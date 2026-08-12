@@ -18,6 +18,7 @@ export interface GovernmentParticipationMetrics {
   participating_students: number;
   participation_rate: number;
   active_cycle_name: string;
+  is_suppressed: boolean;
 }
 
 export interface CategoryAggregateSummary {
@@ -224,13 +225,17 @@ export async function getGovernmentParticipationMetrics(
 
   if (!error && data && data.length > 0) {
     const row = data[0];
+    const participating = Number(row.participating_students || 0);
+    const isSuppressed = participating < PRIVACY_THRESHOLD_MIN_STUDENTS;
+
     return {
       authorized_institutions_count: Number(row.authorized_institutions_count || 0),
-      active_reporting_institutions_count: Number(row.active_reporting_institutions_count || 0),
+      active_reporting_institutions_count: isSuppressed ? 0 : Number(row.active_reporting_institutions_count || 0),
       total_eligible_students: Number(row.total_eligible_students || 0),
-      participating_students: Number(row.participating_students || 0),
+      participating_students: participating,
       participation_rate: Number(row.participation_rate || 0),
       active_cycle_name: row.active_cycle_name || 'Active Cycle',
+      is_suppressed: isSuppressed,
     };
   }
 
@@ -246,6 +251,7 @@ export async function getGovernmentParticipationMetrics(
       participating_students: 0,
       participation_rate: 0,
       active_cycle_name: 'No Active Cycle',
+      is_suppressed: true,
     };
   }
 
@@ -260,11 +266,12 @@ export async function getGovernmentParticipationMetrics(
 
   return {
     authorized_institutions_count: authorizedInsts.length,
-    active_reporting_institutions_count: authorizedInsts.length,
+    active_reporting_institutions_count: 0,
     total_eligible_students: eligible,
     participating_students: 0,
     participation_rate: 0,
     active_cycle_name: 'Weekly Wellness Check-in Cycle',
+    is_suppressed: true,
   };
 }
 

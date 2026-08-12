@@ -37,9 +37,13 @@ const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id
 const institutionSummaries = await getGovernmentInstitutionSummaries(supabase, user.id);
 const trends = await getGovernmentTrends(supabase, user.id);
 
-const attentionCategories = categorySummaries.filter(
-  (cs) => cs.dominant_band === 'needs_attention' || cs.dominant_band === 'elevated' || cs.dominant_band === 'watch'
-);
+const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) => cs.is_suppressed);
+
+const attentionCategories = isDataSuppressed
+  ? []
+  : categorySummaries.filter(
+      (cs) => cs.dominant_band === 'needs_attention' || cs.dominant_band === 'elevated' || cs.dominant_band === 'watch'
+    );
 ---
 
 <GovernmentLayout title="Government Intelligence Overview" activePath="/admin/dashboard">
@@ -58,31 +62,31 @@ const attentionCategories = categorySummaries.filter(
       <MetricCard
         title="Authorized Institutions"
         value={metrics.authorized_institutions_count.toString()}
-        change={`${metrics.active_reporting_institutions_count} Reporting Active Data`}
+        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics.active_reporting_institutions_count} Reporting Active Data`}
         changeType="neutral"
       />
       <MetricCard
         title="Participating Students"
-        value={metrics.participating_students.toLocaleString()}
-        change={`Out of ${metrics.total_eligible_students.toLocaleString()} Eligible`}
+        value={isDataSuppressed ? "Insufficient data" : metrics.participating_students.toLocaleString()}
+        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `Out of ${metrics.total_eligible_students.toLocaleString()} Eligible`}
         changeType="neutral"
       />
       <MetricCard
         title="Regional Engagement Rate"
-        value={`${metrics.participation_rate.toFixed(1)}%`}
-        change="Campus-wide Reflection Rate"
-        changeType="positive"
+        value={isDataSuppressed ? "Insufficient data" : `${metrics.participation_rate.toFixed(1)}%`}
+        change={isDataSuppressed ? "Campus-wide Reflection Rate (Suppressed)" : "Campus-wide Reflection Rate"}
+        changeType={isDataSuppressed ? "neutral" : "positive"}
       />
       <MetricCard
         title="Areas of Concern"
-        value={attentionCategories.length.toString()}
-        change="Categories below stable threshold"
-        changeType={attentionCategories.length > 0 ? "negative" : "positive"}
+        value={isDataSuppressed ? "Insufficient data" : attentionCategories.length.toString()}
+        change={isDataSuppressed ? "Category signals suppressed (<10 participants)" : "Categories below stable threshold"}
+        changeType={isDataSuppressed ? "neutral" : (attentionCategories.length > 0 ? "negative" : "positive")}
       />
     </div>
 
     {/* Calm Non-Clinical Policy Insight Action Alert */}
-    {attentionCategories.length > 0 && (
+    {!isDataSuppressed && attentionCategories.length > 0 && (
       <Alert type="warning" title="Regional Institutional Action Recommended">
         <p>
           Aggregate signals indicate elevated stress indicators in <strong>{attentionCategories.map((c) => c.category.replace('_', ' ')).join(', ')}</strong> across authorized institutions. Consider coordinating targeted workload management or peer-support workshops.
@@ -187,7 +191,13 @@ const attentionCategories = categorySummaries.filter(
                 <td class="font-medium">{inst.institution_name}</td>
                 <td><span class="code-badge">{inst.institution_code}</span></td>
                 <td>{inst.state}</td>
-                <td>{inst.participating_student_count}</td>
+                <td>
+                  {inst.is_suppressed ? (
+                    <span class="suppressed-text">Insufficient data</span>
+                  ) : (
+                    inst.participating_student_count
+                  )}
+                </td>
                 <td>
                   {inst.is_suppressed ? (
                     <span class="suppressed-text">Suppressed (&lt;10)</span>
