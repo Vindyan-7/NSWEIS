@@ -81,10 +81,10 @@ if (Astro.request.method === 'POST' && user && assessment) {
     if (submitResult.success) {
       return Astro.redirect('/student/wellness');
     } else {
-      errorMessage = submitResult.error || 'Failed to submit check-in.';
+      errorMessage = 'Your check-in could not be submitted. Please review your responses and try again.';
     }
   } catch (err: any) {
-    errorMessage = err?.message || 'An unexpected error occurred during submission.';
+    errorMessage = 'Your check-in could not be submitted. Please review your responses and try again.';
   }
 }
 ---
@@ -95,7 +95,11 @@ if (Astro.request.method === 'POST' && user && assessment) {
     subtitle="Confidential self-reflection check-in"
   />
 
-  {errorMessage && <Alert type="error" title="Assessment Notice">{errorMessage}</Alert>}
+  {errorMessage && (
+    <Alert variant="error" title="Submission Notice" class="mb-4">
+      {errorMessage}
+    </Alert>
+  )}
 
   {!activeCycle ? (
     <Card padding="lg">

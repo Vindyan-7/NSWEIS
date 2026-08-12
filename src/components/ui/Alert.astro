@@ -1,11 +1,13 @@
 ---
 interface Props {
   type?: 'info' | 'success' | 'warning' | 'error';
+  variant?: 'info' | 'success' | 'warning' | 'error';
   title?: string;
   class?: string;
 }
 
-const { type = 'info', title, class: className = '' } = Astro.props;
+const { type: typeProp, variant, title, class: className = '' } = Astro.props;
+const type = variant || typeProp || 'info';
 ---
 
 <div class={`alert alert-${type} ${className}`} role="alert">

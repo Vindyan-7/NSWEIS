@@ -5,10 +5,12 @@ import Card from '../../components/ui/Card.astro';
 import Button from '../../components/ui/Button.astro';
 import Select from '../../components/ui/Select.astro';
 import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import { getAllInstitutions } from '../../services/institutions';
+import { Check } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -119,6 +121,7 @@ const institutions = await getAllInstitutions(supabase);
               <th>Government Administrator</th>
               <th>Assigned Institution</th>
               <th>Code</th>
+              <th>Scope Status</th>
               <th>Assigned Date</th>
             </tr>
           </thead>
@@ -129,12 +132,17 @@ const institutions = await getAllInstitutions(supabase);
                   <td class="font-medium">{sc.profiles?.full_name || sc.admin_profile_id}</td>
                   <td>{sc.institutions?.name || sc.institution_id}</td>
                   <td><span class="code-badge">{sc.institutions?.code || 'INST'}</span></td>
+                  <td>
+                    <Badge variant="stable" size="sm">
+                      <Check size={12} aria-hidden="true" /> Active
+                    </Badge>
+                  </td>
                   <td>{new Date(sc.created_at).toLocaleDateString()}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colspan="4" class="empty-cell">No active scope assignments found.</td>
+                <td colspan="5" class="empty-cell">No active scope assignments found.</td>
               </tr>
             )}
           </tbody>

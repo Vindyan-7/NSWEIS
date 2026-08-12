@@ -27,11 +27,14 @@ const { id, name, value, label, checked = false } = Astro.props;
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    min-height: 48px;
+    width: 100%;
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--color-border-default);
+    border: 1.5px solid var(--color-border-default);
     border-radius: var(--radius-lg);
     background-color: var(--color-bg-surface);
     cursor: pointer;
+    box-sizing: border-box;
     transition: all var(--transition-fast);
   }
 
@@ -40,20 +43,47 @@ const { id, name, value, label, checked = false } = Astro.props;
     background-color: var(--color-primary-50);
   }
 
+  .choice-option:focus-within {
+    border-color: var(--color-primary-600);
+    box-shadow: var(--focus-ring);
+    outline: none;
+  }
+
   .choice-option.is-checked {
     border-color: var(--color-primary-600);
     background-color: var(--color-primary-50);
+  }
+
+  .choice-option.is-checked .choice-label {
+    font-weight: 600;
+    color: var(--color-primary-900);
   }
 
   .choice-radio {
     accent-color: var(--color-primary-600);
     width: 1.125rem;
     height: 1.125rem;
+    flex-shrink: 0;
+    margin: 0;
   }
 
   .choice-label {
     font-size: 0.9375rem;
+    line-height: 1.4;
     color: var(--color-text-main);
     font-weight: 500;
+    word-break: break-word;
+    user-select: none;
+  }
+
+  @media (max-width: 480px) {
+    .choice-option {
+      align-items: flex-start;
+      padding: var(--space-3) var(--space-3);
+    }
+
+    .choice-radio {
+      margin-top: 0.125rem;
+    }
   }
 </style>

@@ -82,7 +82,7 @@ const institutions = await getGovernmentInstitutionSummaries(supabase, user.id);
             </div>
 
             <div class="inst-card-footer">
-              <span class="interventions-tag">{inst.active_interventions_count} Active Interventions</span>
+              <span class="interventions-tag">{inst.active_interventions_count} {inst.active_interventions_count === 1 ? 'Active Intervention' : 'Active Interventions'}</span>
               <a href={`/admin/institutions/${inst.institution_id}`}>
                 <Button variant="outline" size="sm">Oversight Details &rarr;</Button>
               </a>

@@ -64,13 +64,30 @@ const { question, questionNumber, selectedOptionId, id } = Astro.props;
   .question-text {
     font-size: 1.125rem;
     font-weight: 600;
+    line-height: 1.4;
     color: var(--color-text-main);
     margin-bottom: var(--space-5);
+    word-break: break-word;
   }
 
   .question-options {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+
+  @media (max-width: 480px) {
+    .question-card {
+      margin-bottom: var(--space-4);
+    }
+
+    .question-text {
+      font-size: 1.0625rem;
+      margin-bottom: var(--space-4);
+    }
+
+    .question-options {
+      gap: var(--space-2);
+    }
   }
 </style>

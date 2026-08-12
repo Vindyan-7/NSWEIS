@@ -207,7 +207,7 @@ const attentionCategories = isDataSuppressed
                     </Badge>
                   )}
                 </td>
-                <td>{inst.active_interventions_count} active</td>
+                <td>{inst.active_interventions_count} {inst.active_interventions_count === 1 ? 'Active Intervention' : 'Active Interventions'}</td>
                 <td>
                   <a href={`/admin/institutions/${inst.institution_id}`} class="action-link">
                     Oversight &rarr;

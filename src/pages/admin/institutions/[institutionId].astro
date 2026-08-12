@@ -85,7 +85,7 @@ const interventions = await getInstitutionInterventions(supabase, institutionId)
       <MetricCard
         title="Active Interventions"
         value={interventions.length.toString()}
-        change="Scheduled Wellness Sessions"
+        change={interventions.length === 1 ? "Scheduled Wellness Session" : "Scheduled Wellness Sessions"}
         changeType="positive"
       />
     </div>

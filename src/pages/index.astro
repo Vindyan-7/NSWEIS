@@ -2,119 +2,531 @@
 import PublicLayout from '../layouts/PublicLayout.astro';
 import Button from '../components/ui/Button.astro';
 import Card from '../components/ui/Card.astro';
+import Badge from '../components/ui/Badge.astro';
 import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+import {
+  ClipboardCheck,
+  Sparkles,
+  Building2,
+  CalendarCheck,
+  Landmark,
+  LockKeyhole,
+  ShieldCheck,
+  User,
+  ArrowRight,
+} from '@lucide/astro';
 ---
 
 <PublicLayout title="National Student Well-being Early Intervention System">
+  {/* Hero Section */}
   <section class="hero-section">
     <div class="container hero-content">
       <div class="hero-text">
-        <span class="hero-badge">Government Early-Intervention Ecosystem</span>
+        <div class="hero-badge-group">
+          <span class="hero-badge">Civic Policy Infrastructure</span>
+          <Badge variant="stable" size="sm">Non-Clinical & Privacy-First</Badge>
+        </div>
         <h1 class="hero-title">National Student Well-being Early Intervention System</h1>
         <p class="hero-desc">
-          A privacy-conscious, non-clinical ecosystem empowering students through self-reflection, providing higher education institutions with aggregate wellness insights, and enabling targeted preventative interventions.
+          A privacy-first civic platform connecting confidential student self-reflection with anonymous institutional intelligence and evidence-informed government policy.
         </p>
+        
         <div class="hero-cta">
           <a href="/login">
-            <Button variant="primary" size="lg">Access Ecosystem &rarr;</Button>
+            <Button variant="primary" size="lg">
+              Access Ecosystem <ArrowRight size={18} aria-hidden="true" />
+            </Button>
           </a>
           <a href="/privacy">
             <Button variant="outline" size="lg">Privacy Principles</Button>
           </a>
         </div>
+
+        <div class="nonclinical-hero-banner">
+          <ShieldCheck size={18} class="banner-icon" aria-hidden="true" />
+          <span><strong>Non-Clinical Boundary:</strong> Designed for early awareness and preventive well-being support — not clinical diagnosis or medical treatment.</span>
+        </div>
       </div>
-      <div class="hero-card-grid">
-        <Card padding="lg">
-          <h4>🎓 Students</h4>
-          <p>Complete confidential weekly check-ins, receive instant personal wellness insights, and access tailored non-clinical recommendations.</p>
+    </div>
+  </section>
+
+  {/* 5-Stage Policy Architecture Flow */}
+  <section class="section-container architecture-section">
+    <div class="container">
+      <div class="section-header text-center">
+        <span class="section-eyebrow">System Workflow</span>
+        <h2 class="section-title">5-Stage Early Intervention Architecture</h2>
+        <p class="section-subtitle">
+          How NSWEIS converts confidential student reflection into proactive campus interventions and regional policy coordination.
+        </p>
+      </div>
+
+      <div class="flow-grid">
+        <Card padding="md" class="flow-card">
+          <div class="step-num">01</div>
+          <div class="flow-icon-box">
+            <ClipboardCheck size={24} aria-hidden="true" />
+          </div>
+          <h4>Student Self-Reflection</h4>
+          <p>Confidential weekly check-ins empowering students through structured, non-clinical self-reflection.</p>
         </Card>
-        <Card padding="lg">
-          <h4>🏫 Colleges</h4>
-          <p>Monitor institution-wide aggregate wellness trends and organize proactive wellness interventions without compromising student PII.</p>
+
+        <Card padding="md" class="flow-card">
+          <div class="step-num">02</div>
+          <div class="flow-icon-box">
+            <Sparkles size={24} aria-hidden="true" />
+          </div>
+          <h4>Personal Insight</h4>
+          <p>Instant personalized wellness snapshots and actionable self-care recommendations for the student.</p>
         </Card>
-        <Card padding="lg">
-          <h4>🏛️ Government</h4>
-          <p>Oversight dashboards monitoring adoption, district/state wellness signals, and institutional intervention compliance.</p>
+
+        <Card padding="md" class="flow-card">
+          <div class="step-num">03</div>
+          <div class="flow-icon-box">
+            <Building2 size={24} aria-hidden="true" />
+          </div>
+          <h4>Anonymous Intelligence</h4>
+          <p>Campus aggregate indicators preserving privacy via strict suppression thresholds (&ge; 10 students).</p>
+        </Card>
+
+        <Card padding="md" class="flow-card">
+          <div class="step-num">04</div>
+          <div class="flow-icon-box">
+            <CalendarCheck size={24} aria-hidden="true" />
+          </div>
+          <h4>Targeted Intervention</h4>
+          <p>Proactive wellness workshops and mentorship programs scheduled directly from aggregate stress signals.</p>
+        </Card>
+
+        <Card padding="md" class="flow-card">
+          <div class="step-num">05</div>
+          <div class="flow-icon-box">
+            <Landmark size={24} aria-hidden="true" />
+          </div>
+          <h4>Government Oversight</h4>
+          <p>Scoped regional trend monitoring empowering evidence-informed educational policy without accessing student PII.</p>
         </Card>
       </div>
     </div>
   </section>
 
-  <section class="container privacy-section">
-    <PrivacyNotice variant="full" />
+  {/* Privacy-First Architecture Section */}
+  <section class="section-container privacy-arch-section">
+    <div class="container">
+      <div class="section-header text-center">
+        <span class="section-eyebrow">Data Governance</span>
+        <h2 class="section-title">Architectural Privacy & Safety Guarantees</h2>
+        <p class="section-subtitle">
+          Built from the ground up to prevent individual student identification at every operational tier.
+        </p>
+      </div>
+
+      <div class="privacy-features-grid">
+        <Card padding="lg" class="privacy-feature-card">
+          <div class="feature-icon"><LockKeyhole size={22} aria-hidden="true" /></div>
+          <h3>Confidential Student Tier</h3>
+          <p>Individual student responses are strictly protected by database-level PostgreSQL Row Level Security (RLS). No officer or administrator can access individual check-in logs.</p>
+        </Card>
+
+        <Card padding="lg" class="privacy-feature-card">
+          <div class="feature-icon"><Building2 size={22} aria-hidden="true" /></div>
+          <h3>Anonymous College Tier</h3>
+          <p>College officers receive anonymized aggregate category indicators to evaluate campus-wide well-being patterns without receiving student names or individual answers.</p>
+        </Card>
+
+        <Card padding="lg" class="privacy-feature-card">
+          <div class="feature-icon"><Landmark size={22} aria-hidden="true" /></div>
+          <h3>Scoped Government Tier</h3>
+          <p>Government administrators oversee institutional compliance and regional trends strictly within authorized institutional scope boundaries (<code>government_admin_scopes</code>).</p>
+        </Card>
+
+        <Card padding="lg" class="privacy-feature-card">
+          <div class="feature-icon"><ShieldCheck size={22} aria-hidden="true" /></div>
+          <h3>Automatic Privacy Suppression (&ge; 10)</h3>
+          <p>Groups with fewer than 10 participating students automatically suppress category scores and display lock indicators to eliminate any reverse-identification risk.</p>
+        </Card>
+      </div>
+    </div>
+  </section>
+
+  {/* Stakeholder Value Section */}
+  <section class="section-container stakeholders-section">
+    <div class="container">
+      <div class="section-header text-center">
+        <span class="section-eyebrow">Multi-Tenant Ecosystem</span>
+        <h2 class="section-title">Designed for Every Higher Education Stakeholder</h2>
+      </div>
+
+      <div class="stakeholder-grid">
+        <Card padding="lg" class="stakeholder-card">
+          <div class="stakeholder-header">
+            <User size={24} class="stakeholder-icon" aria-hidden="true" />
+            <h3>Students</h3>
+          </div>
+          <ul class="stakeholder-list">
+            <li>Private weekly self-reflection space</li>
+            <li>Instant personal wellness snapshot & trend tracking</li>
+            <li>Actionable non-clinical self-care recommendations</li>
+          </ul>
+        </Card>
+
+        <Card padding="lg" class="stakeholder-card">
+          <div class="stakeholder-header">
+            <Building2 size={24} class="stakeholder-icon" aria-hidden="true" />
+            <h3>Colleges</h3>
+          </div>
+          <ul class="stakeholder-list">
+            <li>Anonymous aggregate well-being signals</li>
+            <li>Department-level comparison (&ge; 10 privacy threshold)</li>
+            <li>Proactive intervention planning and scheduling</li>
+          </ul>
+        </Card>
+
+        <Card padding="lg" class="stakeholder-card">
+          <div class="stakeholder-header">
+            <Landmark size={24} class="stakeholder-icon" aria-hidden="true" />
+            <h3>Government</h3>
+          </div>
+          <ul class="stakeholder-list">
+            <li>Authorized institutional scope oversight</li>
+            <li>Regional wellness trend analysis</li>
+            <li>Evidence-informed policy and resource allocation</li>
+          </ul>
+        </Card>
+      </div>
+    </div>
+  </section>
+
+  {/* Final Call To Action & Privacy Notice */}
+  <section class="container cta-section">
+    <Card padding="lg" class="cta-card text-center">
+      <h2>Ready to Explore the NSWEIS Ecosystem?</h2>
+      <p>Log in with role-based demo credentials to experience the multi-tenant workflow.</p>
+      <div class="cta-actions">
+        <a href="/login">
+          <Button variant="primary" size="lg">
+            Sign In to Demo <ArrowRight size={18} aria-hidden="true" />
+          </Button>
+        </a>
+      </div>
+    </Card>
+
+    <div class="privacy-footer-notice">
+      <PrivacyNotice variant="full" />
+    </div>
   </section>
 </PublicLayout>
 
 <style>
+  /* Hero Section */
   .hero-section {
-    padding: var(--space-16) 0 var(--space-12);
+    padding: var(--space-12) 0 var(--space-12);
     background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-bg-app) 100%);
   }
 
   .hero-content {
     display: flex;
     flex-direction: column;
-    gap: var(--space-12);
     align-items: center;
   }
 
   .hero-text {
     text-align: center;
-    max-width: 800px;
+    max-width: 840px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
   }
 
+  .hero-badge-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
   .hero-badge {
     background-color: var(--color-primary-100);
-    color: var(--color-primary-700);
+    color: var(--color-primary-800);
     padding: var(--space-1) var(--space-4);
     border-radius: var(--radius-full);
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
 
   .hero-title {
-    font-size: 2.75rem;
+    font-size: 2.5rem;
     font-weight: 800;
     color: var(--color-text-main);
     line-height: 1.15;
+    letter-spacing: -0.02em;
   }
 
   .hero-desc {
     font-size: 1.125rem;
     color: var(--color-text-muted);
     line-height: 1.6;
+    max-width: 720px;
   }
 
   .hero-cta {
     display: flex;
     gap: var(--space-4);
+    margin-top: var(--space-2);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .nonclinical-hero-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    font-size: 0.84375rem;
+    color: var(--color-text-muted);
     margin-top: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    text-align: left;
   }
 
-  .hero-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--space-6);
-    width: 100%;
+  .nonclinical-hero-banner strong {
+    color: var(--color-text-main);
   }
 
-  .hero-card-grid h4 {
-    font-size: 1.25rem;
+  .banner-icon {
+    color: var(--color-primary-600);
+    flex-shrink: 0;
+  }
+
+  /* Section Containers */
+  .section-container {
+    padding: var(--space-12) 0;
+  }
+
+  .section-header {
+    margin-bottom: var(--space-8);
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .section-eyebrow {
+    font-size: 0.75rem;
     font-weight: 700;
-    margin-bottom: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary-600);
+    display: block;
+    margin-bottom: var(--space-1);
   }
 
-  .hero-card-grid p {
-    font-size: 0.9375rem;
+  .section-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    letter-spacing: -0.01em;
+  }
+
+  .section-subtitle {
+    font-size: 1rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-2);
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* 5-Stage Flow Grid */
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .flow-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    height: 100%;
+  }
+
+  .step-num {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--color-primary-600);
+    background-color: var(--color-primary-50);
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-sm);
+    width: fit-content;
+  }
+
+  .flow-icon-box {
+    color: var(--color-primary-600);
+    margin-top: var(--space-1);
+  }
+
+  .flow-card h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .flow-card p {
+    font-size: 0.84375rem;
     color: var(--color-text-muted);
     line-height: 1.5;
   }
 
-  .privacy-section {
-    margin-bottom: var(--space-16);
+  /* Privacy Features Grid */
+  .privacy-arch-section {
+    background-color: var(--color-bg-subtle);
+  }
+
+  .privacy-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-5);
+  }
+
+  .privacy-feature-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .feature-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-md);
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .privacy-feature-card h3 {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .privacy-feature-card p {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .privacy-feature-card code {
+    background-color: var(--color-bg-surface);
+    padding: 0.1rem 0.3rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+  }
+
+  /* Stakeholder Grid */
+  .stakeholder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .stakeholder-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .stakeholder-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .stakeholder-icon {
+    color: var(--color-primary-600);
+  }
+
+  .stakeholder-header h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .stakeholder-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .stakeholder-list li {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    position: relative;
+    padding-left: var(--space-4);
+  }
+
+  .stakeholder-list li::before {
+    content: "•";
+    color: var(--color-primary-600);
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+  }
+
+  /* CTA & Footer */
+  .cta-section {
+    margin-bottom: var(--space-12);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+  }
+
+  .cta-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    background: linear-gradient(135deg, var(--color-bg-surface) 0%, var(--color-primary-50) 100%);
+  }
+
+  .cta-card h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+  }
+
+  .cta-card p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+  }
+
+  .cta-actions {
+    margin-top: var(--space-2);
+  }
+
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 1.875rem;
+    }
+
+    .hero-desc {
+      font-size: 1rem;
+    }
+
+    .section-title {
+      font-size: 1.375rem;
+    }
   }
 </style>
+
