@@ -4,7 +4,7 @@ import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
 
-import { LayoutDashboard, ClipboardCheck, HeartPulse, History as HistoryIcon, User } from '@lucide/astro';
+import { LayoutDashboard, ClipboardCheck, ListChecks, TrendingUp, HeartPulse, History as HistoryIcon, User } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -18,6 +18,8 @@ const profile = Astro.locals.profile;
 const studentNav = [
   { label: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard, active: activePath === '/student/dashboard' },
   { label: 'Weekly Check-in', href: '/student/check-in', icon: ClipboardCheck, active: activePath === '/student/check-in' },
+  { label: 'Tasks', href: '/student/tasks', icon: ListChecks, active: activePath === '/student/tasks' },
+  { label: 'Progress', href: '/student/progress', icon: TrendingUp, active: activePath === '/student/progress' },
   { label: 'Wellness Summary', href: '/student/wellness', icon: HeartPulse, active: activePath === '/student/wellness' },
   { label: 'History', href: '/student/history', icon: HistoryIcon, active: activePath === '/student/history' },
   { label: 'Profile', href: '/student/profile', icon: User, active: activePath === '/student/profile' },

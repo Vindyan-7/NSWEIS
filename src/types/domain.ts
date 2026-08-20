@@ -9,7 +9,8 @@ export type WellnessCategory =
   | 'financial'
   | 'career'
   | 'campus_experience'
-  | 'physical_wellbeing';
+  | 'physical_wellbeing'
+  | 'digital_balance';
 
 export type WellnessBand = 'stable' | 'watch' | 'needs_attention' | 'elevated';
 
@@ -18,6 +19,8 @@ export type WellnessTrend = 'improving' | 'stable' | 'declining' | 'first_check_
 export type AssessmentStatus = 'not_started' | 'in_progress' | 'completed';
 
 export type InterventionStatus = 'draft' | 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
+
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'expired';
 
 export type QuestionType = 'single_choice' | 'multiple_choice' | 'scale_1_5' | 'text' | 'voice';
 
@@ -29,6 +32,7 @@ export interface UserProfile {
   department_id?: string | null;
   student_roll_no?: string | null;
   year_level?: number | null;
+  section_code?: string | null;
   avatar_url?: string | null;
   active: boolean;
   created_at: string;
@@ -78,6 +82,11 @@ export interface Question {
   active: boolean;
   order_index: number;
   is_base_question: boolean;
+  question_code?: string | null;
+  week_number?: number;
+  target_department?: string;
+  adaptive_trigger_group?: string | null;
+  required?: boolean;
   options?: QuestionOption[];
 }
 
@@ -87,6 +96,9 @@ export interface QuestionOption {
   label: string;
   score: number;
   order_index: number;
+  option_code?: string | null;
+  signal_value?: number | null;
+  follow_up_group?: string | null;
 }
 
 export interface QuestionRule {
@@ -140,6 +152,43 @@ export interface Recommendation {
   description: string;
   priority: number;
   active: boolean;
+}
+
+export interface StudentTask {
+  id: string;
+  student_id: string;
+  assessment_id?: string | null;
+  category: WellnessCategory;
+  title: string;
+  description: string;
+  estimated_minutes: number;
+  task_type: string;
+  due_date?: string | null;
+  status: TaskStatus;
+  credits_awarded: number;
+  source_reason?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+}
+
+export interface StudentCreditLog {
+  id: string;
+  student_id: string;
+  amount: number;
+  activity_type: string;
+  description?: string | null;
+  reference_id?: string | null;
+  created_at: string;
+}
+
+export interface QuestionImport {
+  id: string;
+  admin_id: string;
+  filename: string;
+  total_rows: number;
+  successful_rows: number;
+  error_log?: Record<string, unknown> | Array<Record<string, unknown>> | null;
+  created_at: string;
 }
 
 export interface Intervention {

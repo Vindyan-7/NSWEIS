@@ -13,8 +13,9 @@ import { calculateTrend } from '../../lib/scoring/engine';
 import {
   getLatestCompletedAssessment,
   getStudentAssessmentHistory,
-  getRecommendationsForAssessment,
 } from '../../services/assessments';
+import { getRecommendationsForAssessment } from '../../services/recommendations';
+import { BookOpen, HeartHandshake, ArrowRight, Sparkles } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -30,32 +31,25 @@ const trend = calculateTrend(
 );
 
 let recommendations: any[] = [];
-if (latestData && latestData.scores) {
-  const categoriesToRecommend = latestData.scores
-    .filter((s) => s.band === 'needs_attention' || s.band === 'elevated' || s.band === 'watch')
-    .map((s) => s.category);
-
-  recommendations = await getRecommendationsForAssessment(
-    supabase,
-    categoriesToRecommend.length > 0 ? categoriesToRecommend : ['academic', 'sleep_rest', 'emotional_wellbeing']
-  );
+if (latestData?.assessment?.id) {
+  recommendations = await getRecommendationsForAssessment(supabase, latestData.assessment.id);
 }
 ---
 
 <StudentLayout title="Wellness Summary" activePath="/student/wellness">
   <PageHeader
-    title="Wellness Summary & Recommendations"
-    subtitle="Personalized self-reflection results and non-clinical recommendations"
+    title="Wellness Summary & Focus Actions"
+    subtitle="Personalized self-reflection results and supportive well-being focus steps"
   />
 
   {!latestData ? (
     <Card padding="lg">
       <EmptyState
         title="No completed check-ins found"
-        description="Complete your weekly check-in to view your wellness summary and recommendations."
+        description="Complete your weekly check-in to view your wellness summary and personalized focus steps."
       >
         <a href="/student/check-in">
-          <Button variant="primary">Start Check-in Now</Button>
+          <Button variant="primary">Start Weekly Reflection</Button>
         </a>
       </EmptyState>
     </Card>
@@ -79,11 +73,11 @@ if (latestData && latestData.scores) {
         </div>
         {previousAssessment ? (
           <p class="comparison-text">
-            Compared with your previous check-in on {new Date(previousAssessment.completed_at || '').toLocaleDateString()}, your overall indicator changed from <strong>{previousAssessment.overall_indicator}</strong> to <strong>{latestData.assessment.overall_indicator}</strong> ({trend}).
+            Compared with your previous check-in on {new Date(previousAssessment.completed_at || '').toLocaleDateString()}, your overall indicator shifted from <strong>{previousAssessment.overall_indicator}</strong> to <strong>{latestData.assessment.overall_indicator}</strong> ({trend}).
           </p>
         ) : (
           <p class="comparison-text">
-            This is your first completed check-in. Future check-ins will track your progress over time.
+            This is your first completed reflection. Future check-ins will track your progress over time.
           </p>
         )}
       </Card>
@@ -102,10 +96,13 @@ if (latestData && latestData.scores) {
         </div>
       </div>
 
-      {/* Recommendations */}
+      {/* Personalized Well-being Focus Recommendations */}
       <Card padding="lg" class="recommendations-card">
-        <h3 class="card-section-title">Preventative & Preventive Recommendations</h3>
-        <p class="section-subtext">Practical non-clinical self-care strategies based on your check-in focus areas.</p>
+        <div class="rec-section-header">
+          <Sparkles size={20} class="text-primary" aria-hidden="true" />
+          <h3 class="card-section-title" style="margin-bottom: 0;">Your Focus for This Week</h3>
+        </div>
+        <p class="section-subtext">Supportive, practical focus steps based on your latest reflection.</p>
         
         <div class="recommendations-list">
           {recommendations.length > 0 ? (
@@ -113,14 +110,22 @@ if (latestData && latestData.scores) {
               <div class="recommendation-item">
                 <div class="rec-header">
                   <span class="rec-cat">{rec.category.replace('_', ' ')}</span>
-                  <Badge variant="primary" size="sm">Priority {rec.priority}</Badge>
+                  <span class="rec-added-tag">Added to your weekly tasks</span>
                 </div>
                 <h4 class="rec-title">{rec.title}</h4>
                 <p class="rec-desc">{rec.description}</p>
+                
+                <div class="rec-action-row">
+                  <a href="/student/tasks" class="view-task-link">
+                    View in My Tasks <ArrowRight size={14} aria-hidden="true" />
+                  </a>
+                </div>
               </div>
             ))
           ) : (
-            <p class="empty-rec">Your indicators look stable! Maintain your regular sleep and study habits.</p>
+            <div class="empty-rec-box">
+              <p class="empty-rec">Your indicators look steady! Continue maintaining your regular study and sleep routines.</p>
+            </div>
           )}
         </div>
       </Card>
@@ -131,12 +136,18 @@ if (latestData && latestData.scores) {
         <p class="section-subtext">Access voluntary student welfare resources provided by your campus.</p>
         <div class="support-grid">
           <div class="support-item">
-            <h5>📚 Academic Mentorship</h5>
+            <div class="support-item-header">
+              <BookOpen size={18} class="support-icon" aria-hidden="true" />
+              <h5>Academic Mentorship</h5>
+            </div>
             <p>Peer tutoring, academic advising, and exam preparation assistance.</p>
           </div>
           <div class="support-item">
-            <h5>🧘 Student Welfare Office</h5>
-            <p>Campus life advisory, residence guidance, and student activities.</p>
+            <div class="support-item-header">
+              <HeartHandshake size={18} class="support-icon" aria-hidden="true" />
+              <h5>Student Welfare Office</h5>
+            </div>
+            <p>Campus life advisory, residence guidance, and student activity support.</p>
           </div>
         </div>
       </Card>
@@ -178,6 +189,13 @@ if (latestData && latestData.scores) {
     gap: var(--space-4);
   }
 
+  .rec-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
   .recommendations-list {
     display: flex;
     flex-direction: column;
@@ -201,9 +219,19 @@ if (latestData && latestData.scores) {
 
   .rec-cat {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--color-primary-700);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .rec-added-tag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-success-700);
+    background-color: #d1fae5;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
   }
 
   .rec-title {
@@ -214,6 +242,37 @@ if (latestData && latestData.scores) {
   }
 
   .rec-desc {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .rec-action-row {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .view-task-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+  }
+
+  .view-task-link:hover {
+    text-decoration: underline;
+  }
+
+  .empty-rec-box {
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .empty-rec {
     font-size: 0.875rem;
     color: var(--color-text-muted);
   }
@@ -231,11 +290,22 @@ if (latestData && latestData.scores) {
     border-radius: var(--radius-lg);
   }
 
+  .support-item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .support-icon {
+    color: var(--color-primary-600);
+  }
+
   .support-item h5 {
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--color-text-main);
-    margin-bottom: var(--space-1);
+    margin: 0;
   }
 
   .support-item p {

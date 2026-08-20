@@ -2,12 +2,11 @@
 import StudentLayout from '../../layouts/StudentLayout.astro';
 import PageHeader from '../../components/navigation/PageHeader.astro';
 import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
 import Alert from '../../components/ui/Alert.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import QuestionCard from '../../components/assessment/QuestionCard.astro';
 import ReflectionBox from '../../components/assessment/ReflectionBox.astro';
-import AssessmentProgress from '../../components/assessment/AssessmentProgress.astro';
-import AssessmentNavigation from '../../components/assessment/AssessmentNavigation.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import {
   getActiveAssessmentCycle,
@@ -15,76 +14,151 @@ import {
   getBaseQuestions,
   submitAssessmentResponsesAndScore,
 } from '../../services/assessments';
+import { generateRecommendationsForAssessment } from '../../services/recommendations';
+import {
+  Clock3,
+  CheckCircle2,
+  ShieldCheck,
+} from '@lucide/astro';
 
 const user = Astro.locals.user;
+const profile = Astro.locals.profile;
 const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+if (profile?.role !== 'student') {
+  return Astro.redirect('/login');
+}
 
 let errorMessage = '';
 
+// Load active assessment cycle
 const activeCycle = await getActiveAssessmentCycle(supabase);
 
 if (!activeCycle) {
-  errorMessage = 'No active assessment cycle is open at this time.';
+  errorMessage = 'No active assessment cycle is open at this time. Please check back soon.';
 }
 
-const assessment = user && activeCycle ? await getOrCreateStudentAssessment(supabase, user.id, activeCycle.id) : null;
+// Fetch or create student assessment for the active cycle
+const assessment = activeCycle ? await getOrCreateStudentAssessment(supabase, user.id, activeCycle.id) : null;
 
-const baseQuestions = await getBaseQuestions(supabase);
+// Determine student department code dynamically
+let studentDeptCode = 'ALL';
+if (profile?.department_id) {
+  const { data: dept } = await supabase
+    .from('departments')
+    .select('code')
+    .eq('id', profile.department_id)
+    .single();
+  if (dept) studentDeptCode = (dept as any).code;
+}
 
-// Handle POST Submission
+// Fetch base questions for active week and student department
+const baseQuestions = activeCycle
+  ? await getBaseQuestions(supabase, activeCycle.week_number, studentDeptCode)
+  : [];
+
+// Fetch existing responses if assessment is in progress
+const existingResponseMap = new Map<string, string>();
+let existingReflectionText = '';
+
+if (assessment) {
+  const { data: respData } = await supabase
+    .from('assessment_responses')
+    .select('question_id, selected_option_id, text_response')
+    .eq('assessment_id', assessment.id);
+
+  if (respData) {
+    for (const r of respData as any[]) {
+      if (r.selected_option_id) existingResponseMap.set(r.question_id, r.selected_option_id);
+      if (r.text_response && !existingReflectionText) existingReflectionText = r.text_response;
+    }
+  }
+}
+
+// Calculate server-authoritative session timer (20 minutes = 1200 seconds)
+const REQUIRED_SESSION_SECONDS = 1200;
+const startedAtMs = assessment?.started_at ? new Date(assessment.started_at).getTime() : Date.now();
+const nowMs = Date.now();
+const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+const remainingSeconds = Math.max(0, REQUIRED_SESSION_SECONDS - elapsedSeconds);
+const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
+
+// Handle POST Form Submission
 if (Astro.request.method === 'POST' && user && assessment) {
   try {
-    const formData = await Astro.request.formData();
-    const rawResponses: Array<{
-      questionId: string;
-      category: any;
-      selectedOptionId?: string;
-      score: number;
-      weight: number;
-      textResponse?: string;
-    }> = [];
+    if (assessment.status === 'completed') {
+      return Astro.redirect('/student/wellness');
+    }
 
-    // Parse base questions and follow-ups
-    for (const [key, val] of formData.entries()) {
-      if (key.startsWith('q_')) {
-        const questionId = key.replace('q_', '');
-        const selectedOptionId = val as string;
-        
-        // Find question in base or all questions
-        const q = baseQuestions.find((item) => item.id === questionId);
-        if (q && q.options) {
-          const opt = q.options.find((o) => o.id === selectedOptionId);
+    // Server-side completion duration verification gate
+    if (elapsedSeconds < REQUIRED_SESSION_SECONDS) {
+      errorMessage = 'Your reflection session is still in progress. Please continue for a little longer.';
+    } else {
+      const formData = await Astro.request.formData();
+      const rawResponses: Array<{
+        questionId: string;
+        category: any;
+        selectedOptionId?: string;
+        score: number;
+        weight: number;
+        textResponse?: string;
+      }> = [];
+
+      let missingRequired = false;
+
+      for (const q of baseQuestions) {
+        const val = formData.get(`q_${q.id}`)?.toString();
+        if (q.required !== false && !val) {
+          missingRequired = true;
+          break;
+        }
+
+        if (val && q.options) {
+          const opt = q.options.find((o) => o.id === val);
           if (opt) {
             rawResponses.push({
-              questionId,
+              questionId: q.id,
               category: q.category,
-              selectedOptionId,
+              selectedOptionId: val,
               score: Number(opt.score),
               weight: Number(q.weight || 1.0),
             });
           }
         }
       }
-    }
 
-    const reflectionText = (formData.get('reflection_text') as string || '').trim();
-    if (reflectionText && rawResponses.length > 0) {
-      rawResponses[0].textResponse = reflectionText;
-    }
+      if (missingRequired) {
+        errorMessage = 'Please answer all required reflection questions before completing your session.';
+      } else {
+        const reflectionText = (formData.get('reflection_text') as string || '').trim();
+        if (reflectionText && rawResponses.length > 0) {
+          rawResponses[0].textResponse = reflectionText;
+        }
 
-    const submitResult = await submitAssessmentResponsesAndScore(
-      supabase,
-      assessment.id,
-      rawResponses
-    );
+        const submitResult = await submitAssessmentResponsesAndScore(
+          supabase,
+          assessment.id,
+          rawResponses
+        );
 
-    if (submitResult.success) {
-      return Astro.redirect('/student/wellness');
-    } else {
-      errorMessage = 'Your check-in could not be submitted. Please review your responses and try again.';
+        if (submitResult.success) {
+          try {
+            await generateRecommendationsForAssessment(supabase, user.id, assessment.id);
+          } catch (recErr) {
+            // Log safely without rolling back assessment completion
+          }
+          return Astro.redirect('/student/wellness');
+        } else {
+          errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
+        }
+      }
     }
   } catch (err: any) {
-    errorMessage = 'Your check-in could not be submitted. Please review your responses and try again.';
+    errorMessage = 'We couldn\'t continue your reflection session right now. Please try again.';
   }
 }
 ---
@@ -95,57 +169,401 @@ if (Astro.request.method === 'POST' && user && assessment) {
     subtitle="Confidential self-reflection check-in"
   />
 
-  {errorMessage && (
-    <Alert variant="error" title="Submission Notice" class="mb-4">
-      {errorMessage}
-    </Alert>
-  )}
+  <div class="checkin-page-layout">
+    {errorMessage && (
+      <Alert type="error" title="Session Notice">
+        {errorMessage}
+      </Alert>
+    )}
 
-  {!activeCycle ? (
-    <Card padding="lg">
-      <p>There are no active weekly check-in cycles available currently. Please check back soon.</p>
-    </Card>
-  ) : (
-    <div class="assessment-container">
-      <Card padding="lg" class="assessment-card glass-panel">
-        <form method="POST" id="checkin-form">
-          <AssessmentProgress currentStep={1} totalSteps={baseQuestions.length + 1} stepName="Base Self-Reflection" />
-
-          <div class="questions-list">
-            {baseQuestions.map((q, idx) => (
-              <QuestionCard
-                question={q}
-                questionNumber={idx + 1}
-              />
-            ))}
+    {!activeCycle ? (
+      <Card padding="lg">
+        <div class="empty-cycle-box">
+          <Clock3 size={32} class="text-muted" aria-hidden="true" />
+          <h3>No Active Assessment Cycle</h3>
+          <p>There are no active weekly check-in cycles available currently. Please check back soon.</p>
+        </div>
+      </Card>
+    ) : assessment?.status === 'completed' ? (
+      <Card padding="lg" class="completed-session-card">
+        <div class="completed-session-box">
+          <div class="completed-icon-wrap">
+            <CheckCircle2 size={36} aria-hidden="true" />
+          </div>
+          <h3 class="completed-title">This week's reflection is complete</h3>
+          <p class="completed-text">
+            Thank you for taking time to complete your weekly reflection for {activeCycle.name}. Your responses have been securely stored.
+          </p>
+          <a href="/student/wellness">
+            <Button variant="primary" size="md">
+              View Wellness Results &rarr;
+            </Button>
+          </a>
+        </div>
+      </Card>
+    ) : (
+      <div class="session-container">
+        {/* Session Header Bar */}
+        <Card padding="md" class="session-header-card">
+          <div class="header-flex-top">
+            <div class="header-info">
+              <span class="cycle-name-tag">{activeCycle.name}</span>
+              <h3 class="session-header-title">Weekly Reflection</h3>
+            </div>
+            
+            <div class="timer-box">
+              <span class="timer-label">Time Remaining</span>
+              <span id="timer-display" class="timer-digits">
+                {Math.floor(remainingSeconds / 60).toString().padStart(2, '0')}:
+                {(remainingSeconds % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
           </div>
 
-          <ReflectionBox />
+          <div class="header-flex-bottom">
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" style={`width: 100%`}></div>
+              </div>
+              <span class="progress-text">Question 1 of {baseQuestions.length}</span>
+            </div>
+            <span class="save-status-text">
+              <ShieldCheck size={14} aria-hidden="true" /> Your responses are saved as you continue.
+            </span>
+          </div>
+        </Card>
 
-          <PrivacyNotice variant="compact" />
+        {/* Questions Form */}
+        <Card padding="lg" class="questions-card">
+          <form method="POST" id="reflection-form">
+            <div class="questions-list">
+              {baseQuestions.map((q, idx) => (
+                <QuestionCard
+                  question={q}
+                  questionNumber={idx + 1}
+                  selectedOptionId={existingResponseMap.get(q.id)}
+                />
+              ))}
+            </div>
 
-          <AssessmentNavigation isLastStep={true} isSubmitting={false} />
-        </form>
-      </Card>
-    </div>
-  )}
+            {/* Optional Final Reflection Box */}
+            <ReflectionBox value={existingReflectionText} />
+
+            {/* Pre-completion UI status notice */}
+            <div class="precompletion-notice-box" id="notice-box">
+              <span id="completion-status-text" class="status-msg">
+                {isTimerCompleteOnServer
+                  ? 'Your reflection responses are ready to submit.'
+                  : 'Your responses are complete. Please continue reflecting until your session timer finishes.'}
+              </span>
+            </div>
+
+            <PrivacyNotice variant="compact" />
+
+            <div class="session-nav-actions">
+              <a href="/student/dashboard">
+                <Button variant="outline" type="button">
+                  &larr; Leave Reflection
+                </Button>
+              </a>
+              
+              <Button
+                variant="primary"
+                type="submit"
+                id="submit-btn"
+                disabled={!isTimerCompleteOnServer}
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span id="btn-label">
+                  {isTimerCompleteOnServer ? 'Complete Weekly Reflection' : 'Session In Progress'}
+                </span>
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    )}
+  </div>
 </StudentLayout>
 
-<style>
-  .assessment-container {
-    max-width: 720px;
-    margin: 0 auto;
-  }
+<script is:inline define:vars={{ remainingSeconds, isTimerCompleteOnServer }}>
+  (function () {
+    var timerDisplay = document.getElementById('timer-display');
+    var submitBtn = document.getElementById('submit-btn');
+    var btnLabel = document.getElementById('btn-label');
+    var statusText = document.getElementById('completion-status-text');
 
-  .assessment-card {
+    var secondsLeft = remainingSeconds;
+    var timerInterval = null;
+
+    function formatTime(secs) {
+      var m = Math.floor(secs / 60);
+      var s = secs % 60;
+      return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+    }
+
+    function checkFormValidity() {
+      var form = document.getElementById('reflection-form');
+      if (!form) return false;
+
+      var requiredQuestions = form.querySelectorAll('.question-card');
+      var allAnswered = true;
+
+      requiredQuestions.forEach(function (card) {
+        var radios = card.querySelectorAll('input[type="radio"]');
+        if (radios.length > 0) {
+          var isChecked = Array.from(radios).some(function (r) { return r.checked; });
+          if (!isChecked) allAnswered = false;
+        }
+      });
+
+      return allAnswered;
+    }
+
+    function updateState() {
+      var isAnswered = checkFormValidity();
+      var isTimeUp = secondsLeft <= 0;
+
+      if (timerDisplay) {
+        timerDisplay.textContent = formatTime(secondsLeft);
+      }
+
+      if (!isAnswered) {
+        if (statusText) statusText.textContent = 'Complete all required reflections to continue.';
+        if (submitBtn) submitBtn.disabled = true;
+        if (btnLabel) btnLabel.textContent = 'Session In Progress';
+      } else if (!isTimeUp) {
+        if (statusText) statusText.textContent = 'Your responses are complete. Please continue reflecting until your session is ready to complete.';
+        if (submitBtn) submitBtn.disabled = true;
+        if (btnLabel) btnLabel.textContent = 'Session In Progress (' + formatTime(secondsLeft) + ')';
+      } else {
+        if (statusText) statusText.textContent = 'Your reflection is ready to complete.';
+        if (submitBtn) submitBtn.disabled = false;
+        if (btnLabel) btnLabel.textContent = 'Complete Weekly Reflection';
+      }
+    }
+
+    if (secondsLeft > 0) {
+      timerInterval = setInterval(function () {
+        secondsLeft--;
+        updateState();
+        if (secondsLeft <= 0) {
+          clearInterval(timerInterval);
+        }
+      }, 1000);
+    }
+
+    var form = document.getElementById('reflection-form');
+    if (form) {
+      form.addEventListener('change', updateState);
+    }
+
+    updateState();
+  })();
+</script>
+
+<style>
+  .checkin-page-layout {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .empty-cycle-box {
+    text-align: center;
+    padding: var(--space-8);
+  }
+
+  .completed-session-card {
+    background: linear-gradient(135deg, #ffffff 0%, var(--color-primary-50) 100%);
+  }
+
+  .completed-session-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-6);
+  }
+
+  .completed-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: #d1fae5;
+    color: #047857;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .completed-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .completed-text {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    max-width: 500px;
+    margin-bottom: var(--space-6);
+  }
+
+  .session-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .session-header-card {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .header-flex-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .cycle-name-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .session-header-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .timer-box {
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    text-align: right;
+  }
+
+  .timer-label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-primary-800);
+    text-transform: uppercase;
+  }
+
+  .timer-digits {
+    display: block;
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--color-primary-900);
+  }
+
+  .header-flex-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .progress-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .progress-bar-track {
+    flex: 1;
+    height: 8px;
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background-color: var(--color-primary-500);
+    border-radius: var(--radius-full);
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  .save-status-text {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
   }
 
   .questions-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+  }
+
+  .precompletion-notice-box {
+    background-color: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-6);
+    margin-bottom: var(--space-4);
+    text-align: center;
+  }
+
+  .status-msg {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+
+  .session-nav-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-6);
+  }
+
+  @media (max-width: 480px) {
+    .header-flex-top {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-3);
+    }
+
+    .timer-box {
+      width: 100%;
+      text-align: left;
+    }
+
+    .session-nav-actions {
+      flex-direction: column-reverse;
+      gap: var(--space-3);
+      width: 100%;
+    }
+
+    .session-nav-actions button,
+    .session-nav-actions a {
+      width: 100%;
+    }
   }
 </style>

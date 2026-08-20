@@ -36,7 +36,10 @@ supabase/
 │   ├── 03_college_institutional_intelligence.sql  # College aggregate functions & interventions
 │   ├── 04_government_intelligence.sql             # Government admin scopes & RPC functions
 │   ├── 05_demo_government_dataset.sql             # Synthetic regional dataset for Metropolitan College
-│   └── 06_hackathon_demo_dataset.sql              # Scenario B demo dataset (Requires 10 manual Auth user UIDs)
+│   ├── 06_hackathon_demo_dataset.sql              # Scenario B demo dataset (Requires 10 manual Auth user UIDs)
+│   ├── 07_student_first_mvp_schema.sql            # Student-first MVP schema extensions & task RPC
+│   ├── 08_question_management.sql                 # Super Admin question management & import RLS policies
+│   └── 09_recommendation_engine.sql               # Recommendation engine rules & task generation (PENDING MANUAL EXECUTION)
 ├── migrations/                                    # Preserved historical migration archives
 ├── seed.sql                                       # Historical seed archive
 └── README.md                                      # Workflow guide

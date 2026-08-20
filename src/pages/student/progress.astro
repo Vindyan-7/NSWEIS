@@ -1,0 +1,297 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getStudentProgress, getStudentCreditBalance } from '../../services/student-tasks';
+import {
+  TrendingUp,
+  CalendarCheck,
+  ListChecks,
+  Coins,
+  CheckCircle2,
+  Sparkles,
+} from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const progress = await getStudentProgress(supabase, user.id);
+const creditBalance = await getStudentCreditBalance(supabase, user.id);
+---
+
+<StudentLayout title="My Progress" activePath="/student/progress">
+  <PageHeader
+    title="My Progress & Participation"
+    subtitle="Track your weekly reflections, activity completion, and well-being consistency."
+  >
+    <a href="/student/tasks">
+      <Button variant="outline" size="sm">
+        <ListChecks size={16} aria-hidden="true" /> View Active Tasks
+      </Button>
+    </a>
+  </PageHeader>
+
+  <div class="progress-page-layout">
+    {/* Continuity Reflection Card */}
+    <Card padding="lg" class="continuity-card">
+      <div class="continuity-flex">
+        <div class="continuity-icon">
+          <Sparkles size={24} aria-hidden="true" />
+        </div>
+        <div>
+          <h3 class="continuity-title">You're building a consistent reflection routine</h3>
+          <p class="continuity-text">
+            Taking time each week to pause, reflect, and complete small wellness actions helps you stay mindful of your balance.
+          </p>
+        </div>
+      </div>
+    </Card>
+
+    {/* Activity Completion Summary Cards */}
+    <div class="metrics-grid">
+      <Card padding="md">
+        <div class="metric-item">
+          <div class="icon-box primary">
+            <TrendingUp size={20} aria-hidden="true" />
+          </div>
+          <div>
+            <span class="label">Completion Rate</span>
+            <span class="value">{progress.completionPercentage}%</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card padding="md">
+        <div class="metric-item">
+          <div class="icon-box success">
+            <CheckCircle2 size={20} aria-hidden="true" />
+          </div>
+          <div>
+            <span class="label">Completed Activities</span>
+            <span class="value">{progress.completedTasks}</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card padding="md">
+        <div class="metric-item">
+          <div class="icon-box watch">
+            <ListChecks size={20} aria-hidden="true" />
+          </div>
+          <div>
+            <span class="label">Active Activities</span>
+            <span class="value">{progress.activeTasks}</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card padding="md">
+        <div class="metric-item">
+          <div class="icon-box accent">
+            <Coins size={20} aria-hidden="true" />
+          </div>
+          <div>
+            <span class="label">Total Credits Earned</span>
+            <span class="value">+{creditBalance.totalEarned}</span>
+          </div>
+        </div>
+      </Card>
+    </div>
+
+    {/* Weekly Participation Section */}
+    <Card padding="lg">
+      <h3 class="card-title">Weekly Participation History</h3>
+      <p class="card-subtitle">Overview of your completed weekly check-ins and reflection actions.</p>
+
+      {progress.totalTasks > 0 || progress.weeklyParticipation.some((w) => w.checkInCompleted) ? (
+        <div class="table-wrapper">
+          <table class="participation-table">
+            <thead>
+              <tr>
+                <th>Cycle Week</th>
+                <th>Weekly Reflection</th>
+                <th>Activities Completed</th>
+                <th>Credits Earned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {progress.weeklyParticipation.map((week) => (
+                <tr>
+                  <td class="font-medium">Week {week.weekNumber}</td>
+                  <td>
+                    {week.checkInCompleted ? (
+                      <Badge variant="stable" size="sm">
+                        <CheckCircle2 size={12} aria-hidden="true" /> Completed
+                      </Badge>
+                    ) : (
+                      <Badge variant="neutral" size="sm">Pending</Badge>
+                    )}
+                  </td>
+                  <td>{week.completedTasksCount} activities</td>
+                  <td>
+                    <span class="credit-highlight">+{week.creditsEarned} Credits</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState
+          title="No Progress History Yet"
+          description="Complete your first weekly reflection to start building your progress."
+          icon={CalendarCheck}
+        />
+      )}
+    </Card>
+
+    <PrivacyNotice variant="full" />
+  </div>
+</StudentLayout>
+
+<style>
+  .progress-page-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .continuity-card {
+    background-color: var(--color-primary-50);
+    border-left: 4px solid var(--color-primary-500);
+  }
+
+  .continuity-flex {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .continuity-icon {
+    color: var(--color-primary-600);
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .continuity-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-primary-900);
+    margin-bottom: 0.25rem;
+  }
+
+  .continuity-text {
+    font-size: 0.875rem;
+    color: var(--color-primary-800);
+    line-height: 1.5;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .metric-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-box.primary {
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+  }
+
+  .icon-box.success {
+    background-color: #d1fae5;
+    color: #047857;
+  }
+
+  .icon-box.watch {
+    background-color: #e0f2fe;
+    color: #0369a1;
+  }
+
+  .icon-box.accent {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+
+  .label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .card-subtitle {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  .participation-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .participation-table th,
+  .participation-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .participation-table th {
+    background-color: var(--color-bg-subtle);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .credit-highlight {
+    font-weight: 700;
+    color: #047857;
+  }
+</style>

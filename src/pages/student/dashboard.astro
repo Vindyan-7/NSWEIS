@@ -16,6 +16,13 @@ import {
   getLatestCompletedAssessment,
   getStudentAssessmentHistory,
 } from '../../services/assessments';
+import {
+  getActiveStudentTasks,
+  getCompletedStudentTasks,
+  getStudentCreditBalance,
+} from '../../services/student-tasks';
+import { getStudentRecommendations } from '../../services/recommendations';
+import { ListChecks, Coins, CheckCircle2, ArrowRight, Sparkles } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
@@ -27,6 +34,13 @@ const activeCycle = await getActiveAssessmentCycle(supabase);
 const currentAssessment = activeCycle && user ? await getStudentAssessmentForCycle(supabase, user.id, activeCycle.id) : null;
 const latestData = user ? await getLatestCompletedAssessment(supabase, user.id) : null;
 const history = user ? await getStudentAssessmentHistory(supabase, user.id) : [];
+
+// Task & Credits summary for Your Week widget
+const activeTasksList = user ? await getActiveStudentTasks(supabase, user.id) : [];
+const completedTasksList = user ? await getCompletedStudentTasks(supabase, user.id) : [];
+const credits = user ? await getStudentCreditBalance(supabase, user.id) : { currentBalance: 0, thisWeekEarned: 0, totalEarned: 0 };
+const userRecs = user ? await getStudentRecommendations(supabase, user.id) : [];
+const topRecommendation = userRecs.length > 0 ? userRecs[0] : null;
 
 const checkInStatus = currentAssessment ? currentAssessment.status : 'not_started';
 
@@ -83,6 +97,58 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
           </>
         )}
       </div>
+    </Card>
+
+    {/* Your Week Activity & Progress Widget */}
+    <Card padding="lg">
+      <div class="your-week-header">
+        <div>
+          <h3 class="widget-title">This Week</h3>
+          <p class="widget-sub">Active tasks, completion progress, and well-being credits.</p>
+        </div>
+        <a href="/student/tasks">
+          <Button variant="outline" size="sm">
+            View My Tasks <ArrowRight size={14} aria-hidden="true" />
+          </Button>
+        </a>
+      </div>
+
+      <div class="your-week-stats">
+        <div class="week-stat-item">
+          <span class="stat-icon primary"><ListChecks size={18} aria-hidden="true" /></span>
+          <div>
+            <span class="week-stat-val">{activeTasksList.length}</span>
+            <span class="week-stat-lbl">Active Tasks</span>
+          </div>
+        </div>
+
+        <div class="week-stat-item">
+          <span class="stat-icon success"><CheckCircle2 size={18} aria-hidden="true" /></span>
+          <div>
+            <span class="week-stat-val">{completedTasksList.length}</span>
+            <span class="week-stat-lbl">Completed</span>
+          </div>
+        </div>
+
+        <div class="week-stat-item">
+          <span class="stat-icon accent"><Coins size={18} aria-hidden="true" /></span>
+          <div>
+            <span class="week-stat-val">+{credits.currentBalance}</span>
+            <span class="week-stat-lbl">Credits Balance</span>
+          </div>
+        </div>
+      </div>
+
+      {topRecommendation && (
+        <div class="highlighted-rec-box">
+          <div class="highlighted-rec-header">
+            <Sparkles size={14} class="highlighted-rec-icon" aria-hidden="true" />
+            <span class="highlighted-rec-tag">Highlighted Focus Action</span>
+          </div>
+          <p class="highlighted-rec-title">{topRecommendation.title}</p>
+          <p class="highlighted-rec-desc">{topRecommendation.description}</p>
+        </div>
+      )}
     </Card>
 
     {/* Personal Wellness Snapshot */}
@@ -187,5 +253,115 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--space-4);
+  }
+
+  .your-week-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .widget-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .widget-sub {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .your-week-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .week-stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-icon.primary {
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+  }
+
+  .stat-icon.success {
+    background-color: #d1fae5;
+    color: #047857;
+  }
+
+  .stat-icon.accent {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+
+  .week-stat-val {
+    display: block;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .week-stat-lbl {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .highlighted-rec-box {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--radius-md);
+  }
+
+  .highlighted-rec-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1);
+  }
+
+  .highlighted-rec-icon {
+    color: var(--color-primary-600);
+  }
+
+  .highlighted-rec-tag {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--color-primary-800);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .highlighted-rec-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .highlighted-rec-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
   }
 </style>

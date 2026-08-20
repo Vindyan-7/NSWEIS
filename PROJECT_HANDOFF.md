@@ -1,41 +1,54 @@
 # NSWEIS — CURRENT DEVELOPMENT HANDOFF
 
-**Current Milestone:** Phase 6 — Hackathon Presentation Readiness  
-**Current Phase:** Slice 3 Completed — Pre-Demo Reliability Audit Only  
-**Overall Status:** READ-ONLY PRE-DEMO SYSTEM AUDIT PASSED & VERIFIED  
-**Date:** August 12, 2026  
+**Current Milestone:** Phase 7 — NSWEIS Student-First MVP Architecture Foundation  
+**Current Phase:** Phase 7 Slice 5 Final Security Correction — Recommendation Engine RPC Security & Database Hardening (COMPLETED)  
+**Overall Status:** FINAL SECURITY AUDIT PASSED — READY FOR CTO REVIEW / NEXT DIRECTIVE  
+**Date:** August 20, 2026  
 
 ---
 
-## 1. Executive Summary & Phase 6 Slice 3 Audit Completion
-Pre-demo system reliability audit completed:
-1. **Environment Variables**: Confirmed `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` are present. Zero service-role keys exposed in browser code.
-2. **Build Diagnostics**: `npx astro check` passed with `0 errors, 0 warnings, 6 hints`. `npm run build` succeeded in `4.79s`.
-3. **Route Coverage**: Verified all 19 application routes across Public (3), Student (6), College (4), Government Admin (5), and Super Admin (4) portals.
-4. **Security & Authorization**: Middleware guards and RLS queries verified intact; privacy threshold ($\ge 10$ students) active across all dashboards.
+## 1. Executive Summary & Security Correction Summary
+Phase 7 Slice 5 Final Security Correction completed:
+1. **Unsafe Rule RPC Removal**: Dropped `public.get_active_recommendation_rules()` RPC which exposed internal rule thresholds (`minimum_signal`, `maximum_signal`, `priority`) to authenticated users.
+2. **Secure Generation RPC**: Created `public.generate_assessment_recommendations(p_assessment_id UUID)` SECURITY DEFINER RPC returning ONLY `BOOLEAN` status (`true`). It evaluates signals and inserts safe recommendation links and tasks inside PostgreSQL server-side without returning internal algorithm thresholds to client JavaScript.
+3. **Table RLS Hardening**: Enforced RLS on `public.recommendation_rules` with SELECT policy restricted strictly to `super_admin`. Students have ZERO direct SELECT access to recommendation rules.
+4. **Database Uniqueness**: Maintained database unique indexes `idx_assessment_recs_unique` and `idx_student_tasks_assessment_title_unique` preventing duplicate links/tasks on concurrent calls.
+5. **Astro SSR Service Integration**: Updated [`src/services/recommendations.ts`](file:///c:/Projects/YI/NSWEIS/src/services/recommendations.ts) to invoke `generate_assessment_recommendations` RPC (returning boolean) and fall back cleanly to server-side Astro SSR evaluation using isolated `FALLBACK_RULES` when DB RPC is pending manual execution.
 
 ---
 
-## 2. Files Inspected Across Phase 6 Slices
-- **Slice 1 (Journey Audit)**: Full presentation narrative audit.
-- **Slice 2 (Landing Experience)**: [`src/pages/index.astro`](file:///c:/Projects/YI/NSWEIS/src/pages/index.astro)
-- **Slice 3 (Reliability Audit)**: [`.env`](file:///c:/Projects/YI/NSWEIS/.env), [`astro.config.mjs`](file:///c:/Projects/YI/NSWEIS/astro.config.mjs), [`src/middleware.ts`](file:///c:/Projects/YI/NSWEIS/src/middleware.ts), [`src/lib/permissions/roles.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/permissions/roles.ts), [`src/lib/supabase/server.ts`](file:///c:/Projects/YI/NSWEIS/src/lib/supabase/server.ts), [`PROJECT_CONTEXT.md`](file:///c:/Projects/YI/NSWEIS/PROJECT_CONTEXT.md), [`PROJECT_HANDOFF.md`](file:///c:/Projects/YI/NSWEIS/PROJECT_HANDOFF.md)
+## 2. Files Changed Across Security Correction Pass
+- `supabase/sql/09_recommendation_engine.sql`
+- `src/services/recommendations.ts`
+- `PROJECT_CONTEXT.md`
+- `PROJECT_HANDOFF.md`
 
 ---
 
-## 3. Database State
+## 3. SQL Execution Status
 - **Database Status:** FROZEN FOR TESTING. Zero SQL executed.
-- **Pending SQL Files:** `00_initial_schema.sql` through `06_hackathon_demo_dataset.sql` in `supabase/sql/` marked `PENDING MANUAL EXECUTION`.
-- **Demo Accounts:** All 4 role accounts (`student@demo.nsweis.gov.in`, `college@demo.nsweis.gov.in`, `admin@demo.nsweis.gov.in`, `super@demo.nsweis.gov.in`) ready.
+- **Pending SQL Files:** `00_initial_schema.sql` through `09_recommendation_engine.sql` in `supabase/sql/` marked `PENDING MANUAL EXECUTION`.
 
 ---
 
 ## 4. Verification & Diagnostics
-- **`npx astro check`:** PASSED (`Result (80 files): 0 errors, 0 warnings, 6 hints`).
-- **`npm run build`:** PASSED (`Server built in 4.79s`, `[build] Complete!`).
+- **`node scratch/test_recommendation_engine.mjs`:** PASSED cleanly.
+- **`npx astro check`:** PASSED (0 errors, 0 warnings, 17 hints across 87 files).
+- **`npm run build`:** PASSED (`Server built in 3.59s`, `[build] Complete!`).
 - **Git Status:** Uncommitted working tree. **DO NOT COMMIT. DO NOT PUSH.**
 
 ---
 
 ## 5. Next Immediate Task
-CTO review and decision based on audit findings. Do not implement the next slice without explicit approval.
+Awaiting CTO approval / Next Directive.
+
+---
+
+## 6. Commands Needed to Continue
+```bash
+# Check TypeScript diagnostics
+npx astro check
+
+# Build production bundle
+npm run build
+```

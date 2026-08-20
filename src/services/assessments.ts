@@ -87,14 +87,25 @@ export async function getLatestCompletedAssessment(
 }
 
 export async function getBaseQuestions(
-  supabase: SupabaseClient<Database>
+  supabase: SupabaseClient<Database>,
+  weekNumber?: number,
+  departmentCode?: string
 ): Promise<Question[]> {
-  const { data: questionsData, error: qError } = await supabase
+  let query = supabase
     .from('questions')
     .select('*, options:question_options(*)')
     .eq('is_base_question', true)
-    .eq('active', true)
-    .order('order_index');
+    .eq('active', true);
+
+  if (weekNumber !== undefined) {
+    query = query.eq('week_number', weekNumber);
+  }
+
+  if (departmentCode) {
+    query = query.in('target_department', ['ALL', departmentCode]);
+  }
+
+  const { data: questionsData, error: qError } = await query.order('order_index');
 
   if (qError || !questionsData) return [];
 

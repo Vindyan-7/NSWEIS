@@ -28,6 +28,7 @@ export interface Database {
           department_id: string | null;
           student_roll_no: string | null;
           year_level: number | null;
+          section_code: string | null;
           avatar_url: string | null;
           active: boolean;
           created_at: string;
@@ -41,6 +42,7 @@ export interface Database {
           department_id?: string | null;
           student_roll_no?: string | null;
           year_level?: number | null;
+          section_code?: string | null;
           avatar_url?: string | null;
           active?: boolean;
           created_at?: string;
@@ -54,6 +56,7 @@ export interface Database {
           department_id?: string | null;
           student_roll_no?: string | null;
           year_level?: number | null;
+          section_code?: string | null;
           avatar_url?: string | null;
           active?: boolean;
           created_at?: string;
@@ -166,6 +169,11 @@ export interface Database {
           active: boolean;
           order_index: number;
           is_base_question: boolean;
+          question_code: string | null;
+          week_number: number;
+          target_department: string;
+          adaptive_trigger_group: string | null;
+          required: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -178,6 +186,11 @@ export interface Database {
           active?: boolean;
           order_index?: number;
           is_base_question?: boolean;
+          question_code?: string | null;
+          week_number?: number;
+          target_department?: string;
+          adaptive_trigger_group?: string | null;
+          required?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -190,6 +203,11 @@ export interface Database {
           active?: boolean;
           order_index?: number;
           is_base_question?: boolean;
+          question_code?: string | null;
+          week_number?: number;
+          target_department?: string;
+          adaptive_trigger_group?: string | null;
+          required?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -201,6 +219,9 @@ export interface Database {
           label: string;
           score: number;
           order_index: number;
+          option_code: string | null;
+          signal_value: number | null;
+          follow_up_group: string | null;
         };
         Insert: {
           id?: string;
@@ -208,6 +229,9 @@ export interface Database {
           label: string;
           score: number;
           order_index?: number;
+          option_code?: string | null;
+          signal_value?: number | null;
+          follow_up_group?: string | null;
         };
         Update: {
           id?: string;
@@ -215,6 +239,9 @@ export interface Database {
           label?: string;
           score?: number;
           order_index?: number;
+          option_code?: string | null;
+          signal_value?: number | null;
+          follow_up_group?: string | null;
         };
       };
       question_rules: {
@@ -247,6 +274,114 @@ export interface Database {
           follow_up_question_id?: string;
           priority?: number;
           active?: boolean;
+        };
+      };
+      student_tasks: {
+        Row: {
+          id: string;
+          student_id: string;
+          assessment_id: string | null;
+          category: WellnessCategory;
+          title: string;
+          description: string;
+          estimated_minutes: number;
+          task_type: string;
+          due_date: string | null;
+          status: string;
+          credits_awarded: number;
+          source_reason: string | null;
+          completed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          assessment_id?: string | null;
+          category: WellnessCategory;
+          title: string;
+          description: string;
+          estimated_minutes?: number;
+          task_type?: string;
+          due_date?: string | null;
+          status?: string;
+          credits_awarded?: number;
+          source_reason?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          assessment_id?: string | null;
+          category?: WellnessCategory;
+          title?: string;
+          description?: string;
+          estimated_minutes?: number;
+          task_type?: string;
+          due_date?: string | null;
+          status?: string;
+          credits_awarded?: number;
+          source_reason?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+        };
+      };
+      student_credits_log: {
+        Row: {
+          id: string;
+          student_id: string;
+          amount: number;
+          activity_type: string;
+          description: string | null;
+          reference_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          amount: number;
+          activity_type: string;
+          description?: string | null;
+          reference_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          amount?: number;
+          activity_type?: string;
+          description?: string | null;
+          reference_id?: string | null;
+          created_at?: string;
+        };
+      };
+      question_imports: {
+        Row: {
+          id: string;
+          admin_id: string;
+          filename: string;
+          total_rows: number;
+          successful_rows: number;
+          error_log: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_id: string;
+          filename: string;
+          total_rows: number;
+          successful_rows: number;
+          error_log?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_id?: string;
+          filename?: string;
+          total_rows?: number;
+          successful_rows?: number;
+          error_log?: Json | null;
+          created_at?: string;
         };
       };
       assessments: {
@@ -512,7 +647,12 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      complete_student_task: {
+        Args: {
+          p_task_id: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;

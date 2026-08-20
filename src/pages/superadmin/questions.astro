@@ -1,0 +1,589 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  listQuestions,
+  createQuestionWithOptions,
+  importQuestionCsvs,
+  getImportHistory,
+} from '../../services/question-management';
+import type { WellnessCategory } from '../../types/domain';
+import { Upload, Plus, FileText, Search } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  return Astro.redirect('/superadmin/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+// Read query params for filters
+const url = new URL(Astro.request.url);
+const weekFilter = url.searchParams.get('week') ? parseInt(url.searchParams.get('week')!, 10) : undefined;
+const deptFilter = url.searchParams.get('department') || undefined;
+const searchFilter = url.searchParams.get('search') || undefined;
+
+// POST Handlers
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action')?.toString();
+
+    if (action === 'create') {
+      const question_code = formData.get('question_code')?.toString().trim();
+      const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
+      const text = formData.get('question_text')?.toString().trim();
+      const category = formData.get('category')?.toString() as WellnessCategory;
+      const target_department = formData.get('target_department')?.toString() || 'ALL';
+      const adaptive_trigger_group = formData.get('adaptive_trigger_group')?.toString().trim() || null;
+      const required = formData.get('required') === 'true';
+
+      const optionCodes = formData.getAll('option_code[]').map((v) => v.toString().trim());
+      const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
+      const optionSignals = formData.getAll('signal_value[]').map((v) => parseFloat(v.toString()));
+      const optionFollowUps = formData.getAll('follow_up_group[]').map((v) => v.toString().trim() || null);
+
+      if (!question_code || !text || !category) {
+        message = 'Please provide Question Code, Question Text, and Category.';
+        isError = true;
+      } else {
+        const optionsData = optionCodes.map((code, idx) => ({
+          option_code: code || `OPT_${idx + 1}`,
+          label: optionLabels[idx] || `Option ${idx + 1}`,
+          score: isNaN(optionSignals[idx]) ? 5.0 : optionSignals[idx],
+          signal_value: isNaN(optionSignals[idx]) ? 5.0 : optionSignals[idx],
+          follow_up_group: optionFollowUps[idx] || null,
+          order_index: idx + 1,
+        }));
+
+        const result = await createQuestionWithOptions(
+          supabase,
+          { question_code, week_number, text, category, target_department, adaptive_trigger_group, required },
+          optionsData
+        );
+
+        if (!result.success) {
+          message = result.error || 'Failed to create question.';
+          isError = true;
+        } else {
+          message = `Question '${question_code}' created successfully.`;
+        }
+      }
+    } else if (action === 'import_csv') {
+      const questionsCsvText = formData.get('questions_csv')?.toString() || '';
+      const optionsCsvText = formData.get('options_csv')?.toString() || '';
+      const filename = formData.get('filename')?.toString() || 'questions_import.csv';
+
+      if (!questionsCsvText || !optionsCsvText) {
+        message = 'Please upload or provide both Questions CSV and Options CSV content.';
+        isError = true;
+      } else {
+        const res = await importQuestionCsvs(supabase, user.id, filename, questionsCsvText, optionsCsvText);
+        if (!res.success) {
+          message = res.errors ? res.errors.join(' | ') : 'CSV Import failed.';
+          isError = true;
+        } else {
+          message = `Successfully imported ${res.importedCount} questions with options.`;
+        }
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'Operation failed.';
+    isError = true;
+  }
+}
+
+// Fetch questions and import history
+const questions = await listQuestions(supabase, {
+  weekNumber: weekFilter,
+  departmentCode: deptFilter,
+  searchQuery: searchFilter,
+});
+
+const importHistory = await getImportHistory(supabase);
+---
+
+<SuperAdminLayout title="Question Bank Management" activePath="/superadmin/questions">
+  <PageHeader
+    title="Question Bank Management"
+    subtitle="Configure data-driven student reflection questions, weekly cycle targeting, and department rules"
+  >
+    <a href="/superadmin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+    </a>
+  </PageHeader>
+
+  <div class="questions-management-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Error' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    {/* Filter Toolbar */}
+    <Card padding="md">
+      <form method="GET" class="filter-bar">
+        <div class="filter-group">
+          <label for="filter-week" class="filter-label">Filter by Week:</label>
+          <select id="filter-week" name="week" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Weeks</option>
+            <option value="1" selected={weekFilter === 1}>Week 1</option>
+            <option value="2" selected={weekFilter === 2}>Week 2</option>
+            <option value="3" selected={weekFilter === 3}>Week 3</option>
+            <option value="4" selected={weekFilter === 4}>Week 4</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-dept" class="filter-label">Filter by Department:</label>
+          <select id="filter-dept" name="department" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Departments</option>
+            <option value="ALL" selected={deptFilter === 'ALL'}>Global (ALL)</option>
+            <option value="CSE" selected={deptFilter === 'CSE'}>CSE</option>
+            <option value="ECE" selected={deptFilter === 'ECE'}>ECE</option>
+            <option value="EEE" selected={deptFilter === 'EEE'}>EEE</option>
+            <option value="MECH" selected={deptFilter === 'MECH'}>MECH</option>
+            <option value="CIVIL" selected={deptFilter === 'CIVIL'}>CIVIL</option>
+          </select>
+        </div>
+
+        <div class="filter-group search-group">
+          <input
+            type="text"
+            name="search"
+            placeholder="Search code or text..."
+            value={searchFilter || ''}
+            class="filter-input"
+          />
+          <Button variant="outline" size="sm" type="submit">
+            <Search size={14} aria-hidden="true" /> Search
+          </Button>
+        </div>
+      </form>
+    </Card>
+
+    {/* Question Bank Table */}
+    <Card padding="lg">
+      <div class="card-header-flex">
+        <div>
+          <h3 class="card-section-title">Question Bank Directory</h3>
+          <p class="section-subtext">Active question inventory and targeting rules for student weekly check-ins.</p>
+        </div>
+        <Badge variant="primary" size="md">{questions.length} Questions</Badge>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Week</th>
+              <th>Question Text</th>
+              <th>Category</th>
+              <th>Target Dept</th>
+              <th>Options</th>
+              <th>Required</th>
+            </tr>
+          </thead>
+          <tbody>
+            {questions.length > 0 ? (
+              questions.map((q) => (
+                <tr>
+                  <td><span class="code-badge">{q.question_code || 'W01-Q00'}</span></td>
+                  <td class="font-medium">Week {q.week_number || 1}</td>
+                  <td class="question-text-cell">{q.text}</td>
+                  <td><Badge variant="neutral" size="sm">{q.category.replace('_', ' ')}</Badge></td>
+                  <td><span class="dept-badge">{q.target_department || 'ALL'}</span></td>
+                  <td>{q.options?.length || 0} choices</td>
+                  <td>
+                    {q.required !== false ? (
+                      <Badge variant="stable" size="sm">Required</Badge>
+                    ) : (
+                      <Badge variant="neutral" size="sm">Optional</Badge>
+                    )}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colspan="7" class="empty-cell">No questions found matching active filters.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Create Question Form */}
+    <Card padding="lg">
+      <h3 class="card-section-title">+ Add New Question</h3>
+      <p class="section-subtext">Add a targeted reflection question and configure choice options.</p>
+
+      <form method="POST" class="question-form">
+        <input type="hidden" name="action" value="create" />
+
+        <div class="form-grid">
+          <Input label="Question Code" name="question_code" placeholder="e.g. W01-Q01" required />
+          <Input label="Week Number" name="week_number" type="number" min="1" value="1" required />
+          
+          <Select label="Category" name="category" required>
+            <option value="academic">Academic Balance</option>
+            <option value="sleep_rest">Sleep & Rest</option>
+            <option value="emotional_wellbeing">Emotional Reflection</option>
+            <option value="social_connection">Social Connection</option>
+            <option value="family_home">Routine Self-Management</option>
+            <option value="financial">Financial Balance</option>
+            <option value="career">Career & Future Confidence</option>
+            <option value="campus_experience">Campus Experience</option>
+            <option value="physical_wellbeing">Physical Activity</option>
+            <option value="digital_balance">Digital Balance</option>
+          </Select>
+
+          <Select label="Target Department" name="target_department" required>
+            <option value="ALL">ALL (Global)</option>
+            <option value="CSE">CSE</option>
+            <option value="ECE">ECE</option>
+            <option value="EEE">EEE</option>
+            <option value="MECH">MECH</option>
+            <option value="CIVIL">CIVIL</option>
+          </Select>
+        </div>
+
+        <Input label="Question Text" name="question_text" placeholder="Enter question statement..." required />
+
+        <div class="form-grid">
+          <Input label="Adaptive Trigger Group (Optional)" name="adaptive_trigger_group" placeholder="e.g. academic_low" />
+          <Select label="Required Response" name="required">
+            <option value="true">Required</option>
+            <option value="false">Optional</option>
+          </Select>
+        </div>
+
+        <h4 class="sub-section-title">Choice Options (4 Options Recommended)</h4>
+        <div class="options-grid">
+          <div class="option-row">
+            <Input label="Code" name="option_code[]" value="A" required />
+            <Input label="Option Text A" name="option_text[]" placeholder="Very manageable" required />
+            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="9.0" required />
+            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+          </div>
+          <div class="option-row">
+            <Input label="Code" name="option_code[]" value="B" required />
+            <Input label="Option Text B" name="option_text[]" placeholder="Mostly manageable" required />
+            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="7.0" required />
+            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+          </div>
+          <div class="option-row">
+            <Input label="Code" name="option_code[]" value="C" required />
+            <Input label="Option Text C" name="option_text[]" placeholder="Somewhat difficult" required />
+            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="5.0" required />
+            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+          </div>
+          <div class="option-row">
+            <Input label="Code" name="option_code[]" value="D" required />
+            <Input label="Option Text D" name="option_text[]" placeholder="Very difficult" required />
+            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="2.5" required />
+            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="academic_low" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <Button variant="primary" type="submit">
+            <Plus size={14} aria-hidden="true" /> Save Question
+          </Button>
+        </div>
+      </form>
+    </Card>
+
+    {/* Dual CSV Import Section */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Bulk Question Import (Dual CSV)</h3>
+      <p class="section-subtext">Import questions and options using the NSWEIS CSV contract with pre-mutation validation.</p>
+
+      <form method="POST" class="csv-form">
+        <input type="hidden" name="action" value="import_csv" />
+        <input type="hidden" name="filename" value="bulk_questions_import.csv" />
+
+        <div class="csv-inputs-grid">
+          <div class="csv-box">
+            <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 1. Questions CSV</h4>
+            <p class="csv-box-hint">Headers: question_code, week_number, question_text, category, target_department, adaptive_trigger_group, required, question_type</p>
+            <textarea
+              name="questions_csv"
+              rows="6"
+              class="csv-textarea"
+              placeholder={`question_code,week_number,question_text,category,target_department,adaptive_trigger_group,required,question_type\nW01-Q01,1,"How manageable has your academic workload felt this week?",academic,ALL,academic_low,true,single_choice`}
+              required
+            ></textarea>
+          </div>
+
+          <div class="csv-box">
+            <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 2. Options CSV</h4>
+            <p class="csv-box-hint">Headers: question_code, option_code, option_text, signal_value, follow_up_group, display_order</p>
+            <textarea
+              name="options_csv"
+              rows="6"
+              class="csv-textarea"
+              placeholder={`question_code,option_code,option_text,signal_value,follow_up_group,display_order\nW01-Q01,A,"Very manageable",9.0,,1\nW01-Q01,B,"Mostly manageable",7.0,,2\nW01-Q01,C,"Somewhat difficult",5.0,academic_low,3\nW01-Q01,D,"Very difficult",2.5,academic_low,4`}
+              required
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <Button variant="primary" type="submit">
+            <Upload size={14} aria-hidden="true" /> Validate & Import CSVs
+          </Button>
+        </div>
+      </form>
+    </Card>
+
+    {/* Import Audit Log Table */}
+    {importHistory.length > 0 && (
+      <Card padding="lg">
+        <h3 class="card-section-title">Question Import Audit History</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Total Questions</th>
+                <th>Successful</th>
+                <th>Import Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {importHistory.map((imp) => (
+                <tr>
+                  <td class="font-medium">{imp.filename}</td>
+                  <td>{imp.total_rows}</td>
+                  <td><Badge variant="stable" size="sm">{imp.successful_rows} imported</Badge></td>
+                  <td>{new Date(imp.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    )}
+
+    <PrivacyNotice variant="full" />
+  </div>
+</SuperAdminLayout>
+
+<style>
+  .questions-management-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .sub-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .filter-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    white-space: nowrap;
+  }
+
+  .filter-select,
+  .filter-input {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background-color: var(--color-bg-card);
+    color: var(--color-text-main);
+  }
+
+  .search-group {
+    margin-left: auto;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin-top: var(--space-4);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .question-text-cell {
+    max-width: 320px;
+  }
+
+  .code-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .dept-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-main);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: var(--space-6) !important;
+  }
+
+  .question-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .option-row {
+    display: grid;
+    grid-template-columns: 80px 2fr 1fr 1fr;
+    gap: var(--space-3);
+    align-items: center;
+    background-color: var(--color-bg-subtle);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+  }
+
+  .csv-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .csv-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .csv-box-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .csv-box-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .csv-textarea {
+    width: 100%;
+    font-family: monospace;
+    font-size: 0.8125rem;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-main);
+    box-sizing: border-box;
+  }
+</style>

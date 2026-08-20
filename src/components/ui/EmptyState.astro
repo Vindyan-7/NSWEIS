@@ -2,14 +2,20 @@
 interface Props {
   title: string;
   description?: string;
-  icon?: string;
+  icon?: any;
 }
 
-const { title, description, icon = '📂' } = Astro.props;
+const { title, description, icon: Icon } = Astro.props;
 ---
 
 <div class="empty-state">
-  <div class="empty-icon">{icon}</div>
+  <div class="empty-icon">
+    {typeof Icon === 'function' ? (
+      <Icon size={36} aria-hidden="true" />
+    ) : (
+      Icon || '📂'
+    )}
+  </div>
   <h4 class="empty-title">{title}</h4>
   {description && <p class="empty-desc">{description}</p>}
   <div class="empty-actions">
