@@ -45,7 +45,7 @@ if (!activeCycle) {
   errorMessage = 'Your next weekly reflection is not available yet. Please check back soon.';
 }
 
-// 2. Fetch or Create Student Assessment for Active Cycle (Strictly uses authenticated user.id)
+// 2. Fetch or Create Student Assessment for Active Cycle (Derived strictly from authenticated user.id)
 const assessment = activeCycle ? await getOrCreateStudentAssessment(supabase, user.id, activeCycle.id) : null;
 
 // 3. Resolve Student Department Code
@@ -114,7 +114,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
     const formData = await Astro.request.formData();
     const actionType = formData.get('action_type')?.toString();
 
-    // Server-Authoritative Super Admin Test Submit Gate
+    // Server-Authoritative Super Admin Test Submit Gate:
     // Skips ONLY session_duration_minutes minimum duration check when profile.role === 'super_admin'
     const isAdminTestSubmit = isSuperAdmin && actionType === 'admin_test_submit';
     const canPassTimeGate = isTimerCompleteOnServer || isAdminTestSubmit;
@@ -326,6 +326,20 @@ if (Astro.request.method === 'POST' && user && assessment) {
               </a>
               
               <div class="submit-action-group">
+                <Button
+                  variant="primary"
+                  type="submit"
+                  id="submit-btn"
+                  name="action_type"
+                  value="student_submit"
+                  disabled={!isTimerCompleteOnServer}
+                >
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                  <span id="btn-label">
+                    {isTimerCompleteOnServer ? 'Complete Weekly Reflection' : 'Session In Progress'}
+                  </span>
+                </Button>
+
                 {isSuperAdmin && (
                   <div class="admin-test-control">
                     <span class="admin-test-note">Testing only — bypasses the 10-minute waiting period.</span>
@@ -340,20 +354,6 @@ if (Astro.request.method === 'POST' && user && assessment) {
                     </Button>
                   </div>
                 )}
-                
-                <Button
-                  variant="primary"
-                  type="submit"
-                  id="submit-btn"
-                  name="action_type"
-                  value="student_submit"
-                  disabled={!isTimerCompleteOnServer}
-                >
-                  <CheckCircle2 size={16} aria-hidden="true" />
-                  <span id="btn-label">
-                    {isTimerCompleteOnServer ? 'Complete Weekly Reflection' : 'Session In Progress'}
-                  </span>
-                </Button>
               </div>
             </div>
           </form>
@@ -400,6 +400,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
     function updateState() {
       var isAnswered = checkFormValidity();
       var isTimeUp = secondsLeft <= 0;
+      var adminTestBtn = document.querySelector('.admin-test-btn');
 
       if (timerDisplay) {
         timerDisplay.textContent = formatTime(secondsLeft);
@@ -409,14 +410,21 @@ if (Astro.request.method === 'POST' && user && assessment) {
         if (statusText) statusText.textContent = 'Complete all required reflections to continue.';
         if (submitBtn) submitBtn.disabled = true;
         if (btnLabel) btnLabel.textContent = 'Session In Progress';
+        if (adminTestBtn) adminTestBtn.disabled = true;
       } else if (!isTimeUp && !isSuperAdmin) {
         if (statusText) statusText.textContent = 'Your responses are complete. Please continue reflecting until your session is ready to complete.';
         if (submitBtn) submitBtn.disabled = true;
         if (btnLabel) btnLabel.textContent = 'Session In Progress (' + formatTime(secondsLeft) + ')';
+        if (adminTestBtn) adminTestBtn.disabled = false;
       } else {
         if (statusText) statusText.textContent = 'Your reflection is ready to complete.';
         if (submitBtn) submitBtn.disabled = false;
         if (btnLabel) btnLabel.textContent = 'Complete Weekly Reflection';
+        if (adminTestBtn) adminTestBtn.disabled = false;
+      }
+
+      if (isSuperAdmin && isAnswered && adminTestBtn) {
+        adminTestBtn.disabled = false;
       }
     }
 
