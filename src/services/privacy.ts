@@ -347,3 +347,7 @@ export async function logPrivacyAuditEvent(
     created_at: now,
   });
 }
+
+export function getPrivacyAuditLogs(): PrivacyAuditLogDTO[] {
+  return [...inMemoryAuditLogs];
+}

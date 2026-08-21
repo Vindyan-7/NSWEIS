@@ -5,12 +5,28 @@ import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
 import Button from '../../components/ui/Button.astro';
 import Badge from '../../components/ui/Badge.astro';
+import InstitutionalParticipationBarChart from '../../components/analytics/InstitutionalParticipationBarChart.astro';
 import FiveStagePrivacyFlow from '../../components/privacy/FiveStagePrivacyFlow.astro';
+import NonClinicalDisclaimer from '../../components/privacy/NonClinicalDisclaimer.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
-import { ShieldCheck } from '@lucide/astro';
+import {
+  Building,
+  Users,
+  CheckCircle2,
+  LockKeyhole,
+  ShieldCheck,
+  TrendingUp,
+  AlertTriangle,
+  ArrowUpRight,
+  Sparkles,
+} from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
-import { getLiveGovernmentDashboardData } from '../../services/analytics';
+import {
+  getLiveGovernmentDashboardData,
+  getGovernmentCategorySummaries,
+  getGovernmentTrends,
+} from '../../services/analytics';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -24,102 +40,206 @@ const profile = await getProfile(supabase, user.id);
 if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
   if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
   if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
-  return Astro.redirect('/login');
 }
 
-// Server-authoritative scope-authorized multi-college analytics
+// Server-side scope-authorized analytics DTO
 const dashboardData = await getLiveGovernmentDashboardData(supabase, user.id);
 const { cycle, participation, institution_summaries, privacy } = dashboardData;
+const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id);
+const trends = await getGovernmentTrends(supabase, user.id);
+
+const isDataSuppressed = participation.is_suppressed;
+const { status_distribution } = participation;
 ---
 
-<GovernmentLayout title="Government Wellness Intelligence" activePath="/government/dashboard">
+<GovernmentLayout title="Government Intelligence & Institutional Benchmarking" activePath="/admin/dashboard">
+  {/* Hero Header */}
   <PageHeader
-    title="Government Wellness Intelligence"
-    subtitle={`Statewide anonymous aggregate participation and institutional trends for ${cycle ? cycle.name : 'Weekly Cycle'}`}
+    title="Government Regional & Institutional Intelligence"
+    subtitle={`Aggregate well-being signals across authorized institutions for ${cycle ? cycle.name : 'Weekly Cycle'}`}
   >
-    <a href="/admin/institutions">
-      <Button variant="outline" size="sm">View Institutional Directory &rarr;</Button>
+    <a href="/admin/interventions">
+      <Button variant="primary" size="sm">Review Institutional Actions &rarr;</Button>
     </a>
   </PageHeader>
 
-  <div class="gov-dashboard-layout">
-    {/* Top Aggregate Metric Cards */}
-    <div class="metrics-grid">
-      <MetricCard
-        title="Authorized Institutions"
-        value={participation.total_institutions.toString()}
-        change={`${participation.institutions_with_activity} Reporting Active Check-ins`}
-        changeType="neutral"
-      />
-      <MetricCard
-        title="Eligible Students"
-        value={participation.total_eligible_students.toLocaleString()}
-        change="Total Active Student Roster"
-        changeType="neutral"
-      />
-      <MetricCard
-        title="Started Check-ins"
-        value={participation.started_students.toLocaleString()}
-        change="Initiated Weekly Check-ins"
-        changeType="neutral"
-      />
-      <MetricCard
-        title="Completed Reflections"
-        value={participation.completed_students.toLocaleString()}
-        change="Completed Weekly Sessions"
-        changeType="neutral"
-      />
-      <MetricCard
-        title="Overall Completion Rate"
-        value={`${participation.completion_percentage.toFixed(1)}%`}
-        change={participation.is_suppressed ? "Global signals suppressed (<10 completed)" : "Statewide Reflection Rate"}
-        changeType={participation.is_suppressed ? "neutral" : "positive"}
-      />
+  <div class="government-dashboard-layout">
+    {/* Section 1: Animated Government KPI Cards (6 Cards) */}
+    <div class="section-container">
+      <h3 class="section-heading">Statewide Institutional Overview</h3>
+      <div class="kpi-cards-grid">
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Total Institutions"
+            value={participation.total_institutions.toLocaleString()}
+            change="Directory Scope"
+            changeType="neutral"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Active Institutions"
+            value={participation.institutions_with_activity.toLocaleString()}
+            change="Reporting Campuses"
+            changeType="positive"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Eligible Students"
+            value={participation.total_eligible_students.toLocaleString()}
+            change="Statewide Student Scope"
+            changeType="neutral"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Started Check-in"
+            value={participation.started_students.toLocaleString()}
+            change="Sessions Initiated"
+            changeType="neutral"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Completed Reflections"
+            value={participation.completed_students.toLocaleString()}
+            change="Finished Check-ins"
+            changeType="positive"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Overall Participation Rate"
+            value={`${participation.completion_percentage.toFixed(1)}%`}
+            change="Regional Completion"
+            changeType={participation.completion_percentage > 50 ? "positive" : "neutral"}
+          />
+        </div>
+      </div>
     </div>
 
-    {/* Comparative Benchmarking Table */}
-    <Card padding="lg">
-      <div class="section-header">
-        <div>
-          <h3 class="card-section-title">Institutional Participation Comparison</h3>
-          <p class="section-subtext">Anonymous aggregate completion rates per institution, sorted by completion percentage. Student privacy threshold (&ge; 10 completed check-ins) enforced.</p>
+    {/* Section 2: Institutional Participation Bar Chart & Status Distribution Grid */}
+    <div class="two-col-dashboard-grid">
+      {/* Left: Participation Comparison Bar Chart */}
+      <Card padding="lg" class="barchart-card">
+        <div class="card-title-row">
+          <div>
+            <h3 class="card-section-title">Institutional Participation Comparison</h3>
+            <p class="section-subtext">Operational check-in completion percentages across authorized higher education campuses.</p>
+          </div>
+          <Badge variant="neutral" size="sm">Operational Metrics</Badge>
         </div>
-        <a href="/admin/insights" class="header-link">Detailed Analytics &rarr;</a>
+
+        <InstitutionalParticipationBarChart institutions={institution_summaries} />
+      </Card>
+
+      {/* Right: Institution Status Distribution */}
+      <Card padding="lg" class="status-distribution-card">
+        <div class="card-title-row">
+          <div>
+            <h3 class="card-section-title">Institution Status Distribution</h3>
+            <p class="section-subtext">Categorization of institutions by active operational participation tier.</p>
+          </div>
+        </div>
+
+        <div class="status-boxes-grid">
+          <div class="status-box active-box">
+            <div class="box-top">
+              <span class="box-count font-bold">{status_distribution.active_institutions}</span>
+              <Badge variant="stable" size="sm">ACTIVE (≥75%)</Badge>
+            </div>
+            <span class="box-lbl">Strong Campus Participation</span>
+          </div>
+
+          <div class="status-box partial-box">
+            <div class="box-top">
+              <span class="box-count font-bold">{status_distribution.partial_institutions}</span>
+              <Badge variant="improving" size="sm">PARTIAL (&lt;75%)</Badge>
+            </div>
+            <span class="box-lbl">Initial Student Check-ins</span>
+          </div>
+
+          <div class="status-box nopart-box">
+            <div class="box-top">
+              <span class="box-count font-bold">{status_distribution.no_participation_institutions}</span>
+              <Badge variant="neutral" size="sm">NO CHECK-INS</Badge>
+            </div>
+            <span class="box-lbl">Eligible > 0, Awaiting Check-ins</span>
+          </div>
+
+          <div class="status-box noelig-box">
+            <div class="box-top">
+              <span class="box-count font-bold">{status_distribution.no_eligible_institutions}</span>
+              <Badge variant="neutral" size="sm">NO STUDENTS</Badge>
+            </div>
+            <span class="box-lbl">Awaiting Roster Onboarding</span>
+          </div>
+        </div>
+
+        <div class="distribution-footer-note">
+          <ShieldCheck size={14} class="text-primary inline-icon" /> Operational tier classification measures institutional participation, not diagnostic student health.
+        </div>
+      </Card>
+    </div>
+
+    {/* Section 3: Institutional Comparative Benchmarking Table */}
+    <Card padding="lg" class="benchmarking-table-card">
+      <div class="card-title-row">
+        <div>
+          <h3 class="card-section-title">Institutional Comparative Benchmarking</h3>
+          <p class="section-subtext">Multi-institution operational benchmarking. Ranked by completion percentage descending.</p>
+        </div>
+        <a href="/admin/institutions">
+          <Button variant="outline" size="sm">View Directory &rarr;</Button>
+        </a>
       </div>
 
-      <div class="table-wrapper">
+      <div class="table-responsive-wrapper">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Institution</th>
+              <th>Institution Name</th>
               <th>Code</th>
               <th>State</th>
-              <th>Eligible Students</th>
-              <th>Started</th>
+              <th>Eligible</th>
               <th>Completed</th>
-              <th>Completion Rate</th>
-              <th>Privacy Status</th>
-              <th>Interventions</th>
+              <th>Participation %</th>
+              <th>Operational Action Signal</th>
+              <th>Institutional Action</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {institution_summaries.map((inst) => (
               <tr>
                 <td class="font-medium">{inst.institution_name}</td>
-                <td><span class="code-badge">{inst.institution_code}</span></td>
+                <td><span class="code-badge font-semibold">{inst.institution_code}</span></td>
                 <td>{inst.state}</td>
-                <td>{inst.eligible_students.toLocaleString()}</td>
-                <td>{inst.started_students.toLocaleString()}</td>
-                <td>{inst.completed_students.toLocaleString()}</td>
+                <td>{inst.eligible_students}</td>
+                <td>{inst.completed_students}</td>
                 <td class="font-semibold">{inst.completion_percentage.toFixed(1)}%</td>
                 <td>
-                  {inst.is_suppressed ? (
-                    <Badge variant="neutral" size="sm">Suppressed (&lt;10)</Badge>
+                  {inst.action_signal === 'PARTICIPATION_REQUIRES_FOLLOWUP' ? (
+                    <Badge variant="improving" size="sm">Requires Follow-up</Badge>
+                  ) : inst.action_signal === 'STRONG_PARTICIPATION' ? (
+                    <Badge variant="stable" size="sm">Strong Participation</Badge>
                   ) : (
-                    <Badge variant="stable" size="sm">Reporting (&ge;10)</Badge>
+                    <Badge variant="neutral" size="sm">No Participation Data</Badge>
                   )}
                 </td>
-                <td>{inst.active_interventions_count} Active</td>
+                <td>
+                  {inst.active_interventions_count > 0 ? (
+                    <span class="text-primary font-semibold">&check; {inst.active_interventions_count} Active Action</span>
+                  ) : (
+                    <span class="text-muted">No Active Action</span>
+                  )}
+                </td>
+                <td>
+                  <a href={`/admin/institutions/${inst.institution_id}`} class="action-link font-semibold">
+                    Oversight &rarr;
+                  </a>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -127,12 +247,64 @@ const { cycle, participation, institution_summaries, privacy } = dashboardData;
       </div>
     </Card>
 
-    {/* Section 4: Government Privacy & Governance Panel */}
+    {/* Section 4: Participation Trend Analytics */}
+    <Card padding="lg" class="trend-card">
+      <div class="card-title-row">
+        <h3 class="card-section-title">Multi-Cycle Participation Trend</h3>
+        <TrendingUp size={18} class="text-primary" aria-hidden="true" />
+      </div>
+      <p class="section-subtext">Historical aggregate participation metrics tracked across weekly reflection cycles.</p>
+
+      <div class="trend-empty-box">
+        <Sparkles size={28} class="text-muted" aria-hidden="true" />
+        <h4 class="trend-empty-title">Active Cycle: {cycle ? cycle.name : 'Week 1 Reflection'}</h4>
+        <p class="trend-empty-desc">
+          Historical participation trends will populate automatically as additional weekly reflection cycles are completed across authorized institutions.
+        </p>
+      </div>
+    </Card>
+
+    {/* Section 5: Privacy-Protected Wellness Analytics Panel */}
+    <Card padding="lg" class="gov-privacy-suppression-card">
+      <div class="card-title-row">
+        <h3 class="card-section-title">Statewide Wellness Analytics</h3>
+        <Badge variant="neutral" size="sm">Privacy Threshold: ≥ 10 Students</Badge>
+      </div>
+      <p class="section-subtext">Aggregated wellness category indicators across all authorized institutions.</p>
+
+      {isDataSuppressed ? (
+        <div class="gov-suppressed-box">
+          <div class="suppressed-lock-icon">
+            <LockKeyhole size={28} />
+          </div>
+          <div class="suppressed-info">
+            <span class="suppressed-tag">&bull; PRIVACY THRESHOLD ACTIVE</span>
+            <h4 class="suppressed-title">Detailed Analytics Withheld</h4>
+            <p class="suppressed-desc">
+              Detailed reflection analytics and category averages are withheld across all institutions until the minimum privacy threshold ({participation.completed_students} / 10 completed check-ins) is met.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div class="categories-summary-grid">
+          {categorySummaries.map((cs) => (
+            <div class="cat-summary-box">
+              <span class="cat-lbl">{cs.category.replace('_', ' ')}</span>
+              <span class="cat-val font-bold">
+                {cs.average_score !== null ? `${cs.average_score.toFixed(1)} / 10` : '--'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
+    {/* Section 6: Government Data Governance Panel (Feature 3) */}
     <Card padding="lg">
-      <div class="section-header">
+      <div class="section-header-row">
         <div>
           <h3 class="card-section-title">NSWEIS Data Governance Status</h3>
-          <p class="section-subtext">Architectural privacy boundaries enforced across all authorized institutions.</p>
+          <p class="section-subtext">Designed around DPDP privacy-preserving principles: Architectural boundaries enforced server-side.</p>
         </div>
         <Badge variant="stable" size="md">&bull; GOVERNANCE PROTECTED</Badge>
       </div>
@@ -165,73 +337,143 @@ const { cycle, participation, institution_summaries, privacy } = dashboardData;
       </div>
     </Card>
 
-    {/* Section 5: Five-Stage Privacy Data Flow */}
+    {/* Section 7: Five-Stage Privacy Data Flow Component */}
     <FiveStagePrivacyFlow />
 
-    {/* Section 6: Privacy & Data Protection Notice */}
-    <Card padding="lg" class="privacy-card">
-      <div class="privacy-content">
-        <div class="privacy-icon">
-          <ShieldCheck size={24} class="text-primary" />
-        </div>
-        <div class="privacy-text">
-          <h4 class="privacy-title">Statewide Privacy & Data Protection Guarantee</h4>
-          <p class="privacy-body">{privacy.notice}</p>
-        </div>
-      </div>
-    </Card>
-
+    <NonClinicalDisclaimer />
     <PrivacyNotice variant="full" />
   </div>
 </GovernmentLayout>
 
 <style>
-  .gov-dashboard-layout {
+  .government-dashboard-layout {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
   }
 
-  .metrics-grid {
+  .section-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .section-heading {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  /* KPI Cards Grid (6 cards) */
+  .kpi-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--space-4);
   }
 
-  .section-header {
+  .kpi-card-wrap {
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .kpi-card-wrap:nth-child(1) { animation-delay: 0.04s; }
+  .kpi-card-wrap:nth-child(2) { animation-delay: 0.08s; }
+  .kpi-card-wrap:nth-child(3) { animation-delay: 0.12s; }
+  .kpi-card-wrap:nth-child(4) { animation-delay: 0.16s; }
+  .kpi-card-wrap:nth-child(5) { animation-delay: 0.20s; }
+  .kpi-card-wrap:nth-child(6) { animation-delay: 0.24s; }
+
+  @keyframes fadeSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kpi-card-wrap {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Two Column Dashboard Grid */
+  .two-col-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .card-title-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--space-4);
-    gap: var(--space-4);
+    margin-bottom: var(--space-2);
   }
 
   .card-section-title {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-md);
     font-weight: 700;
     color: var(--color-text-main);
   }
 
   .section-subtext {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     color: var(--color-text-muted);
-    margin-top: var(--space-1);
+    margin-top: 2px;
   }
 
-  .header-link {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--color-primary);
-    text-decoration: none;
-    white-space: nowrap;
+  /* Status Distribution Boxes */
+  .status-boxes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    margin-top: var(--space-3);
   }
 
-  .header-link:hover {
-    text-decoration: underline;
+  .status-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
 
-  .table-wrapper {
+  .box-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .box-count {
+    font-size: var(--font-size-xl);
+    color: var(--color-text-main);
+  }
+
+  .box-lbl {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .distribution-footer-note {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px dashed var(--color-border);
+  }
+
+  /* Benchmarking Table */
+  .table-responsive-wrapper {
     overflow-x: auto;
+    margin-top: var(--space-4);
   }
 
   .data-table {
@@ -251,56 +493,129 @@ const { cycle, participation, institution_summaries, privacy } = dashboardData;
     background-color: var(--color-bg-secondary);
     color: var(--color-text-muted);
     font-weight: 600;
-    text-transform: uppercase;
     font-size: var(--font-size-xs);
-    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
 
   .code-badge {
-    background-color: var(--color-bg-secondary);
-    padding: var(--space-1) var(--space-2);
+    background-color: rgba(99, 102, 241, 0.12);
+    color: var(--color-primary);
+    padding: 2px 6px;
     border-radius: var(--radius-sm);
-    font-family: monospace;
     font-size: var(--font-size-xs);
-    color: var(--color-text-main);
   }
 
-  .font-medium {
-    font-weight: 500;
+  .action-link {
+    color: var(--color-primary);
+    text-decoration: none;
   }
 
-  .font-semibold {
-    font-weight: 600;
+  .action-link:hover {
+    text-decoration: underline;
   }
 
-  .privacy-card {
-    background-color: var(--color-bg-secondary);
-    border-left: 4px solid var(--color-primary);
-  }
-
-  .privacy-content {
+  /* Trend Empty Box */
+  .trend-empty-box {
     display: flex;
-    align-items: flex-start;
-    gap: var(--space-4);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-6);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    text-align: center;
+    margin-top: var(--space-2);
   }
 
-  .privacy-title {
-    font-size: var(--font-size-md);
+  .trend-empty-title {
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--color-text-main);
-    margin-bottom: var(--space-1);
   }
 
-  .privacy-body {
-    font-size: var(--font-size-sm);
+  .trend-empty-desc {
+    font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  /* Government Privacy Suppression Card */
+  .gov-suppressed-box {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background-color: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-2);
+  }
+
+  .suppressed-lock-icon {
+    color: var(--color-primary);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .suppressed-tag {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+  }
+
+  .suppressed-title {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-top: var(--space-1);
+  }
+
+  .suppressed-desc {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
     line-height: 1.5;
   }
+
+  .categories-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  .cat-summary-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .cat-lbl {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+  }
+
+  .cat-val {
+    font-size: var(--font-size-md);
+    color: var(--color-text-main);
+  }
+
+  /* Governance Section Header & Grid */
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
   .gov-privacy-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--space-4);
-    margin-top: var(--space-4);
   }
 
   .gov-privacy-box {
@@ -321,5 +636,9 @@ const { cycle, participation, institution_summaries, privacy } = dashboardData;
 
   .box-val {
     font-size: var(--font-size-sm);
+  }
+
+  .inline-icon {
+    vertical-align: text-bottom;
   }
 </style>

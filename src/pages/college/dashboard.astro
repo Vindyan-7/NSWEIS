@@ -5,8 +5,18 @@ import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
 import Button from '../../components/ui/Button.astro';
 import Badge from '../../components/ui/Badge.astro';
+import ParticipationDonut from '../../components/analytics/ParticipationDonut.astro';
+import FiveStagePrivacyFlow from '../../components/privacy/FiveStagePrivacyFlow.astro';
+import NonClinicalDisclaimer from '../../components/privacy/NonClinicalDisclaimer.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
-import { LockKeyhole, Calendar, Sparkles, ListChecks, CalendarRange } from '@lucide/astro';
+import {
+  LockKeyhole,
+  Calendar,
+  Sparkles,
+  ListChecks,
+  Building,
+  ShieldCheck,
+} from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import { getLiveCollegeDashboardData } from '../../services/analytics';
@@ -28,17 +38,22 @@ if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_a
 
 const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
 
-// Load live server-authoritative institutional data & interventions
+// Load live server-authoritative institutional analytics & interventions
 const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
 const interventions = await getInstitutionInterventions(supabase, institutionId);
 
 const { cycle, participation, analytics, recommendation_distribution, task_activity } = dashboardData;
+
+const ongoingInterventions = interventions.filter((i) => i.status === 'ongoing').length;
+const scheduledInterventions = interventions.filter((i) => i.status === 'scheduled').length;
+const completedInterventions = interventions.filter((i) => i.status === 'completed').length;
 ---
 
-<CollegeLayout title="Institutional Wellness Overview" activePath="/college/dashboard">
+<CollegeLayout title="Institutional Wellness Intelligence" activePath="/college/dashboard">
+  {/* Hero Header */}
   <PageHeader
     title="College Institutional Intelligence"
-    subtitle={`Anonymous aggregate well-being trends for ${cycle ? cycle.name : 'Weekly Cycle'}`}
+    subtitle={`${cycle ? cycle.name : 'Weekly Cycle'} — Anonymous aggregate well-being trends for National Institute of Technology, Apex (NITA01)`}
   >
     <a href="/college/interventions/new">
       <Button variant="primary" size="sm">+ Create Intervention</Button>
@@ -46,76 +61,137 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
   </PageHeader>
 
   <div class="college-dashboard-layout">
-    {/* SECTION A: CURRENT WEEK */}
-    <Card padding="lg" class="current-week-card">
-      <div class="week-card-header">
-        <div class="week-info">
-          <span class="week-badge">Active Weekly Cycle</span>
-          <h3 class="week-title">{cycle ? cycle.name : 'No Active Cycle'}</h3>
-          {cycle && (
-            <p class="week-dates">
-              <Calendar size={14} aria-hidden="true" />
-              {new Date(cycle.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(cycle.ends_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
-          )}
-        </div>
-        <div class="week-status-badge">
-          <Badge variant={cycle?.status === 'active' ? 'stable' : 'neutral'}>
-            Status: {cycle ? cycle.status : 'Inactive'}
+    {/* Active Cycle Context Banner */}
+    <Card padding="md" class="active-cycle-banner">
+      <div class="banner-content">
+        <div class="banner-left">
+          <Badge variant={cycle?.status === 'active' ? 'stable' : 'neutral'} size="md">
+            &bull; {cycle?.status === 'active' ? 'Cycle Active' : 'Cycle Inactive'}
           </Badge>
+          <span class="inst-pill-tag">National Institute of Technology, Apex &bull; NITA01</span>
         </div>
+        {cycle && (
+          <div class="banner-right">
+            <Calendar size={14} class="text-muted" aria-hidden="true" />
+            <span class="cycle-dates">
+              {new Date(cycle.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(cycle.ends_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+        )}
       </div>
     </Card>
 
-    {/* SECTION B: PARTICIPATION */}
+    {/* Section 1: Animated KPI Cards Row */}
     <div class="section-container">
-      <h3 class="section-heading">Campus Participation Metrics</h3>
-      <div class="metrics-grid">
-        <MetricCard
-          title="Eligible Students"
-          value={participation.total_eligible_students.toLocaleString()}
-          change="Campus Student Scope"
-          changeType="neutral"
-        />
-        <MetricCard
-          title="Started Check-in"
-          value={participation.started_students.toLocaleString()}
-          change="Sessions Initiated"
-          changeType="neutral"
-        />
-        <MetricCard
-          title="Completed Reflections"
-          value={participation.completed_students.toLocaleString()}
-          change="Finished Check-ins"
-          changeType="positive"
-        />
-        <MetricCard
-          title="Completion Rate"
-          value={`${participation.completion_percentage.toFixed(1)}%`}
-          change="Cycle Completion"
-          changeType={participation.completion_percentage > 50 ? "positive" : "neutral"}
-        />
+      <h3 class="section-heading">Campus Participation Overview</h3>
+      <div class="kpi-cards-grid">
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Eligible Students"
+            value={participation.total_eligible_students.toLocaleString()}
+            change="Campus Student Scope"
+            changeType="neutral"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Started Check-in"
+            value={participation.started_students.toLocaleString()}
+            change="Sessions Initiated"
+            changeType="neutral"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Completed Reflections"
+            value={participation.completed_students.toLocaleString()}
+            change="Finished Check-ins"
+            changeType="positive"
+          />
+        </div>
+        <div class="kpi-card-wrap">
+          <MetricCard
+            title="Completion Rate"
+            value={`${participation.completion_percentage.toFixed(1)}%`}
+            change="Cycle Completion"
+            changeType={participation.completion_percentage > 50 ? "positive" : "neutral"}
+          />
+        </div>
       </div>
     </div>
 
-    {/* SECTION C & D: REFLECTION ANALYTICS & FOCUS DISTRIBUTION */}
-    <div class="dashboard-section-grid">
-      {/* SECTION C: WELL-BEING / REFLECTION ANALYTICS */}
+    {/* Section 2: Participation Intelligence (Donut + Progress Bar Grid) */}
+    <div class="two-col-dashboard-grid">
+      <Card padding="lg" class="donut-chart-card">
+        <div class="card-title-row">
+          <h3 class="card-section-title">Participation Distribution</h3>
+          <Badge variant="neutral" size="sm">Operational Aggregates</Badge>
+        </div>
+        <p class="section-subtext">Visual breakdown of student check-in completions for the active weekly cycle.</p>
+
+        <div class="donut-chart-wrapper">
+          <ParticipationDonut
+            completed={participation.completed_students}
+            total={participation.total_eligible_students}
+            percentage={participation.completion_percentage}
+            size={160}
+          />
+        </div>
+      </Card>
+
+      <Card padding="lg" class="progress-bar-card">
+        <div class="card-title-row">
+          <h3 class="card-section-title">Weekly Participation Progress</h3>
+          <span class="pct-badge font-bold">{participation.completion_percentage.toFixed(1)}%</span>
+        </div>
+        <p class="section-subtext">Campus participation for the active reflection cycle.</p>
+
+        <div class="progress-container">
+          <div class="progress-status-row">
+            <span class="progress-count-text font-semibold">
+              {participation.completed_students} / {participation.total_eligible_students} students completed
+            </span>
+            <span class="progress-sub-text">
+              {participation.total_eligible_students - participation.completed_students} remaining
+            </span>
+          </div>
+
+          <div class="progress-track-bg">
+            <div class="progress-track-fill" style={`width: ${Math.max(5, participation.completion_percentage)}%;`}></div>
+          </div>
+
+          <p class="progress-footnote text-muted">
+            <ShieldCheck size={14} class="inline-icon" /> Operational participation metrics remain visible to monitor engagement.
+          </p>
+        </div>
+      </Card>
+    </div>
+
+    {/* Section 3: Reflection Analytics & Supportive Focus Distribution Grid */}
+    <div class="two-col-dashboard-grid">
+      {/* Category Analytics Card */}
       <Card padding="lg" class="analytics-card">
-        <div class="section-header">
+        <div class="card-title-row">
           <h3 class="card-section-title">Reflection Category Analytics</h3>
-          <Badge variant="neutral" size="sm">Privacy Threshold: ≥ 10 Students</Badge>
+          <Badge variant="neutral" size="sm">Privacy Threshold: &ge; 10 Students</Badge>
         </div>
         <p class="section-subtext">Aggregate category indicators from completed reflections. Excludes private student text.</p>
 
         {analytics.is_suppressed ? (
-          <div class="suppressed-box">
-            <LockKeyhole size={20} class="lock-icon" aria-hidden="true" />
-            <div>
-              <h4 class="suppressed-title">Privacy Protection Active</h4>
-              <p class="suppressed-desc">
-                Data is suppressed because fewer than 10 students ({participation.completed_students} completed) have finished check-ins for this cycle.
+          <div class="suppressed-privacy-card">
+            <div class="suppressed-lock-icon">
+              <LockKeyhole size={28} />
+            </div>
+            <div class="suppressed-content">
+              <span class="suppressed-badge-tag">&bull; PRIVACY PROTECTED</span>
+              <h4 class="suppressed-heading">Anonymous Analytics Protected</h4>
+              <p class="suppressed-body">
+                Category indicators are hidden because fewer than 10 students ({participation.completed_students} completed) have finished check-ins for this reflection cycle.
               </p>
+              <div class="suppressed-meta-row">
+                <span class="meta-pill">Current Completed: <strong>{participation.completed_students}</strong></span>
+                <span class="meta-pill">Minimum Threshold: <strong>10</strong></span>
+              </div>
             </div>
           </div>
         ) : (
@@ -130,7 +206,7 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
                     </Badge>
                   )}
                 </div>
-                <span class="score-display">
+                <span class="score-display font-semibold">
                   {cs.average_score !== null ? `${cs.average_score.toFixed(1)} / 10` : '--'}
                 </span>
               </div>
@@ -139,9 +215,9 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
         )}
       </Card>
 
-      {/* SECTION D: FOCUS / RECOMMENDATION INSIGHTS */}
+      {/* Focus / Recommendation Distribution Card */}
       <Card padding="lg" class="focus-distribution-card">
-        <div class="section-header">
+        <div class="card-title-row">
           <h3 class="card-section-title">Supportive Focus Distribution</h3>
           <Sparkles size={18} class="text-primary" aria-hidden="true" />
         </div>
@@ -152,8 +228,8 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
             {recommendation_distribution.map((rec) => (
               <div class="distribution-item">
                 <div class="dist-header">
-                  <span class="dist-title">{rec.title}</span>
-                  <span class="dist-pct">{rec.percentage}% ({rec.count})</span>
+                  <span class="dist-title font-medium">{rec.title}</span>
+                  <span class="dist-pct font-semibold">{rec.percentage}% ({rec.count})</span>
                 </div>
                 <div class="dist-track">
                   <div class="dist-fill" style={`width: ${rec.percentage}%;`}></div>
@@ -162,14 +238,20 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
             ))}
           </div>
         ) : (
-          <p class="empty-state-text">No recommendation distribution available for this cycle yet.</p>
+          <div class="empty-focus-box">
+            <Sparkles size={28} class="text-muted" aria-hidden="true" />
+            <h4 class="empty-focus-title">No Recommendation Signals Available</h4>
+            <p class="empty-focus-desc">
+              Aggregate supportive focus areas will appear when privacy-safe recommendation signals are generated for completed check-ins.
+            </p>
+          </div>
         )}
       </Card>
     </div>
 
-    {/* SECTION E: TASK ACTIVITY */}
+    {/* Section 4: Task Activity & Credits Metrics Card */}
     <Card padding="lg" class="task-activity-card">
-      <div class="section-header">
+      <div class="card-title-row">
         <h3 class="card-section-title">Activity & Task Completion Metrics</h3>
         <ListChecks size={20} class="text-primary" aria-hidden="true" />
       </div>
@@ -177,33 +259,41 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
 
       <div class="task-activity-grid">
         <div class="activity-metric-box">
-          <span class="act-val">{task_activity.tasks_assigned}</span>
+          <span class="act-val font-bold">{task_activity.tasks_assigned}</span>
           <span class="act-lbl">Tasks Assigned</span>
         </div>
         <div class="activity-metric-box">
-          <span class="act-val">{task_activity.tasks_completed}</span>
+          <span class="act-val font-bold">{task_activity.tasks_completed}</span>
           <span class="act-lbl">Tasks Completed</span>
         </div>
         <div class="activity-metric-box">
-          <span class="act-val">{task_activity.completion_rate}%</span>
+          <span class="act-val font-bold">{task_activity.completion_rate}%</span>
           <span class="act-lbl">Task Completion Rate</span>
         </div>
         <div class="activity-metric-box">
-          <span class="act-val">+{task_activity.total_credits_earned}</span>
+          <span class="act-val font-bold text-primary">+{task_activity.total_credits_earned}</span>
           <span class="act-lbl">Credits Awarded</span>
         </div>
       </div>
     </Card>
 
-    {/* SECTION F: INSTITUTIONAL INTERVENTIONS */}
+    {/* Section 5: Institutional Interventions */}
     <Card padding="lg" class="interventions-summary-card">
-      <div class="section-header">
-        <h3 class="card-section-title">Institutional Interventions & Action Tracking</h3>
+      <div class="card-title-row">
+        <div>
+          <h3 class="card-section-title">Institutional Interventions & Action Tracking</h3>
+          <p class="section-subtext">Active and planned campus-wide preventative programs initiated by college leadership.</p>
+        </div>
         <a href="/college/interventions">
           <Button variant="outline" size="sm">Manage Interventions ({interventions.length})</Button>
         </a>
       </div>
-      <p class="section-subtext">Active and planned campus-wide preventative programs initiated by college leadership.</p>
+
+      <div class="int-summary-pills">
+        <span class="int-pill-count">&bull; {ongoingInterventions} Active</span>
+        <span class="int-pill-count">&bull; {scheduledInterventions} Scheduled</span>
+        <span class="int-pill-count">&bull; {completedInterventions} Completed</span>
+      </div>
 
       {interventions.length > 0 ? (
         <div class="interventions-preview-list">
@@ -211,7 +301,7 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
             <div class="int-preview-item">
               <div class="int-preview-left">
                 <span class="int-cat-badge">{item.category.replace('_', ' ')}</span>
-                <span class="int-preview-title">{item.title}</span>
+                <span class="int-preview-title font-medium">{item.title}</span>
               </div>
               <div class="int-preview-right">
                 <span class="int-location">📍 {item.location}</span>
@@ -234,18 +324,21 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
           ))}
         </div>
       ) : (
-        <p class="empty-state-text">No institutional interventions have been created yet for this campus.</p>
+        <div class="empty-int-box">
+          <Building size={24} class="text-muted" aria-hidden="true" />
+          <p class="empty-state-text">No institutional interventions have been created yet for this campus.</p>
+        </div>
       )}
     </Card>
 
-    {/* College Officer Privacy Protection Panel */}
+    {/* Section 6: Institutional Privacy Protection Panel (Feature 3) */}
     <Card padding="lg" class="officer-privacy-panel">
       <div class="privacy-header">
         <div class="flex-title">
           <h3 class="card-section-title">Institutional Privacy & Governance Status</h3>
           <Badge variant="stable" size="md">&bull; PRIVACY PROTECTION ACTIVE</Badge>
         </div>
-        <p class="section-subtext">Architectural privacy controls strictly enforce anonymous aggregate reporting.</p>
+        <p class="section-subtext">Designed around DPDP privacy principles: Architectural privacy controls strictly enforce anonymous aggregate reporting.</p>
       </div>
 
       <div class="privacy-check-grid">
@@ -262,7 +355,7 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
             <strong>Anonymity Threshold ({participation.completed_students} / 10 Completed):</strong>
             <span class="block-text">
               {analytics.is_suppressed
-                ? "SUFFERED / HIDDEN: Category averages are masked because fewer than 10 students completed reflections."
+                ? "SUPPRESSED: Category averages are masked because fewer than 10 students completed reflections."
                 : "REPORTING: Group size meets minimum privacy threshold (&ge;10 completed reflections)."}
             </span>
           </div>
@@ -271,12 +364,23 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
           <span class="check-icon text-success">&check;</span>
           <div>
             <strong>Institution Scope Enforced:</strong>
-            <span class="block-text">Server-authoritative queries isolate data to your assigned campus ({institutionId}).</span>
+            <span class="block-text">Server-authoritative queries isolate data to your assigned campus (NITA01).</span>
+          </div>
+        </div>
+        <div class="privacy-check-item">
+          <span class="check-icon text-success">&check;</span>
+          <div>
+            <strong>Student Identities Protected:</strong>
+            <span class="block-text">No student PII, names, emails, or student IDs reach officer analytics DTOs.</span>
           </div>
         </div>
       </div>
     </Card>
 
+    {/* Section 7: Compact Five-Stage Privacy Data Flow */}
+    <FiveStagePrivacyFlow />
+
+    <NonClinicalDisclaimer />
     <PrivacyNotice variant="full" />
   </div>
 </CollegeLayout>
@@ -288,61 +392,99 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
     gap: var(--space-6);
   }
 
-  .current-week-card {
-    background: linear-gradient(135deg, #ffffff 0%, var(--color-primary-50) 100%);
-    border-left: 4px solid var(--color-primary-600);
+  /* Active Banner */
+  .active-cycle-banner {
+    background: var(--color-bg-card);
+    border-left: 4px solid var(--color-primary);
   }
 
-  .week-card-header {
+  .banner-content {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 
-  .week-badge {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--color-primary-700);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .week-title {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-    margin-top: var(--space-1);
-  }
-
-  .week-dates {
+  .banner-left {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    font-size: 0.875rem;
+    gap: var(--space-3);
+  }
+
+  .inst-pill-tag {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
     color: var(--color-text-muted);
-    margin-top: var(--space-1);
+    background: var(--color-bg-secondary);
+    padding: 2px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .banner-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  /* Section Container & Animated KPI Row */
+  .section-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
   .section-heading {
-    font-size: 1.125rem;
+    font-size: var(--font-size-md);
     font-weight: 700;
     color: var(--color-text-main);
-    margin-bottom: var(--space-3);
   }
 
-  .metrics-grid {
+  .kpi-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--space-4);
   }
 
-  .dashboard-section-grid {
+  .kpi-card-wrap {
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .kpi-card-wrap:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card-wrap:nth-child(2) { animation-delay: 0.12s; }
+  .kpi-card-wrap:nth-child(3) { animation-delay: 0.19s; }
+  .kpi-card-wrap:nth-child(4) { animation-delay: 0.26s; }
+
+  @keyframes fadeSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kpi-card-wrap {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Grids */
+  .two-col-dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
     gap: var(--space-6);
   }
 
-  .section-header {
+  .card-title-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -350,45 +492,132 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
   }
 
   .card-section-title {
-    font-size: 1.125rem;
+    font-size: var(--font-size-md);
     font-weight: 700;
     color: var(--color-text-main);
   }
 
   .section-subtext {
-    font-size: 0.875rem;
+    font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     margin-bottom: var(--space-4);
   }
 
-  .suppressed-box {
+  /* Donut Card */
+  .donut-chart-wrapper {
     display: flex;
-    align-items: flex-start;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-4) 0;
+  }
+
+  /* Progress Bar Card */
+  .pct-badge {
+    font-size: var(--font-size-md);
+    color: var(--color-primary);
+  }
+
+  .progress-container {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-3);
-    padding: var(--space-4);
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border-subtle);
+    margin-top: var(--space-2);
   }
 
-  .lock-icon {
-    color: var(--color-primary-600);
-    flex-shrink: 0;
-    margin-top: 0.125rem;
+  .progress-status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--font-size-sm);
   }
 
-  .suppressed-title {
-    font-size: 0.9375rem;
-    font-weight: 700;
+  .progress-count-text {
     color: var(--color-text-main);
   }
 
-  .suppressed-desc {
-    font-size: 0.8125rem;
+  .progress-sub-text {
     color: var(--color-text-muted);
-    margin-top: 0.25rem;
+    font-size: var(--font-size-xs);
   }
 
+  .progress-track-bg {
+    width: 100%;
+    height: 14px;
+    background-color: var(--color-bg-secondary, #f1f5f9);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-track-fill {
+    height: 100%;
+    background-color: var(--color-primary);
+    border-radius: var(--radius-md);
+    transition: width 0.8s ease-out;
+  }
+
+  .progress-footnote {
+    font-size: var(--font-size-xs);
+    margin-top: var(--space-2);
+  }
+
+  .inline-icon {
+    vertical-align: text-bottom;
+  }
+
+  /* Suppressed Privacy Card */
+  .suppressed-privacy-card {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    background-color: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-2);
+  }
+
+  .suppressed-lock-icon {
+    color: var(--color-primary);
+    flex-shrink: 0;
+    margin-top: var(--space-1);
+  }
+
+  .suppressed-badge-tag {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+  }
+
+  .suppressed-heading {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-top: var(--space-1);
+  }
+
+  .suppressed-body {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+    line-height: 1.5;
+  }
+
+  .suppressed-meta-row {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .meta-pill {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-main);
+    background: var(--color-bg-main);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+  }
+
+  /* Category List (when active) */
   .categories-list {
     display: flex;
     flex-direction: column;
@@ -399,34 +628,57 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-3) var(--space-4);
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-lg);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
   }
 
   .cat-info {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .cat-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-text-main);
+    font-size: var(--font-size-sm);
     text-transform: capitalize;
+    color: var(--color-text-main);
   }
 
   .score-display {
-    font-size: 0.9375rem;
-    font-weight: 700;
+    font-size: var(--font-size-sm);
     color: var(--color-text-main);
+  }
+
+  /* Empty Focus Box */
+  .empty-focus-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-6);
+    text-align: center;
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-2);
+  }
+
+  .empty-focus-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .empty-focus-desc {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
   }
 
   .distribution-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .distribution-item {
@@ -438,59 +690,61 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
   .dist-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    font-size: 0.875rem;
+    font-size: var(--font-size-xs);
   }
 
-  .dist-title {
-    font-weight: 600;
-    color: var(--color-text-main);
-  }
-
-  .dist-pct {
-    font-weight: 700;
-    color: var(--color-primary-600);
-  }
+  .dist-title { color: var(--color-text-main); }
+  .dist-pct { color: var(--color-text-muted); }
 
   .dist-track {
     height: 8px;
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-full);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
     overflow: hidden;
   }
 
   .dist-fill {
     height: 100%;
-    background-color: var(--color-primary-600);
-    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    border-radius: var(--radius-sm);
   }
 
+  /* Task Activity Grid */
   .task-activity-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: var(--space-4);
+    margin-top: var(--space-3);
   }
 
   .activity-metric-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
     padding: var(--space-4);
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-lg);
-    text-align: center;
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
 
   .act-val {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--color-primary-600);
+    font-size: var(--font-size-xl);
+    color: var(--color-text-main);
   }
 
   .act-lbl {
-    display: block;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  /* Interventions Summary */
+  .int-summary-pills {
+    display: flex;
+    gap: var(--space-3);
+    font-size: var(--font-size-xs);
     font-weight: 600;
     color: var(--color-text-muted);
-    margin-top: 0.25rem;
+    margin-bottom: var(--space-3);
   }
 
   .interventions-preview-list {
@@ -504,8 +758,9 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
     justify-content: space-between;
     align-items: center;
     padding: var(--space-3) var(--space-4);
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-lg);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
 
   .int-preview-left {
@@ -515,18 +770,17 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
   }
 
   .int-cat-badge {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     font-weight: 600;
-    color: var(--color-primary-700);
-    background-color: var(--color-primary-50);
-    padding: 0.125rem 0.375rem;
+    color: var(--color-primary);
+    background-color: rgba(99, 102, 241, 0.1);
+    padding: 2px 8px;
     border-radius: var(--radius-sm);
     text-transform: capitalize;
   }
 
   .int-preview-title {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
     color: var(--color-text-main);
   }
 
@@ -537,13 +791,64 @@ const { cycle, participation, analytics, recommendation_distribution, task_activ
   }
 
   .int-location {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .empty-int-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-6);
     color: var(--color-text-muted);
   }
 
   .empty-state-text {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
+  }
+
+  /* Officer Privacy Panel */
+  .officer-privacy-panel {
+    border-left: 4px solid var(--color-primary);
+  }
+
+  .privacy-header {
+    margin-bottom: var(--space-4);
+  }
+
+  .flex-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .privacy-check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+    background-color: var(--color-bg-secondary);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .privacy-check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+  }
+
+  .check-icon {
+    font-weight: 700;
+    font-size: 14px;
+    margin-top: 1px;
+  }
+
+  .block-text {
+    display: block;
     color: var(--color-text-muted);
-    font-style: italic;
+    margin-top: 2px;
+    line-height: 1.4;
   }
 </style>

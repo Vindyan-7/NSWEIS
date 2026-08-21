@@ -100,6 +100,21 @@ export interface CollegeDashboardDTO {
   };
 }
 
+export interface GovernmentInstitutionSummaryItem {
+  institution_id: string;
+  institution_name: string;
+  institution_code: string;
+  state: string;
+  eligible_students: number;
+  started_students: number;
+  completed_students: number;
+  completion_percentage: number;
+  participation_status: 'ACTIVE' | 'PARTIAL' | 'NO_PARTICIPATION' | 'NO_ELIGIBLE_STUDENTS';
+  action_signal: 'STRONG_PARTICIPATION' | 'PARTICIPATION_REQUIRES_FOLLOWUP' | 'NO_PARTICIPATION_DATA';
+  is_suppressed: boolean;
+  active_interventions_count: number;
+}
+
 export interface GovernmentDashboardDTO {
   cycle: {
     id: string;
@@ -117,19 +132,14 @@ export interface GovernmentDashboardDTO {
     completed_students: number;
     completion_percentage: number;
     is_suppressed: boolean;
+    status_distribution: {
+      active_institutions: number;
+      partial_institutions: number;
+      no_participation_institutions: number;
+      no_eligible_institutions: number;
+    };
   };
-  institution_summaries: Array<{
-    institution_id: string;
-    institution_name: string;
-    institution_code: string;
-    state: string;
-    eligible_students: number;
-    started_students: number;
-    completed_students: number;
-    completion_percentage: number;
-    is_suppressed: boolean;
-    active_interventions_count: number;
-  }>;
+  institution_summaries: GovernmentInstitutionSummaryItem[];
   privacy: {
     threshold_min_students: number;
     notice: string;
@@ -574,6 +584,26 @@ export async function getLiveGovernmentDashboardData(
       .select('*', { count: 'exact', head: true })
       .eq('institution_id', inst.id);
 
+    let participationStatus: 'ACTIVE' | 'PARTIAL' | 'NO_PARTICIPATION' | 'NO_ELIGIBLE_STUDENTS';
+    if (eligibleCount === 0) {
+      participationStatus = 'NO_ELIGIBLE_STUDENTS';
+    } else if (completedCount === 0) {
+      participationStatus = 'NO_PARTICIPATION';
+    } else if (completionRate >= 75) {
+      participationStatus = 'ACTIVE';
+    } else {
+      participationStatus = 'PARTIAL';
+    }
+
+    let actionSignal: 'STRONG_PARTICIPATION' | 'PARTICIPATION_REQUIRES_FOLLOWUP' | 'NO_PARTICIPATION_DATA';
+    if (eligibleCount === 0 || (startedCount === 0 && completedCount === 0)) {
+      actionSignal = 'NO_PARTICIPATION_DATA';
+    } else if (completionRate >= 50) {
+      actionSignal = 'STRONG_PARTICIPATION';
+    } else {
+      actionSignal = 'PARTICIPATION_REQUIRES_FOLLOWUP';
+    }
+
     if (startedCount > 0) {
       activeInstsCount += 1;
     }
@@ -591,6 +621,8 @@ export async function getLiveGovernmentDashboardData(
       started_students: startedCount,
       completed_students: completedCount,
       completion_percentage: completionRate,
+      participation_status: participationStatus,
+      action_signal: actionSignal,
       is_suppressed: isSuppressed,
       active_interventions_count: interventionCount || 0,
     });
@@ -601,6 +633,13 @@ export async function getLiveGovernmentDashboardData(
 
   const globalCompletionRate = globalEligible > 0 ? Math.round((globalCompleted / globalEligible) * 1000) / 10 : 0;
   const globalIsSuppressed = globalCompleted < PRIVACY_THRESHOLD_MIN_STUDENTS;
+
+  const statusDistribution = {
+    active_institutions: institutionSummaries.filter((i) => i.participation_status === 'ACTIVE').length,
+    partial_institutions: institutionSummaries.filter((i) => i.participation_status === 'PARTIAL').length,
+    no_participation_institutions: institutionSummaries.filter((i) => i.participation_status === 'NO_PARTICIPATION').length,
+    no_eligible_institutions: institutionSummaries.filter((i) => i.participation_status === 'NO_ELIGIBLE_STUDENTS').length,
+  };
 
   await logPrivacyAuditEvent(
     supabase,
@@ -632,6 +671,7 @@ export async function getLiveGovernmentDashboardData(
       completed_students: globalCompleted,
       completion_percentage: globalCompletionRate,
       is_suppressed: globalIsSuppressed,
+      status_distribution: statusDistribution,
     },
     institution_summaries: institutionSummaries,
     privacy: {

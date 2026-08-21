@@ -1,0 +1,238 @@
+---
+import type { GovernmentInstitutionSummaryItem } from '../../services/analytics';
+import Badge from '../ui/Badge.astro';
+
+interface Props {
+  institutions: GovernmentInstitutionSummaryItem[];
+}
+
+const { institutions } = Astro.props;
+---
+
+<div class="inst-participation-barchart">
+  <div class="chart-header-row font-semibold">
+    <span>Institution & Code</span>
+    <span>Participation Rate</span>
+  </div>
+
+  <div class="bars-container">
+    {institutions.map((inst, idx) => (
+      <div class="inst-bar-item" style={`animation-delay: ${0.05 + idx * 0.08}s;`}>
+        <div class="inst-info-row">
+          <div class="inst-name-box">
+            <span class="inst-name font-medium">{inst.institution_name}</span>
+            <span class="inst-code-badge">{inst.institution_code}</span>
+            <span class="inst-state-tag">{inst.state}</span>
+          </div>
+
+          <div class="inst-metrics-right">
+            <span class="inst-pct-val font-bold">{inst.completion_percentage.toFixed(1)}%</span>
+            <span class="inst-count-val text-muted">
+              ({inst.completed_students} / {inst.eligible_students} completed)
+            </span>
+          </div>
+        </div>
+
+        <div class="bar-track-bg">
+          <div
+            class="bar-track-fill"
+            style={`width: ${Math.max(inst.eligible_students > 0 ? 3 : 0, inst.completion_percentage)}%;`}
+          ></div>
+        </div>
+
+        <div class="inst-footer-row">
+          <div class="status-tags-row">
+            <Badge
+              variant={
+                inst.participation_status === 'ACTIVE'
+                  ? 'stable'
+                  : inst.participation_status === 'PARTIAL'
+                  ? 'improving'
+                  : 'neutral'
+              }
+              size="sm"
+            >
+              {inst.participation_status.replace('_', ' ')}
+            </Badge>
+
+            {inst.action_signal === 'PARTICIPATION_REQUIRES_FOLLOWUP' ? (
+              <span class="signal-tag tag-followup">&bull; Participation Requires Follow-up</span>
+            ) : inst.action_signal === 'STRONG_PARTICIPATION' ? (
+              <span class="signal-tag tag-strong">&bull; Strong Participation</span>
+            ) : (
+              <span class="signal-tag tag-nodata">&bull; No Active Check-ins</span>
+            )}
+          </div>
+
+          {inst.active_interventions_count > 0 ? (
+            <span class="action-tag text-primary font-semibold">
+              &check; {inst.active_interventions_count} Active Institutional Action
+            </span>
+          ) : (
+            <span class="action-tag text-muted">No Active Actions</span>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .inst-participation-barchart {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .chart-header-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .inst-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inst-bar-item {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .inst-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .inst-name-box {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .inst-name {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+  }
+
+  .inst-code-badge {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--color-primary);
+    background: rgba(99, 102, 241, 0.12);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+  }
+
+  .inst-state-tag {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .inst-metrics-right {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .inst-pct-val {
+    font-size: var(--font-size-md);
+    color: var(--color-text-main);
+  }
+
+  .inst-count-val {
+    font-size: var(--font-size-xs);
+  }
+
+  .bar-track-bg {
+    width: 100%;
+    height: 10px;
+    background-color: var(--color-border, #e2e8f0);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .bar-track-fill {
+    height: 100%;
+    background-color: var(--color-primary);
+    border-radius: var(--radius-sm);
+    transition: width 0.8s ease-out;
+  }
+
+  .inst-footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    padding-top: var(--space-1);
+  }
+
+  .status-tags-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .signal-tag {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+
+  .tag-followup {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+  }
+
+  .tag-strong {
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+  }
+
+  .tag-nodata {
+    background-color: rgba(100, 116, 139, 0.12);
+    color: var(--color-text-muted);
+  }
+
+  .action-tag {
+    font-size: var(--font-size-xs);
+  }
+</style>

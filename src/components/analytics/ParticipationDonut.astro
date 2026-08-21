@@ -1,0 +1,158 @@
+---
+interface Props {
+  completed: number;
+  total: number;
+  percentage: number;
+  size?: number;
+}
+
+const { completed, total, percentage, size = 160 } = Astro.props;
+
+const strokeWidth = 14;
+const radius = (size - strokeWidth) / 2;
+const circumference = 2 * Math.PI * radius;
+const completedOffset = circumference - (percentage / 100) * circumference;
+---
+
+<div class="participation-donut-container">
+  <div class="donut-svg-wrapper">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} class="donut-svg">
+      {/* Background Track Circle */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="transparent"
+        stroke="var(--color-bg-secondary, #f1f5f9)"
+        stroke-width={strokeWidth}
+      />
+      {/* Completed Segment Arc */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="transparent"
+        stroke="var(--color-primary, #6366f1)"
+        stroke-width={strokeWidth}
+        stroke-dasharray={circumference}
+        stroke-dashoffset={completedOffset}
+        stroke-linecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        class="donut-segment"
+      />
+    </svg>
+    <div class="donut-center-label">
+      <span class="donut-pct font-bold">{percentage.toFixed(1)}%</span>
+      <span class="donut-sub">Completed</span>
+    </div>
+  </div>
+
+  <div class="donut-legend">
+    <div class="legend-item">
+      <span class="legend-dot dot-completed"></span>
+      <div class="legend-text">
+        <span class="legend-lbl">Completed</span>
+        <span class="legend-val font-semibold">{completed}</span>
+      </div>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot dot-remaining"></span>
+      <div class="legend-text">
+        <span class="legend-lbl">Not Completed</span>
+        <span class="legend-val font-semibold">{Math.max(0, total - completed)}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .participation-donut-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  .donut-svg-wrapper {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    flex-shrink: 0;
+  }
+
+  .donut-svg {
+    transform: rotate(0deg);
+  }
+
+  .donut-segment {
+    transition: stroke-dashoffset 1s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .donut-segment {
+      transition: none;
+    }
+  }
+
+  .donut-center-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .donut-pct {
+    font-size: var(--font-size-xl);
+    color: var(--color-text-main);
+    line-height: 1.1;
+  }
+
+  .donut-sub {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-completed {
+    background-color: var(--color-primary);
+  }
+
+  .dot-remaining {
+    background-color: #cbd5e1;
+  }
+
+  .legend-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legend-lbl {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .legend-val {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+  }
+</style>
