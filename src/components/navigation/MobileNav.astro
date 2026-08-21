@@ -3,6 +3,7 @@ import { MoreHorizontal, X, LogOut } from '@lucide/astro';
 
 interface NavItem {
   label: string;
+  mobileLabel?: string;
   href: string;
   icon?: any;
   active?: boolean;
@@ -25,21 +26,26 @@ const hasMore = secondaryItems.length > 0;
   <div class="mobile-nav-bar">
     {primaryItems.map((item) => {
       const IconComponent = typeof item.icon === 'function' || (typeof item.icon === 'object' && item.icon !== null) ? item.icon : null;
+      const displayLabel = item.mobileLabel || (item.label === 'Weekly Check-in' ? 'Check-in' : item.label);
       return (
         <a href={item.href} class={`mobile-nav-item ${item.active ? 'is-active' : ''}`}>
-          {IconComponent ? (
-            <IconComponent size={20} />
-          ) : (
-            item.icon && <span class="mobile-nav-icon">{item.icon}</span>
-          )}
-          <span class="mobile-nav-label">{item.label}</span>
+          <div class="nav-icon-pill">
+            {IconComponent ? (
+              <IconComponent size={22} />
+            ) : (
+              item.icon && <span class="mobile-nav-icon">{item.icon}</span>
+            )}
+          </div>
+          <span class="mobile-nav-label">{displayLabel}</span>
         </a>
       );
     })}
 
     {hasMore && (
       <button type="button" class="mobile-nav-item more-btn" id="mobile-more-toggle" aria-expanded="false" aria-label="Open more navigation menu">
-        <MoreHorizontal size={20} />
+        <div class="nav-icon-pill">
+          <MoreHorizontal size={22} />
+        </div>
         <span class="mobile-nav-label">More</span>
       </button>
     )}
@@ -50,7 +56,10 @@ const hasMore = secondaryItems.length > 0;
   <div class="mobile-more-overlay" id="mobile-more-overlay" aria-hidden="true">
     <div class="mobile-more-sheet glass-panel" role="dialog" aria-modal="true" aria-label="Secondary navigation">
       <div class="sheet-header">
-        <span class="sheet-title font-semibold">More Menu</span>
+        <div class="sheet-title-wrap">
+          <div class="sheet-title-badge font-bold">NS</div>
+          <span class="sheet-title font-bold">More Menu</span>
+        </div>
         <button type="button" class="sheet-close-btn" id="mobile-more-close" aria-label="Close menu">
           <X size={20} />
         </button>
@@ -62,7 +71,7 @@ const hasMore = secondaryItems.length > 0;
           return (
             <a href={item.href} class={`sheet-nav-link ${item.active ? 'is-active' : ''}`}>
               {IconComponent ? (
-                <IconComponent size={18} />
+                <IconComponent size={20} />
               ) : (
                 item.icon && <span class="nav-icon">{item.icon}</span>
               )}
@@ -73,8 +82,8 @@ const hasMore = secondaryItems.length > 0;
       </div>
 
       <form action="/logout" method="POST" class="sheet-logout-form">
-        <button type="submit" class="sheet-logout-btn font-medium">
-          <LogOut size={18} />
+        <button type="submit" class="sheet-logout-btn font-semibold">
+          <LogOut size={20} />
           <span>Sign Out</span>
         </button>
       </form>
@@ -110,6 +119,11 @@ const hasMore = secondaryItems.length > 0;
   overlay?.addEventListener('click', (e) => {
     if (e.target === overlay) closeSheet();
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay?.classList.contains('is-open')) {
+      closeSheet();
+    }
+  });
 </script>
 
 <style>
@@ -120,10 +134,10 @@ const hasMore = secondaryItems.length > 0;
     left: 0;
     right: 0;
     z-index: 200;
-    background: var(--color-bg-surface);
+    background: #ffffff;
     border-top: 1px solid var(--color-border-subtle);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
   }
 
   @media (max-width: 1023px) {
@@ -136,7 +150,7 @@ const hasMore = secondaryItems.length > 0;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    height: 3.75rem;
+    height: 4.25rem;
     padding: 0 var(--space-2);
   }
 
@@ -145,9 +159,9 @@ const hasMore = secondaryItems.length > 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     color: var(--color-text-muted);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 500;
     flex: 1;
     min-height: 48px;
@@ -155,24 +169,44 @@ const hasMore = secondaryItems.length > 0;
     border: none;
     cursor: pointer;
     text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .nav-icon-pill {
+    padding: 3px 12px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
   }
 
   .mobile-nav-item.is-active {
-    color: var(--color-primary-600);
-    font-weight: 600;
+    color: var(--color-primary-700);
+    font-weight: 700;
+  }
+
+  .mobile-nav-item.is-active .nav-icon-pill {
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+  }
+
+  .mobile-nav-label {
+    font-size: 0.71875rem;
+    line-height: 1.1;
   }
 
   .mobile-more-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(4px);
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px);
     z-index: 300;
     align-items: flex-end;
     justify-content: center;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.25s ease;
   }
 
   .mobile-more-overlay.is-open {
@@ -183,9 +217,9 @@ const hasMore = secondaryItems.length > 0;
   .mobile-more-sheet {
     width: 100%;
     max-width: 480px;
-    background: var(--color-bg-surface);
-    border-top-left-radius: var(--radius-2xl);
-    border-top-right-radius: var(--radius-2xl);
+    background: #ffffff;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
     padding: var(--space-5) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
     box-shadow: var(--shadow-xl);
     display: flex;
@@ -207,6 +241,24 @@ const hasMore = secondaryItems.length > 0;
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
+  .sheet-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .sheet-title-badge {
+    width: 1.75rem;
+    height: 1.75rem;
+    background-color: var(--color-primary-600);
+    color: #ffffff;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6875rem;
+  }
+
   .sheet-title {
     font-size: 1rem;
     color: var(--color-text-main);
@@ -223,6 +275,7 @@ const hasMore = secondaryItems.length > 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: var(--radius-md);
   }
 
   .sheet-nav-list {
@@ -236,12 +289,13 @@ const hasMore = secondaryItems.length > 0;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     color: var(--color-text-main);
     font-size: 0.9375rem;
     font-weight: 500;
     text-decoration: none;
     min-height: 48px;
+    transition: background var(--transition-fast);
   }
 
   .sheet-nav-link:hover, .sheet-nav-link.is-active {
@@ -259,9 +313,9 @@ const hasMore = secondaryItems.length > 0;
     background: var(--color-band-elevated-bg);
     color: var(--color-band-elevated);
     border: 1px solid var(--color-band-elevated-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     font-size: 0.9375rem;
     cursor: pointer;
-    min-height: 48px;
+    min-height: 52px;
   }
 </style>

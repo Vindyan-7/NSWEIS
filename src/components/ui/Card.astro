@@ -33,4 +33,16 @@ const { class: className = '', padding = 'md', id } = Astro.props;
   .card-padding-lg {
     padding: var(--space-8);
   }
+
+  @media (max-width: 767px) {
+    .card {
+      border-radius: 18px;
+    }
+    .card-padding-lg {
+      padding: 1.375rem;
+    }
+    .card-padding-md {
+      padding: 1.125rem;
+    }
+  }
 </style>

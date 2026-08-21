@@ -8,7 +8,7 @@ const { title, subtitle } = Astro.props;
 ---
 
 <div class="page-header">
-  <div>
+  <div class="header-text-group">
     <h1 class="page-title">{title}</h1>
     {subtitle && <p class="page-subtitle">{subtitle}</p>}
   </div>
@@ -28,22 +28,53 @@ const { title, subtitle } = Astro.props;
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
+  .header-text-group {
+    max-width: 100%;
+  }
+
   .page-title {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: clamp(1.5rem, 5.5vw, 2rem);
+    font-weight: 800;
     color: var(--color-text-main);
-    line-height: 1.25;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   .page-subtitle {
     font-size: 0.9375rem;
     color: var(--color-text-muted);
     margin-top: var(--space-1);
+    line-height: 1.45;
   }
 
   .page-actions {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+  }
+
+  @media (max-width: 767px) {
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-3);
+    }
+
+    .page-title {
+      font-size: clamp(1.375rem, 6.5vw, 1.875rem);
+      line-height: 1.25;
+    }
+
+    .page-subtitle {
+      font-size: 0.875rem;
+    }
+
+    .page-actions {
+      width: 100%;
+    }
   }
 </style>

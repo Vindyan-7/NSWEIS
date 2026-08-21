@@ -17,7 +17,7 @@ const profile = Astro.locals.profile;
 
 const studentNav = [
   { label: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard, active: activePath === '/student/dashboard' },
-  { label: 'Weekly Check-in', href: '/student/check-in', icon: ClipboardCheck, active: activePath === '/student/check-in' },
+  { label: 'Weekly Check-in', mobileLabel: 'Check-in', href: '/student/check-in', icon: ClipboardCheck, active: activePath === '/student/check-in' },
   { label: 'Tasks', href: '/student/tasks', icon: ListChecks, active: activePath === '/student/tasks' },
   { label: 'Progress', href: '/student/progress', icon: TrendingUp, active: activePath === '/student/progress' },
   { label: 'Wellness Summary', href: '/student/wellness', icon: HeartPulse, active: activePath === '/student/wellness' },

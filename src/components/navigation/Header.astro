@@ -13,11 +13,16 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
 <header class="app-header glass-panel">
   <div class="header-content">
     <div class="header-left">
+      <div class="mobile-brand-mark">
+        <div class="brand-logo-badge font-bold">NS</div>
+        <span class="brand-app-name font-bold">NSWEIS</span>
+      </div>
       <slot name="left" />
     </div>
+
     <div class="header-right">
       <div class="user-info">
-        <span class="user-name">{userName}</span>
+        <span class="user-name font-semibold">{userName}</span>
         <span class="user-role">{userRole}</span>
       </div>
       <Avatar name={userName} src={avatarUrl} size="sm" />
@@ -44,33 +49,7 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
     position: sticky;
     top: 0;
     z-index: 100;
-  }
-
-  @media (max-width: 767px) {
-    .app-header {
-      height: 3.5rem;
-      padding: 0 1rem;
-    }
-
-    .user-info {
-      max-width: 120px;
-    }
-
-    .user-name {
-      font-size: 0.8125rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .user-role {
-      display: none;
-    }
-
-    .logout-btn {
-      min-width: 44px;
-      min-height: 44px;
-    }
+    background: var(--color-bg-surface);
   }
 
   .header-content {
@@ -80,10 +59,42 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
     align-items: center;
   }
 
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .mobile-brand-mark {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .brand-logo-badge {
+    width: 2rem;
+    height: 2rem;
+    background-color: var(--color-primary-600);
+    color: #ffffff;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .brand-app-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    letter-spacing: -0.01em;
+  }
+
   .header-right {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .user-info {
@@ -119,5 +130,40 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
 
   .logout-btn:hover {
     color: var(--color-band-elevated);
+  }
+
+  @media (max-width: 1023px) {
+    .mobile-brand-mark {
+      display: flex;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .app-header {
+      height: 3.75rem;
+      padding: 0 1rem;
+    }
+
+    .user-info {
+      max-width: 140px;
+    }
+
+    .user-name {
+      font-size: 0.8125rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-role {
+      font-size: 0.6875rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .logout-form {
+      display: none;
+    }
   }
 </style>

@@ -362,4 +362,47 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
     font-size: 0.8125rem;
     color: var(--color-text-muted);
   }
+
+  @media (max-width: 767px) {
+    .status-title {
+      font-size: 1.25rem;
+    }
+
+    .status-desc {
+      font-size: 0.875rem;
+      margin-bottom: var(--space-4);
+    }
+
+    .status-cta, .status-cta button, .status-cta a {
+      width: 100%;
+      min-height: 52px;
+      display: block;
+    }
+
+    .your-week-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-3);
+    }
+
+    .widget-actions, .widget-actions a, .widget-actions button {
+      width: 100%;
+      min-height: 48px;
+    }
+
+    .your-week-stats {
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    .category-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .your-week-stats {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
