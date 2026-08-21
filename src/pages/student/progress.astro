@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge.astro';
 import EmptyState from '../../components/ui/EmptyState.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
-import { getStudentProgress, getStudentCreditBalance } from '../../services/student-tasks';
+import { getStudentJourney } from '../../services/student-journey';
 import {
   TrendingUp,
   CalendarCheck,
@@ -15,6 +15,8 @@ import {
   Coins,
   CheckCircle2,
   Sparkles,
+  ArrowRight,
+  Clock3,
 } from '@lucide/astro';
 
 const user = Astro.locals.user;
@@ -24,14 +26,13 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-const progress = await getStudentProgress(supabase, user.id);
-const creditBalance = await getStudentCreditBalance(supabase, user.id);
+const journey = await getStudentJourney(supabase, user.id);
 ---
 
-<StudentLayout title="My Progress" activePath="/student/progress">
+<StudentLayout title="Your Well-being Journey" activePath="/student/progress">
   <PageHeader
-    title="My Progress & Participation"
-    subtitle="Track your weekly reflections, activity completion, and well-being consistency."
+    title="Your Well-being Journey"
+    subtitle="Track your weekly reflections, activity completion, and personal consistency over time."
   >
     <a href="/student/tasks">
       <Button variant="outline" size="sm">
@@ -41,31 +42,47 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
   </PageHeader>
 
   <div class="progress-page-layout">
-    {/* Continuity Reflection Card */}
+    {/* Participation Continuity Card */}
     <Card padding="lg" class="continuity-card">
       <div class="continuity-flex">
         <div class="continuity-icon">
           <Sparkles size={24} aria-hidden="true" />
         </div>
         <div>
-          <h3 class="continuity-title">You're building a consistent reflection routine</h3>
+          <h3 class="continuity-title">{journey.participationStreakText}</h3>
           <p class="continuity-text">
-            Taking time each week to pause, reflect, and complete small wellness actions helps you stay mindful of your balance.
+            {journey.participationChangeText}
           </p>
         </div>
       </div>
     </Card>
 
-    {/* Activity Completion Summary Cards */}
+    {/* Metrics Summary Grid */}
     <div class="metrics-grid">
+      <Card padding="md">
+        <div class="metric-item">
+          <div class="icon-box primary">
+            <Clock3 size={20} aria-hidden="true" />
+          </div>
+          <div>
+            <span class="label">Current Reflection</span>
+            <span class="value font-sm">
+              {journey.reflectionStatus === 'completed' && <Badge variant="stable" size="sm">Completed</Badge>}
+              {journey.reflectionStatus === 'in_progress' && <Badge variant="primary" size="sm">In Progress</Badge>}
+              {journey.reflectionStatus === 'not_started' && <Badge variant="neutral" size="sm">Pending</Badge>}
+            </span>
+          </div>
+        </div>
+      </Card>
+
       <Card padding="md">
         <div class="metric-item">
           <div class="icon-box primary">
             <TrendingUp size={20} aria-hidden="true" />
           </div>
           <div>
-            <span class="label">Completion Rate</span>
-            <span class="value">{progress.completionPercentage}%</span>
+            <span class="label">Task Completion Rate</span>
+            <span class="value">{journey.taskCompletionPercentage}%</span>
           </div>
         </div>
       </Card>
@@ -76,20 +93,8 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
             <CheckCircle2 size={20} aria-hidden="true" />
           </div>
           <div>
-            <span class="label">Completed Activities</span>
-            <span class="value">{progress.completedTasks}</span>
-          </div>
-        </div>
-      </Card>
-
-      <Card padding="md">
-        <div class="metric-item">
-          <div class="icon-box watch">
-            <ListChecks size={20} aria-hidden="true" />
-          </div>
-          <div>
-            <span class="label">Active Activities</span>
-            <span class="value">{progress.activeTasks}</span>
+            <span class="label">Activities Completed</span>
+            <span class="value">{journey.completedTasksCount}</span>
           </div>
         </div>
       </Card>
@@ -101,18 +106,38 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
           </div>
           <div>
             <span class="label">Total Credits Earned</span>
-            <span class="value">+{creditBalance.totalEarned}</span>
+            <span class="value">+{journey.totalCreditsEarned}</span>
           </div>
         </div>
       </Card>
     </div>
 
-    {/* Weekly Participation Section */}
-    <Card padding="lg">
-      <h3 class="card-title">Weekly Participation History</h3>
-      <p class="card-subtitle">Overview of your completed weekly check-ins and reflection actions.</p>
+    {/* Current Weekly Focus Card */}
+    {journey.currentFocusTitle && (
+      <Card padding="lg" class="focus-card">
+        <div class="focus-header">
+          <span class="focus-badge">Your Focus For This Week</span>
+          <h3 class="focus-title">{journey.currentFocusTitle}</h3>
+          {journey.currentFocusDescription && (
+            <p class="focus-description">{journey.currentFocusDescription}</p>
+          )}
+        </div>
+        <div class="focus-actions">
+          <a href="/student/tasks">
+            <Button variant="primary" size="sm">
+              View Focus in My Tasks <ArrowRight size={14} aria-hidden="true" />
+            </Button>
+          </a>
+        </div>
+      </Card>
+    )}
 
-      {progress.totalTasks > 0 || progress.weeklyParticipation.some((w) => w.checkInCompleted) ? (
+    {/* Weekly Participation History Table */}
+    <Card padding="lg">
+      <h3 class="card-title">Weekly Reflection & Activity History</h3>
+      <p class="card-subtitle">Chronological record of your completed weekly check-ins and reflection actions.</p>
+
+      {journey.weeklyHistory.length > 0 && journey.weeklyHistory.some((w) => w.checkInCompleted || w.completedTasksCount > 0) ? (
         <div class="table-wrapper">
           <table class="participation-table">
             <thead>
@@ -121,10 +146,11 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
                 <th>Weekly Reflection</th>
                 <th>Activities Completed</th>
                 <th>Credits Earned</th>
+                <th>Weekly Focus</th>
               </tr>
             </thead>
             <tbody>
-              {progress.weeklyParticipation.map((week) => (
+              {journey.weeklyHistory.map((week) => (
                 <tr>
                   <td class="font-medium">Week {week.weekNumber}</td>
                   <td>
@@ -140,6 +166,9 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
                   <td>
                     <span class="credit-highlight">+{week.creditsEarned} Credits</span>
                   </td>
+                  <td class="text-subtle font-sm">
+                    {week.focusTitle || 'Self-Reflection'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -148,7 +177,7 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
       ) : (
         <EmptyState
           title="No Progress History Yet"
-          description="Complete your first weekly reflection to start building your progress."
+          description="Complete your first weekly reflection to start building your well-being journey."
           icon={CalendarCheck}
         />
       )}
@@ -250,6 +279,42 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
     color: var(--color-text-main);
   }
 
+  .font-sm {
+    font-size: 0.875rem;
+  }
+
+  .focus-card {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-primary-200);
+  }
+
+  .focus-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+  }
+
+  .focus-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-top: var(--space-1);
+    margin-bottom: var(--space-2);
+  }
+
+  .focus-description {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .focus-actions {
+    margin-top: var(--space-4);
+  }
+
   .card-title {
     font-size: 1.125rem;
     font-weight: 700;
@@ -288,6 +353,10 @@ const creditBalance = await getStudentCreditBalance(supabase, user.id);
   .font-medium {
     font-weight: 600;
     color: var(--color-text-main);
+  }
+
+  .text-subtle {
+    color: var(--color-text-muted);
   }
 
   .credit-highlight {

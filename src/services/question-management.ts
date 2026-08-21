@@ -6,6 +6,10 @@ export interface QuestionFilters {
   weekNumber?: number;
   departmentCode?: string;
   searchQuery?: string;
+  reusableOnly?: boolean;
+  adaptiveOnly?: boolean;
+  activeState?: 'active' | 'archived' | 'all';
+  category?: WellnessCategory;
 }
 
 export interface CsvValidationResult {
@@ -32,16 +36,34 @@ export async function listQuestions(
   supabase: SupabaseClient<Database>,
   filters?: QuestionFilters
 ): Promise<Question[]> {
-  let query = supabase
-    .from('questions')
+  let query = (supabase.from('questions') as any)
     .select('*, options:question_options(*)');
+
+  // Filter by active status
+  if (!filters?.activeState || filters.activeState === 'active') {
+    query = query.eq('active', true);
+  } else if (filters.activeState === 'archived') {
+    query = query.eq('active', false);
+  }
 
   if (filters?.weekNumber !== undefined && filters.weekNumber > 0) {
     query = query.eq('week_number', filters.weekNumber);
   }
 
+  if (filters?.category) {
+    query = query.eq('category', filters.category);
+  }
+
   if (filters?.departmentCode && filters.departmentCode !== 'ALL') {
     query = query.in('target_department', ['ALL', filters.departmentCode]);
+  }
+
+  if (filters?.reusableOnly) {
+    query = query.eq('reusable', true);
+  }
+
+  if (filters?.adaptiveOnly) {
+    query = query.eq('adaptive_enabled', true);
   }
 
   if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
@@ -67,8 +89,7 @@ export async function getQuestionDetails(
   supabase: SupabaseClient<Database>,
   questionId: string
 ): Promise<Question | null> {
-  const { data, error } = await supabase
-    .from('questions')
+  const { data, error } = await (supabase.from('questions') as any)
     .select('*, options:question_options(*)')
     .eq('id', questionId)
     .single();
@@ -90,6 +111,10 @@ export async function createQuestionWithOptions(
     target_department: string;
     adaptive_trigger_group?: string | null;
     required?: boolean;
+    reusable?: boolean;
+    cooldown_weeks?: number;
+    maximum_uses?: number | null;
+    adaptive_enabled?: boolean;
     weight?: number;
     order_index?: number;
   },
@@ -103,8 +128,7 @@ export async function createQuestionWithOptions(
   }>
 ): Promise<{ success: boolean; error?: string; questionId?: string }> {
   // Check for duplicate code
-  const { data: existing } = await supabase
-    .from('questions')
+  const { data: existing } = await (supabase.from('questions') as any)
     .select('id')
     .eq('question_code', questionData.question_code)
     .single();
@@ -113,8 +137,7 @@ export async function createQuestionWithOptions(
     return { success: false, error: `Question code '${questionData.question_code}' already exists.` };
   }
 
-  const { data: insertedQuestion, error: qError } = await supabase
-    .from('questions')
+  const { data: insertedQuestion, error: qError } = await (supabase.from('questions') as any)
     .insert({
       question_code: questionData.question_code,
       week_number: questionData.week_number,
@@ -123,12 +146,16 @@ export async function createQuestionWithOptions(
       target_department: questionData.target_department || 'ALL',
       adaptive_trigger_group: questionData.adaptive_trigger_group || null,
       required: questionData.required ?? true,
+      reusable: questionData.reusable ?? true,
+      cooldown_weeks: questionData.cooldown_weeks ?? 0,
+      maximum_uses: questionData.maximum_uses !== undefined ? questionData.maximum_uses : null,
+      adaptive_enabled: questionData.adaptive_enabled ?? true,
       weight: questionData.weight ?? 1.0,
       order_index: questionData.order_index ?? 1,
       question_type: 'single_choice',
       active: true,
       is_base_question: true,
-    } as any)
+    })
     .select()
     .single();
 
@@ -149,9 +176,8 @@ export async function createQuestionWithOptions(
       follow_up_group: opt.follow_up_group || null,
     }));
 
-    const { error: optError } = await supabase
-      .from('question_options')
-      .insert(optionInserts as any);
+    const { error: optError } = await (supabase.from('question_options') as any)
+      .insert(optionInserts);
 
     if (optError) {
       return { success: false, error: `Question created, but option error: ${optError.message}` };
@@ -171,6 +197,11 @@ export async function updateQuestionWithOptions(
     target_department?: string;
     adaptive_trigger_group?: string | null;
     required?: boolean;
+    reusable?: boolean;
+    cooldown_weeks?: number;
+    maximum_uses?: number | null;
+    adaptive_enabled?: boolean;
+    active?: boolean;
     order_index?: number;
   },
   optionsData?: Array<{
@@ -183,25 +214,33 @@ export async function updateQuestionWithOptions(
     order_index: number;
   }>
 ): Promise<{ success: boolean; error?: string }> {
+  const updatePayload: any = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (questionData.week_number !== undefined) updatePayload.week_number = questionData.week_number;
+  if (questionData.text !== undefined) updatePayload.text = questionData.text;
+  if (questionData.category !== undefined) updatePayload.category = questionData.category;
+  if (questionData.target_department !== undefined) updatePayload.target_department = questionData.target_department;
+  if (questionData.adaptive_trigger_group !== undefined) updatePayload.adaptive_trigger_group = questionData.adaptive_trigger_group;
+  if (questionData.required !== undefined) updatePayload.required = questionData.required;
+  if (questionData.reusable !== undefined) updatePayload.reusable = questionData.reusable;
+  if (questionData.cooldown_weeks !== undefined) updatePayload.cooldown_weeks = questionData.cooldown_weeks;
+  if (questionData.maximum_uses !== undefined) updatePayload.maximum_uses = questionData.maximum_uses;
+  if (questionData.adaptive_enabled !== undefined) updatePayload.adaptive_enabled = questionData.adaptive_enabled;
+  if (questionData.active !== undefined) updatePayload.active = questionData.active;
+  if (questionData.order_index !== undefined) updatePayload.order_index = questionData.order_index;
+
   const { error: qError } = await (supabase as any)
     .from('questions')
-    .update({
-      week_number: questionData.week_number,
-      text: questionData.text,
-      category: questionData.category,
-      target_department: questionData.target_department,
-      adaptive_trigger_group: questionData.adaptive_trigger_group,
-      required: questionData.required,
-      order_index: questionData.order_index,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', questionId);
 
   if (qError) return { success: false, error: qError.message };
 
   if (optionsData) {
     // Delete existing options and insert updated ones cleanly
-    await supabase.from('question_options').delete().eq('question_id', questionId);
+    await (supabase.from('question_options') as any).delete().eq('question_id', questionId);
 
     const optionInserts = optionsData.map((opt) => ({
       question_id: questionId,
@@ -213,13 +252,42 @@ export async function updateQuestionWithOptions(
       follow_up_group: opt.follow_up_group || null,
     }));
 
-    const { error: optError } = await supabase
-      .from('question_options')
-      .insert(optionInserts as any);
+    const { error: optError } = await (supabase.from('question_options') as any)
+      .insert(optionInserts);
 
     if (optError) return { success: false, error: optError.message };
   }
 
+  return { success: true };
+}
+
+/**
+ * Soft-archive a question preserving historical responses.
+ */
+export async function archiveQuestion(
+  supabase: SupabaseClient<Database>,
+  questionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await (supabase.from('questions') as any)
+    .update({ active: false, updated_at: new Date().toISOString() })
+    .eq('id', questionId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+/**
+ * Unarchive / reactivate a question.
+ */
+export async function unarchiveQuestion(
+  supabase: SupabaseClient<Database>,
+  questionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await (supabase.from('questions') as any)
+    .update({ active: true, updated_at: new Date().toISOString() })
+    .eq('id', questionId);
+
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
@@ -451,7 +519,7 @@ export function validateCsvFiles(
       option_code: oCode,
       label: oText,
       signal_value: sigVal,
-      score: sigVal, // Backward compatibility
+      score: sigVal,
       follow_up_group: folGroup || null,
       order_index: isNaN(ordVal) ? 1 : ordVal,
     });
@@ -481,7 +549,7 @@ export async function importQuestionCsvs(
   optionsCsvText: string
 ): Promise<{ success: boolean; errors?: string[]; importedCount?: number }> {
   // Fetch existing department codes from database dynamically
-  const { data: deptData } = await supabase.from('departments').select('code');
+  const { data: deptData } = await (supabase.from('departments') as any).select('code');
   const validDeptCodes = new Set<string>((deptData || []).map((d: any) => d.code));
 
   const validation = validateCsvFiles(questionsCsvText, optionsCsvText, validDeptCodes);
@@ -492,8 +560,7 @@ export async function importQuestionCsvs(
 
   // Check database for pre-existing question codes
   const qCodes = validation.parsedQuestions.map((q) => q.question_code);
-  const { data: existingQ } = await supabase
-    .from('questions')
+  const { data: existingQ } = await (supabase.from('questions') as any)
     .select('question_code')
     .in('question_code', qCodes);
 
@@ -536,13 +603,13 @@ export async function importQuestionCsvs(
   }
 
   // Record import audit history
-  await supabase.from('question_imports').insert({
+  await (supabase.from('question_imports') as any).insert({
     admin_id: adminId,
     filename,
     total_rows: validation.parsedQuestions.length,
     successful_rows: importedQuestions,
     error_log: null,
-  } as any);
+  });
 
   return { success: true, importedCount: importedQuestions };
 }
@@ -550,8 +617,7 @@ export async function importQuestionCsvs(
 export async function getImportHistory(
   supabase: SupabaseClient<Database>
 ): Promise<QuestionImport[]> {
-  const { data, error } = await supabase
-    .from('question_imports')
+  const { data, error } = await (supabase.from('question_imports') as any)
     .select('*')
     .order('created_at', { ascending: false });
 

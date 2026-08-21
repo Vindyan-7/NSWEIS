@@ -13,11 +13,26 @@ import { getProfile } from '../../services/users';
 import {
   listQuestions,
   createQuestionWithOptions,
+  updateQuestionWithOptions,
+  archiveQuestion,
+  unarchiveQuestion,
   importQuestionCsvs,
   getImportHistory,
 } from '../../services/question-management';
+import {
+  getWeeklyCycles,
+  createWeeklyCycle,
+  updateWeeklyCycle,
+} from '../../services/weekly-cycles';
+import {
+  listQuestionSelectionRules,
+  createSelectionRule,
+  updateSelectionRule,
+  toggleSelectionRuleEnabled,
+  deleteSelectionRule,
+} from '../../services/question-selection-rules';
 import type { WellnessCategory } from '../../types/domain';
-import { Upload, Plus, FileText, Search } from '@lucide/astro';
+import { Upload, Plus, FileText, Search, Calendar, Sliders, Archive, Trash2 } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -35,11 +50,30 @@ if (!profile || profile.role !== 'super_admin') {
 let message = '';
 let isError = false;
 
-// Read query params for filters
+// Active Tab state
 const url = new URL(Astro.request.url);
+const activeTab = url.searchParams.get('tab') || 'cycles';
+
+// Question Filters
 const weekFilter = url.searchParams.get('week') ? parseInt(url.searchParams.get('week')!, 10) : undefined;
 const deptFilter = url.searchParams.get('department') || undefined;
+const catFilter = url.searchParams.get('category') as WellnessCategory | undefined;
 const searchFilter = url.searchParams.get('search') || undefined;
+const activeStateFilter = (url.searchParams.get('state') as 'active' | 'archived' | 'all') || 'active';
+const reusableFilter = url.searchParams.get('reusable') === 'true';
+const adaptiveFilter = url.searchParams.get('adaptive') === 'true';
+
+// Fetch departments for dynamic dropdowns
+const { data: deptRows } = await (supabase.from('departments') as any).select('code, name');
+const departmentsList: Array<{ code: string; name: string }> = deptRows && deptRows.length > 0
+  ? deptRows
+  : [
+      { code: 'CSE', name: 'Computer Science' },
+      { code: 'ECE', name: 'Electronics & Comm.' },
+      { code: 'EEE', name: 'Electrical Eng.' },
+      { code: 'MECH', name: 'Mechanical Eng.' },
+      { code: 'CIVIL', name: 'Civil Eng.' },
+    ];
 
 // POST Handlers
 if (Astro.request.method === 'POST') {
@@ -47,21 +81,78 @@ if (Astro.request.method === 'POST') {
     const formData = await Astro.request.formData();
     const action = formData.get('action')?.toString();
 
-    if (action === 'create') {
-      const question_code = formData.get('question_code')?.toString().trim();
+    // 1. WEEKLY CYCLES ACTIONS
+    if (action === 'create_cycle' || action === 'update_cycle') {
+      const cycle_id = formData.get('cycle_id')?.toString();
       const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
-      const text = formData.get('question_text')?.toString().trim();
+      const name = formData.get('name')?.toString().trim() || '';
+      const description = formData.get('description')?.toString().trim() || null;
+      const starts_at = formData.get('starts_at')?.toString() || '';
+      const ends_at = formData.get('ends_at')?.toString() || '';
+      const status = (formData.get('status')?.toString() || 'draft') as 'draft' | 'scheduled' | 'active' | 'closed';
+      const total_questions = parseInt(formData.get('total_questions')?.toString() || '10', 10);
+      const common_questions = parseInt(formData.get('common_questions')?.toString() || '7', 10);
+      const adaptive_questions = parseInt(formData.get('adaptive_questions')?.toString() || '3', 10);
+      const session_duration_minutes = parseInt(formData.get('session_duration_minutes')?.toString() || '20', 10);
+      const reflection_required = formData.get('reflection_required') === 'true';
+      const adaptive_questions_enabled = formData.get('adaptive_questions_enabled') === 'true';
+
+      const cycleInput = {
+        week_number,
+        name,
+        description,
+        starts_at,
+        ends_at,
+        status,
+        total_questions,
+        common_questions,
+        adaptive_questions,
+        session_duration_minutes,
+        reflection_required,
+        adaptive_questions_enabled,
+      };
+
+      if (action === 'create_cycle') {
+        const res = await createWeeklyCycle(supabase, user.id, cycleInput);
+        if (!res.success) {
+          message = res.error || 'Failed to create weekly cycle.';
+          isError = true;
+        } else {
+          message = `Weekly cycle Week ${week_number} ('${name}') created successfully.`;
+        }
+      } else if (action === 'update_cycle' && cycle_id) {
+        const res = await updateWeeklyCycle(supabase, cycle_id, cycleInput);
+        if (!res.success) {
+          message = res.error || 'Failed to update weekly cycle.';
+          isError = true;
+        } else {
+          message = `Weekly cycle Week ${week_number} updated successfully.`;
+        }
+      }
+    }
+
+    // 2. QUESTION LIBRARY ACTIONS
+    else if (action === 'create_question' || action === 'update_question') {
+      const question_id = formData.get('question_id')?.toString();
+      const question_code = formData.get('question_code')?.toString().trim() || '';
+      const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
+      const text = formData.get('question_text')?.toString().trim() || '';
       const category = formData.get('category')?.toString() as WellnessCategory;
       const target_department = formData.get('target_department')?.toString() || 'ALL';
       const adaptive_trigger_group = formData.get('adaptive_trigger_group')?.toString().trim() || null;
       const required = formData.get('required') === 'true';
+      const reusable = formData.get('reusable') === 'true';
+      const cooldown_weeks = parseInt(formData.get('cooldown_weeks')?.toString() || '0', 10);
+      const maxUsesStr = formData.get('maximum_uses')?.toString().trim();
+      const maximum_uses = maxUsesStr ? parseInt(maxUsesStr, 10) : null;
+      const adaptive_enabled = formData.get('adaptive_enabled') === 'true';
 
       const optionCodes = formData.getAll('option_code[]').map((v) => v.toString().trim());
       const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
       const optionSignals = formData.getAll('signal_value[]').map((v) => parseFloat(v.toString()));
       const optionFollowUps = formData.getAll('follow_up_group[]').map((v) => v.toString().trim() || null);
 
-      if (!question_code || !text || !category) {
+      if (!text || !category || (!question_code && action === 'create_question')) {
         message = 'Please provide Question Code, Question Text, and Category.';
         isError = true;
       } else {
@@ -74,20 +165,146 @@ if (Astro.request.method === 'POST') {
           order_index: idx + 1,
         }));
 
-        const result = await createQuestionWithOptions(
-          supabase,
-          { question_code, week_number, text, category, target_department, adaptive_trigger_group, required },
-          optionsData
-        );
+        if (action === 'create_question') {
+          const result = await createQuestionWithOptions(
+            supabase,
+            {
+              question_code,
+              week_number,
+              text,
+              category,
+              target_department,
+              adaptive_trigger_group,
+              required,
+              reusable,
+              cooldown_weeks,
+              maximum_uses,
+              adaptive_enabled,
+            },
+            optionsData
+          );
 
-        if (!result.success) {
-          message = result.error || 'Failed to create question.';
-          isError = true;
-        } else {
-          message = `Question '${question_code}' created successfully.`;
+          if (!result.success) {
+            message = result.error || 'Failed to create question.';
+            isError = true;
+          } else {
+            message = `Question '${question_code}' created successfully.`;
+          }
+        } else if (action === 'update_question' && question_id) {
+          const result = await updateQuestionWithOptions(
+            supabase,
+            question_id,
+            {
+              week_number,
+              text,
+              category,
+              target_department,
+              adaptive_trigger_group,
+              required,
+              reusable,
+              cooldown_weeks,
+              maximum_uses,
+              adaptive_enabled,
+            },
+            optionsData
+          );
+
+          if (!result.success) {
+            message = result.error || 'Failed to update question.';
+            isError = true;
+          } else {
+            message = `Question updated successfully.`;
+          }
         }
       }
-    } else if (action === 'import_csv') {
+    } else if (action === 'archive_question') {
+      const qId = formData.get('question_id')?.toString();
+      if (qId) {
+        const res = await archiveQuestion(supabase, qId);
+        if (!res.success) {
+          message = res.error || 'Failed to archive question.';
+          isError = true;
+        } else {
+          message = 'Question archived successfully.';
+        }
+      }
+    } else if (action === 'unarchive_question') {
+      const qId = formData.get('question_id')?.toString();
+      if (qId) {
+        const res = await unarchiveQuestion(supabase, qId);
+        if (!res.success) {
+          message = res.error || 'Failed to reactivate question.';
+          isError = true;
+        } else {
+          message = 'Question reactivated successfully.';
+        }
+      }
+    }
+
+    // 3. ADAPTIVE SELECTION RULE ACTIONS
+    else if (action === 'create_rule' || action === 'update_rule') {
+      const rule_id = formData.get('rule_id')?.toString();
+      const question_id = formData.get('rule_question_id')?.toString() || '';
+      const trigger_category = (formData.get('trigger_category')?.toString() || null) as WellnessCategory | null;
+      const trigger_condition = formData.get('trigger_condition')?.toString() as any || 'at_or_below';
+      const trigValStr = formData.get('trigger_value')?.toString().trim();
+      const trigger_value = trigValStr ? parseFloat(trigValStr) : null;
+      const priority = parseInt(formData.get('priority')?.toString() || '50', 10);
+      const enabled = formData.get('enabled') === 'true';
+
+      const ruleInput = {
+        question_id,
+        trigger_category: trigger_category || null,
+        trigger_condition,
+        trigger_value,
+        priority,
+        enabled,
+      };
+
+      if (action === 'create_rule') {
+        const res = await createSelectionRule(supabase, user.id, ruleInput);
+        if (!res.success) {
+          message = res.error || 'Failed to create selection rule.';
+          isError = true;
+        } else {
+          message = 'Selection rule created successfully.';
+        }
+      } else if (action === 'update_rule' && rule_id) {
+        const res = await updateSelectionRule(supabase, rule_id, ruleInput);
+        if (!res.success) {
+          message = res.error || 'Failed to update selection rule.';
+          isError = true;
+        } else {
+          message = 'Selection rule updated successfully.';
+        }
+      }
+    } else if (action === 'toggle_rule') {
+      const rule_id = formData.get('rule_id')?.toString();
+      const enabled = formData.get('enabled') === 'true';
+      if (rule_id) {
+        const res = await toggleSelectionRuleEnabled(supabase, rule_id, enabled);
+        if (!res.success) {
+          message = res.error || 'Failed to toggle rule.';
+          isError = true;
+        } else {
+          message = `Rule ${enabled ? 'enabled' : 'disabled'} successfully.`;
+        }
+      }
+    } else if (action === 'delete_rule') {
+      const rule_id = formData.get('rule_id')?.toString();
+      if (rule_id) {
+        const res = await deleteSelectionRule(supabase, rule_id);
+        if (!res.success) {
+          message = res.error || 'Failed to delete rule.';
+          isError = true;
+        } else {
+          message = 'Selection rule deleted successfully.';
+        }
+      }
+    }
+
+    // 4. BULK CSV IMPORT ACTION
+    else if (action === 'import_csv') {
       const questionsCsvText = formData.get('questions_csv')?.toString() || '';
       const optionsCsvText = formData.get('options_csv')?.toString() || '';
       const filename = formData.get('filename')?.toString() || 'questions_import.csv';
@@ -111,278 +328,618 @@ if (Astro.request.method === 'POST') {
   }
 }
 
-// Fetch questions and import history
+// Data Fetching for Views
+const weeklyCycles = await getWeeklyCycles(supabase);
+const selectionRules = await listQuestionSelectionRules(supabase);
 const questions = await listQuestions(supabase, {
   weekNumber: weekFilter,
   departmentCode: deptFilter,
+  category: catFilter,
   searchQuery: searchFilter,
+  activeState: activeStateFilter,
+  reusableOnly: reusableFilter,
+  adaptiveOnly: adaptiveFilter,
 });
 
+// All active questions for rule association dropdown
+const allActiveQuestions = await listQuestions(supabase, { activeState: 'active' });
 const importHistory = await getImportHistory(supabase);
 ---
 
-<SuperAdminLayout title="Question Bank Management" activePath="/superadmin/questions">
+<SuperAdminLayout title="Master Question & Cycle Management" activePath="/superadmin/questions">
   <PageHeader
-    title="Question Bank Management"
-    subtitle="Configure data-driven student reflection questions, weekly cycle targeting, and department rules"
+    title="Master Question & Cycle Management"
+    subtitle="Super Admin workspace for weekly reflection cycles, master question library, options, and adaptive rules"
   >
     <a href="/superadmin/dashboard">
-      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
     </a>
   </PageHeader>
 
-  <div class="questions-management-layout">
+  <div class="master-workspace-layout">
     {message && (
-      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Error' : 'Success'}>
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Action Failed' : 'Success'}>
         {message}
       </Alert>
     )}
 
-    {/* Filter Toolbar */}
-    <Card padding="md">
-      <form method="GET" class="filter-bar">
-        <div class="filter-group">
-          <label for="filter-week" class="filter-label">Filter by Week:</label>
-          <select id="filter-week" name="week" class="filter-select" onchange="this.form.submit()">
-            <option value="">All Weeks</option>
-            <option value="1" selected={weekFilter === 1}>Week 1</option>
-            <option value="2" selected={weekFilter === 2}>Week 2</option>
-            <option value="3" selected={weekFilter === 3}>Week 3</option>
-            <option value="4" selected={weekFilter === 4}>Week 4</option>
-          </select>
-        </div>
+    {/* Navigation Tabs */}
+    <div class="workspace-tabs" role="tablist">
+      <a href="?tab=cycles" class={`tab-btn ${activeTab === 'cycles' ? 'active' : ''}`}>
+        <Calendar size={16} aria-hidden="true" /> Weekly Cycles ({weeklyCycles.length})
+      </a>
+      <a href="?tab=library" class={`tab-btn ${activeTab === 'library' ? 'active' : ''}`}>
+        <FileText size={16} aria-hidden="true" /> Question Library ({questions.length})
+      </a>
+      <a href="?tab=rules" class={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`}>
+        <Sliders size={16} aria-hidden="true" /> Selection Rules ({selectionRules.length})
+      </a>
+      <a href="?tab=csv" class={`tab-btn ${activeTab === 'csv' ? 'active' : ''}`}>
+        <Upload size={16} aria-hidden="true" /> Bulk CSV Importer
+      </a>
+    </div>
 
-        <div class="filter-group">
-          <label for="filter-dept" class="filter-label">Filter by Department:</label>
-          <select id="filter-dept" name="department" class="filter-select" onchange="this.form.submit()">
-            <option value="">All Departments</option>
-            <option value="ALL" selected={deptFilter === 'ALL'}>Global (ALL)</option>
-            <option value="CSE" selected={deptFilter === 'CSE'}>CSE</option>
-            <option value="ECE" selected={deptFilter === 'ECE'}>ECE</option>
-            <option value="EEE" selected={deptFilter === 'EEE'}>EEE</option>
-            <option value="MECH" selected={deptFilter === 'MECH'}>MECH</option>
-            <option value="CIVIL" selected={deptFilter === 'CIVIL'}>CIVIL</option>
-          </select>
-        </div>
+    {/* ============================================================ */}
+    {/* TAB 1: WEEKLY CYCLES MANAGEMENT                              */}
+    {/* ============================================================ */}
+    {activeTab === 'cycles' && (
+      <div class="tab-content">
+        <Card padding="lg">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-section-title">Weekly Cycles Directory</h3>
+              <p class="section-subtext">Configure reflection timeframe, question allocation targets, and duration parameters.</p>
+            </div>
+          </div>
 
-        <div class="filter-group search-group">
-          <input
-            type="text"
-            name="search"
-            placeholder="Search code or text..."
-            value={searchFilter || ''}
-            class="filter-input"
-          />
-          <Button variant="outline" size="sm" type="submit">
-            <Search size={14} aria-hidden="true" /> Search
-          </Button>
-        </div>
-      </form>
-    </Card>
-
-    {/* Question Bank Table */}
-    <Card padding="lg">
-      <div class="card-header-flex">
-        <div>
-          <h3 class="card-section-title">Question Bank Directory</h3>
-          <p class="section-subtext">Active question inventory and targeting rules for student weekly check-ins.</p>
-        </div>
-        <Badge variant="primary" size="md">{questions.length} Questions</Badge>
-      </div>
-
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Week</th>
-              <th>Question Text</th>
-              <th>Category</th>
-              <th>Target Dept</th>
-              <th>Options</th>
-              <th>Required</th>
-            </tr>
-          </thead>
-          <tbody>
-            {questions.length > 0 ? (
-              questions.map((q) => (
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <td><span class="code-badge">{q.question_code || 'W01-Q00'}</span></td>
-                  <td class="font-medium">Week {q.week_number || 1}</td>
-                  <td class="question-text-cell">{q.text}</td>
-                  <td><Badge variant="neutral" size="sm">{q.category.replace('_', ' ')}</Badge></td>
-                  <td><span class="dept-badge">{q.target_department || 'ALL'}</span></td>
-                  <td>{q.options?.length || 0} choices</td>
-                  <td>
-                    {q.required !== false ? (
-                      <Badge variant="stable" size="sm">Required</Badge>
-                    ) : (
-                      <Badge variant="neutral" size="sm">Optional</Badge>
-                    )}
-                  </td>
+                  <th>Week</th>
+                  <th>Name</th>
+                  <th>Timeframe</th>
+                  <th>Status</th>
+                  <th>Allocation (Total / Common / Adaptive)</th>
+                  <th>Duration</th>
+                  <th>Actions</th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colspan="7" class="empty-cell">No questions found matching active filters.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {weeklyCycles.length > 0 ? (
+                  weeklyCycles.map((c) => (
+                    <tr>
+                      <td class="font-bold">Week {c.week_number}</td>
+                      <td class="font-medium">{c.name}</td>
+                      <td class="text-subtle">
+                        {new Date(c.starts_at).toLocaleDateString()} &ndash; {new Date(c.ends_at).toLocaleDateString()}
+                      </td>
+                      <td>
+                        {c.status === 'active' && <Badge variant="stable" size="sm">Active</Badge>}
+                        {c.status === 'scheduled' && <Badge variant="primary" size="sm">Scheduled</Badge>}
+                        {c.status === 'draft' && <Badge variant="neutral" size="sm">Draft</Badge>}
+                        {c.status === 'closed' && <Badge variant="neutral" size="sm">Closed</Badge>}
+                      </td>
+                      <td>
+                        <span class="font-medium">{c.total_questions} total</span> ({c.common_questions} common, {c.adaptive_questions} adaptive)
+                      </td>
+                      <td>{c.session_duration_minutes} mins</td>
+                      <td>
+                        <button class="action-link" onclick={`openEditCycleModal('${c.id}')`}>Edit</button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colspan="7" class="empty-cell">No weekly cycles configured yet. Use the form below to set up Week 1.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Create / Configure Weekly Cycle Form */}
+        <Card padding="lg">
+          <h3 class="card-section-title">+ Create New Weekly Cycle</h3>
+          <p class="section-subtext">Set up parameters for upcoming weekly student check-in cycles.</p>
+
+          <form method="POST" class="standard-form">
+            <input type="hidden" name="action" value="create_cycle" />
+
+            <div class="form-grid-3">
+              <Input label="Week Number" name="week_number" type="number" min="1" value={(weeklyCycles.length + 1).toString()} required />
+              <Input label="Cycle Name" name="name" placeholder="e.g. Week 1: Academic & Routine Setup" required />
+              <Select label="Status" name="status" required>
+                <option value="draft">Draft</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="active">Active</option>
+                <option value="closed">Closed</option>
+              </Select>
+            </div>
+
+            <Input label="Description (Optional)" name="description" placeholder="Internal notes for this cycle..." />
+
+            <div class="form-grid-2">
+              <Input label="Start Date & Time" name="starts_at" type="datetime-local" value={new Date().toISOString().slice(0, 16)} required />
+              <Input label="End Date & Time" name="ends_at" type="datetime-local" value={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)} required />
+            </div>
+
+            <h4 class="sub-section-title">Question Allocation & Duration Parameters</h4>
+            <div class="form-grid-4">
+              <Input label="Total Questions" name="total_questions" type="number" min="1" value="10" required />
+              <Input label="Common Questions" name="common_questions" type="number" min="0" value="7" required />
+              <Input label="Adaptive Questions" name="adaptive_questions" type="number" min="0" value="3" required />
+              <Input label="Session Duration (Mins)" name="session_duration_minutes" type="number" min="1" value="20" required />
+            </div>
+
+            <div class="form-grid-2">
+              <Select label="Reflection Required" name="reflection_required">
+                <option value="true">Required (Student reflection mandatory)</option>
+                <option value="false">Optional</option>
+              </Select>
+
+              <Select label="Adaptive Questions Enabled" name="adaptive_questions_enabled">
+                <option value="true">Enabled (Select adaptive questions per student)</option>
+                <option value="false">Disabled (Common questions only)</option>
+              </Select>
+            </div>
+
+            <div class="form-actions">
+              <Button variant="primary" type="submit">
+                <Plus size={14} aria-hidden="true" /> Save Weekly Cycle
+              </Button>
+            </div>
+          </form>
+        </Card>
       </div>
-    </Card>
+    )}
 
-    {/* Create Question Form */}
-    <Card padding="lg">
-      <h3 class="card-section-title">+ Add New Question</h3>
-      <p class="section-subtext">Add a targeted reflection question and configure choice options.</p>
+    {/* ============================================================ */}
+    {/* TAB 2: QUESTION LIBRARY MANAGEMENT                          */}
+    {/* ============================================================ */}
+    {activeTab === 'library' && (
+      <div class="tab-content">
+        {/* Filter & Search Bar */}
+        <Card padding="md">
+          <form method="GET" class="filter-bar">
+            <input type="hidden" name="tab" value="library" />
 
-      <form method="POST" class="question-form">
-        <input type="hidden" name="action" value="create" />
+            <div class="filter-group">
+              <label for="filter-week" class="filter-label">Week:</label>
+              <select id="filter-week" name="week" class="filter-select" onchange="this.form.submit()">
+                <option value="">All Weeks</option>
+                <option value="1" selected={weekFilter === 1}>Week 1</option>
+                <option value="2" selected={weekFilter === 2}>Week 2</option>
+                <option value="3" selected={weekFilter === 3}>Week 3</option>
+                <option value="4" selected={weekFilter === 4}>Week 4</option>
+              </select>
+            </div>
 
-        <div class="form-grid">
-          <Input label="Question Code" name="question_code" placeholder="e.g. W01-Q01" required />
-          <Input label="Week Number" name="week_number" type="number" min="1" value="1" required />
-          
-          <Select label="Category" name="category" required>
-            <option value="academic">Academic Balance</option>
-            <option value="sleep_rest">Sleep & Rest</option>
-            <option value="emotional_wellbeing">Emotional Reflection</option>
-            <option value="social_connection">Social Connection</option>
-            <option value="family_home">Routine Self-Management</option>
-            <option value="financial">Financial Balance</option>
-            <option value="career">Career & Future Confidence</option>
-            <option value="campus_experience">Campus Experience</option>
-            <option value="physical_wellbeing">Physical Activity</option>
-            <option value="digital_balance">Digital Balance</option>
-          </Select>
+            <div class="filter-group">
+              <label for="filter-cat" class="filter-label">Category:</label>
+              <select id="filter-cat" name="category" class="filter-select" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                <option value="academic" selected={catFilter === 'academic'}>Academic</option>
+                <option value="sleep_rest" selected={catFilter === 'sleep_rest'}>Sleep & Rest</option>
+                <option value="emotional_wellbeing" selected={catFilter === 'emotional_wellbeing'}>Emotional</option>
+                <option value="social_connection" selected={catFilter === 'social_connection'}>Social</option>
+                <option value="family_home" selected={catFilter === 'family_home'}>Routine</option>
+                <option value="digital_balance" selected={catFilter === 'digital_balance'}>Digital Balance</option>
+                <option value="physical_wellbeing" selected={catFilter === 'physical_wellbeing'}>Physical</option>
+                <option value="career" selected={catFilter === 'career'}>Career</option>
+              </select>
+            </div>
 
-          <Select label="Target Department" name="target_department" required>
-            <option value="ALL">ALL (Global)</option>
-            <option value="CSE">CSE</option>
-            <option value="ECE">ECE</option>
-            <option value="EEE">EEE</option>
-            <option value="MECH">MECH</option>
-            <option value="CIVIL">CIVIL</option>
-          </Select>
-        </div>
+            <div class="filter-group">
+              <label for="filter-dept" class="filter-label">Department:</label>
+              <select id="filter-dept" name="department" class="filter-select" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option value="ALL" selected={deptFilter === 'ALL'}>Global (ALL)</option>
+                {departmentsList.map((d) => (
+                  <option value={d.code} selected={deptFilter === d.code}>{d.code}</option>
+                ))}
+              </select>
+            </div>
 
-        <Input label="Question Text" name="question_text" placeholder="Enter question statement..." required />
+            <div class="filter-group">
+              <label for="filter-state" class="filter-label">Status:</label>
+              <select id="filter-state" name="state" class="filter-select" onchange="this.form.submit()">
+                <option value="active" selected={activeStateFilter === 'active'}>Active Only</option>
+                <option value="archived" selected={activeStateFilter === 'archived'}>Archived Only</option>
+                <option value="all" selected={activeStateFilter === 'all'}>All Statuses</option>
+              </select>
+            </div>
 
-        <div class="form-grid">
-          <Input label="Adaptive Trigger Group (Optional)" name="adaptive_trigger_group" placeholder="e.g. academic_low" />
-          <Select label="Required Response" name="required">
-            <option value="true">Required</option>
-            <option value="false">Optional</option>
-          </Select>
-        </div>
+            <div class="filter-group search-group">
+              <input
+                type="text"
+                name="search"
+                placeholder="Search code or text..."
+                value={searchFilter || ''}
+                class="filter-input"
+              />
+              <Button variant="outline" size="sm" type="submit">
+                <Search size={14} aria-hidden="true" /> Search
+              </Button>
+            </div>
+          </form>
+        </Card>
 
-        <h4 class="sub-section-title">Choice Options (4 Options Recommended)</h4>
-        <div class="options-grid">
-          <div class="option-row">
-            <Input label="Code" name="option_code[]" value="A" required />
-            <Input label="Option Text A" name="option_text[]" placeholder="Very manageable" required />
-            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="9.0" required />
-            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-          </div>
-          <div class="option-row">
-            <Input label="Code" name="option_code[]" value="B" required />
-            <Input label="Option Text B" name="option_text[]" placeholder="Mostly manageable" required />
-            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="7.0" required />
-            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-          </div>
-          <div class="option-row">
-            <Input label="Code" name="option_code[]" value="C" required />
-            <Input label="Option Text C" name="option_text[]" placeholder="Somewhat difficult" required />
-            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="5.0" required />
-            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-          </div>
-          <div class="option-row">
-            <Input label="Code" name="option_code[]" value="D" required />
-            <Input label="Option Text D" name="option_text[]" placeholder="Very difficult" required />
-            <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="2.5" required />
-            <Input label="Follow-up Group" name="follow_up_group[]" placeholder="academic_low" />
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <Button variant="primary" type="submit">
-            <Plus size={14} aria-hidden="true" /> Save Question
-          </Button>
-        </div>
-      </form>
-    </Card>
-
-    {/* Dual CSV Import Section */}
-    <Card padding="lg">
-      <h3 class="card-section-title">Bulk Question Import (Dual CSV)</h3>
-      <p class="section-subtext">Import questions and options using the NSWEIS CSV contract with pre-mutation validation.</p>
-
-      <form method="POST" class="csv-form">
-        <input type="hidden" name="action" value="import_csv" />
-        <input type="hidden" name="filename" value="bulk_questions_import.csv" />
-
-        <div class="csv-inputs-grid">
-          <div class="csv-box">
-            <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 1. Questions CSV</h4>
-            <p class="csv-box-hint">Headers: question_code, week_number, question_text, category, target_department, adaptive_trigger_group, required, question_type</p>
-            <textarea
-              name="questions_csv"
-              rows="6"
-              class="csv-textarea"
-              placeholder={`question_code,week_number,question_text,category,target_department,adaptive_trigger_group,required,question_type\nW01-Q01,1,"How manageable has your academic workload felt this week?",academic,ALL,academic_low,true,single_choice`}
-              required
-            ></textarea>
+        {/* Master Question Inventory Table */}
+        <Card padding="lg">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-section-title">Master Question Library Directory</h3>
+              <p class="section-subtext">Curated reflection questions, reuse metadata, and option configurations.</p>
+            </div>
+            <Badge variant="primary" size="md">{questions.length} Questions Listed</Badge>
           </div>
 
-          <div class="csv-box">
-            <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 2. Options CSV</h4>
-            <p class="csv-box-hint">Headers: question_code, option_code, option_text, signal_value, follow_up_group, display_order</p>
-            <textarea
-              name="options_csv"
-              rows="6"
-              class="csv-textarea"
-              placeholder={`question_code,option_code,option_text,signal_value,follow_up_group,display_order\nW01-Q01,A,"Very manageable",9.0,,1\nW01-Q01,B,"Mostly manageable",7.0,,2\nW01-Q01,C,"Somewhat difficult",5.0,academic_low,3\nW01-Q01,D,"Very difficult",2.5,academic_low,4`}
-              required
-            ></textarea>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <Button variant="primary" type="submit">
-            <Upload size={14} aria-hidden="true" /> Validate & Import CSVs
-          </Button>
-        </div>
-      </form>
-    </Card>
-
-    {/* Import Audit Log Table */}
-    {importHistory.length > 0 && (
-      <Card padding="lg">
-        <h3 class="card-section-title">Question Import Audit History</h3>
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Filename</th>
-                <th>Total Questions</th>
-                <th>Successful</th>
-                <th>Import Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {importHistory.map((imp) => (
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <td class="font-medium">{imp.filename}</td>
-                  <td>{imp.total_rows}</td>
-                  <td><Badge variant="stable" size="sm">{imp.successful_rows} imported</Badge></td>
-                  <td>{new Date(imp.created_at).toLocaleString()}</td>
+                  <th>Code</th>
+                  <th>Week</th>
+                  <th>Text</th>
+                  <th>Category</th>
+                  <th>Dept</th>
+                  <th>Reuse / Cooldown</th>
+                  <th>Adaptive</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody>
+                {questions.length > 0 ? (
+                  questions.map((q) => (
+                    <tr class={!q.active ? 'archived-row' : ''}>
+                      <td><span class="code-badge">{q.question_code}</span></td>
+                      <td class="font-medium">Week {q.week_number}</td>
+                      <td class="question-text-cell">{q.text}</td>
+                      <td><Badge variant="neutral" size="sm">{q.category.replace('_', ' ')}</Badge></td>
+                      <td><span class="dept-badge">{q.target_department || 'ALL'}</span></td>
+                      <td class="text-subtle font-sm">
+                        {q.reusable !== false ? `Reusable (${q.cooldown_weeks || 0}w cooldown)` : 'One-time'}
+                      </td>
+                      <td>
+                        {q.adaptive_enabled !== false ? (
+                          <Badge variant="stable" size="sm">Adaptive</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Common Only</Badge>
+                        )}
+                      </td>
+                      <td>
+                        {q.active !== false ? (
+                          <Badge variant="stable" size="sm">Active</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Archived</Badge>
+                        )}
+                      </td>
+                      <td>
+                        <div class="action-row">
+                          {q.active !== false ? (
+                            <form method="POST" inline-form style="display:inline;">
+                              <input type="hidden" name="action" value="archive_question" />
+                              <input type="hidden" name="question_id" value={q.id} />
+                              <button type="submit" class="action-link-danger" onclick="return confirm('Archive this question? Historical responses will be preserved.');">
+                                <Archive size={12} aria-hidden="true" /> Archive
+                              </button>
+                            </form>
+                          ) : (
+                            <form method="POST" style="display:inline;">
+                              <input type="hidden" name="action" value="unarchive_question" />
+                              <input type="hidden" name="question_id" value={q.id} />
+                              <button type="submit" class="action-link">
+                                Reactivate
+                              </button>
+                            </form>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colspan="9" class="empty-cell">No questions found matching active filters.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Add Question to Library Form */}
+        <Card padding="lg">
+          <h3 class="card-section-title">+ Add New Question to Library</h3>
+          <p class="section-subtext">Add a curated question, reuse parameters, and choice option signals.</p>
+
+          <form method="POST" class="standard-form">
+            <input type="hidden" name="action" value="create_question" />
+
+            <div class="form-grid-4">
+              <Input label="Question Code" name="question_code" placeholder="e.g. W01-Q01" required />
+              <Input label="Target Week" name="week_number" type="number" min="1" value="1" required />
+              <Select label="Category" name="category" required>
+                <option value="academic">Academic Balance</option>
+                <option value="sleep_rest">Sleep & Rest</option>
+                <option value="emotional_wellbeing">Emotional Reflection</option>
+                <option value="social_connection">Social Connection</option>
+                <option value="family_home">Routine Self-Management</option>
+                <option value="digital_balance">Digital Balance</option>
+                <option value="physical_wellbeing">Physical Activity</option>
+                <option value="career">Career & Future Confidence</option>
+              </Select>
+              <Select label="Target Department" name="target_department" required>
+                <option value="ALL">ALL (Global)</option>
+                {departmentsList.map((d) => (
+                  <option value={d.code}>{d.code} &ndash; {d.name}</option>
+                ))}
+              </Select>
+            </div>
+
+            <Input label="Question Statement Text" name="question_text" placeholder="Enter clear, non-clinical question text..." required />
+
+            <h4 class="sub-section-title">Question Reuse & Adaptive Eligibility Parameters</h4>
+            <div class="form-grid-4">
+              <Select label="Reusable Across Weeks" name="reusable">
+                <option value="true">Yes (Can be re-asked in future cycles)</option>
+                <option value="false">No (Single-use only)</option>
+              </Select>
+              <Input label="Cooldown Weeks" name="cooldown_weeks" type="number" min="0" value="0" />
+              <Input label="Max Uses (Optional)" name="maximum_uses" type="number" min="1" placeholder="Unlimited" />
+              <Select label="Adaptive Engine Eligible" name="adaptive_enabled">
+                <option value="true">Eligible for Adaptive Selection</option>
+                <option value="false">Common Pool Only</option>
+              </Select>
+            </div>
+
+            <h4 class="sub-section-title">Choice Options & Signal Values (Internal 0.0 &ndash; 10.0 Scale)</h4>
+            <div class="options-grid">
+              <div class="option-row">
+                <Input label="Code" name="option_code[]" value="A" required />
+                <Input label="Option Text A" name="option_text[]" placeholder="Very manageable" required />
+                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="9.0" required />
+                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+              </div>
+              <div class="option-row">
+                <Input label="Code" name="option_code[]" value="B" required />
+                <Input label="Option Text B" name="option_text[]" placeholder="Mostly manageable" required />
+                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="7.0" required />
+                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+              </div>
+              <div class="option-row">
+                <Input label="Code" name="option_code[]" value="C" required />
+                <Input label="Option Text C" name="option_text[]" placeholder="Somewhat difficult" required />
+                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="5.0" required />
+                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
+              </div>
+              <div class="option-row">
+                <Input label="Code" name="option_code[]" value="D" required />
+                <Input label="Option Text D" name="option_text[]" placeholder="Very difficult" required />
+                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="2.5" required />
+                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="academic_low" />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <Button variant="primary" type="submit">
+                <Plus size={14} aria-hidden="true" /> Save Question to Library
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    )}
+
+    {/* ============================================================ */}
+    {/* TAB 3: ADAPTIVE SELECTION RULES MANAGEMENT                   */}
+    {/* ============================================================ */}
+    {activeTab === 'rules' && (
+      <div class="tab-content">
+        <Card padding="lg">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-section-title">Adaptive Question Selection Rules Directory</h3>
+              <p class="section-subtext">Deterministic triggers mapping student category support signals to targeted follow-up questions.</p>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Priority</th>
+                  <th>Target Category</th>
+                  <th>Trigger Condition</th>
+                  <th>Trigger Threshold</th>
+                  <th>Associated Question</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectionRules.length > 0 ? (
+                  selectionRules.map((r) => (
+                    <tr>
+                      <td><span class="code-badge">P-{r.priority}</span></td>
+                      <td><Badge variant="neutral" size="sm">{(r.trigger_category || 'General').replace('_', ' ')}</Badge></td>
+                      <td class="font-medium">{r.trigger_condition}</td>
+                      <td>{(r.trigger_value !== null && r.trigger_value !== undefined) ? `${Number(r.trigger_value).toFixed(1)} / 10.0` : 'N/A'}</td>
+                      <td class="question-text-cell font-medium">
+                        <span class="code-badge">{r.question_code}</span> {r.question_text}
+                      </td>
+                      <td>
+                        {r.enabled ? (
+                          <Badge variant="stable" size="sm">Enabled</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Disabled</Badge>
+                        )}
+                      </td>
+                      <td>
+                        <div class="action-row">
+                          <form method="POST" style="display:inline;">
+                            <input type="hidden" name="action" value="toggle_rule" />
+                            <input type="hidden" name="rule_id" value={r.id} />
+                            <input type="hidden" name="enabled" value={(!r.enabled).toString()} />
+                            <button type="submit" class="action-link">
+                              {r.enabled ? 'Disable' : 'Enable'}
+                            </button>
+                          </form>
+                          <form method="POST" style="display:inline;">
+                            <input type="hidden" name="action" value="delete_rule" />
+                            <input type="hidden" name="rule_id" value={r.id} />
+                            <button type="submit" class="action-link-danger" onclick="return confirm('Delete this selection rule?');">
+                              <Trash2 size={12} aria-hidden="true" /> Delete
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colspan="7" class="empty-cell">No adaptive selection rules defined. Create your first rule below.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Create Adaptive Selection Rule Form */}
+        <Card padding="lg">
+          <h3 class="card-section-title">+ Create Adaptive Selection Rule</h3>
+          <p class="section-subtext">Link category support signals to targeted questions in the library.</p>
+
+          <form method="POST" class="standard-form">
+            <input type="hidden" name="action" value="create_rule" />
+
+            <div class="form-grid-3">
+              <Select label="Associated Question from Library" name="rule_question_id" required>
+                <option value="">Select Target Question...</option>
+                {allActiveQuestions.map((q) => (
+                  <option value={q.id}>[{q.question_code}] Week {q.week_number}: {q.text.slice(0, 50)}...</option>
+                ))}
+              </Select>
+
+              <Select label="Trigger Category" name="trigger_category">
+                <option value="">Any Category (General)</option>
+                <option value="academic">Academic Balance</option>
+                <option value="sleep_rest">Sleep & Rest</option>
+                <option value="emotional_wellbeing">Emotional Reflection</option>
+                <option value="social_connection">Social Connection</option>
+                <option value="family_home">Routine Self-Management</option>
+                <option value="digital_balance">Digital Balance</option>
+                <option value="physical_wellbeing">Physical Activity</option>
+                <option value="career">Career & Future Confidence</option>
+              </Select>
+
+              <Select label="Trigger Condition" name="trigger_condition" required>
+                <option value="below">Signal Below (&lt; Threshold)</option>
+                <option value="at_or_below">Signal At or Below (&le; Threshold)</option>
+                <option value="above">Signal Above (&gt; Threshold)</option>
+                <option value="at_or_above">Signal At or Above (&ge; Threshold)</option>
+                <option value="task_incomplete">Task Incomplete from Previous Week</option>
+                <option value="task_completed">Task Completed from Previous Week</option>
+              </Select>
+            </div>
+
+            <div class="form-grid-3">
+              <Input label="Trigger Signal Threshold (0.0 - 10.0)" name="trigger_value" type="number" step="0.5" min="0" max="10" placeholder="e.g. 5.0" />
+              <Input label="Rule Priority (Higher = Preferred)" name="priority" type="number" min="0" value="50" required />
+              <Select label="Rule Status" name="enabled" required>
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </Select>
+            </div>
+
+            <div class="form-actions">
+              <Button variant="primary" type="submit">
+                <Plus size={14} aria-hidden="true" /> Save Selection Rule
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    )}
+
+    {/* ============================================================ */}
+    {/* TAB 4: BULK DUAL CSV IMPORTER                                */}
+    {/* ============================================================ */}
+    {activeTab === 'csv' && (
+      <div class="tab-content">
+        <Card padding="lg">
+          <h3 class="card-section-title">Bulk Question Import (Dual CSV)</h3>
+          <p class="section-subtext">Import questions and options in bulk using the NSWEIS contract with pre-mutation validation.</p>
+
+          <form method="POST" class="csv-form">
+            <input type="hidden" name="action" value="import_csv" />
+            <input type="hidden" name="filename" value="bulk_questions_import.csv" />
+
+            <div class="csv-inputs-grid">
+              <div class="csv-box">
+                <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 1. Questions CSV</h4>
+                <p class="csv-box-hint">Headers: question_code, week_number, question_text, category, target_department, adaptive_trigger_group, required, question_type</p>
+                <textarea
+                  name="questions_csv"
+                  rows="8"
+                  class="csv-textarea"
+                  placeholder={`question_code,week_number,question_text,category,target_department,adaptive_trigger_group,required,question_type\nW01-Q01,1,"How manageable has your academic workload felt this week?",academic,ALL,academic_low,true,single_choice`}
+                  required
+                ></textarea>
+              </div>
+
+              <div class="csv-box">
+                <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 2. Options CSV</h4>
+                <p class="csv-box-hint">Headers: question_code, option_code, option_text, signal_value, follow_up_group, display_order</p>
+                <textarea
+                  name="options_csv"
+                  rows="8"
+                  class="csv-textarea"
+                  placeholder={`question_code,option_code,option_text,signal_value,follow_up_group,display_order\nW01-Q01,A,"Very manageable",9.0,,1\nW01-Q01,B,"Mostly manageable",7.0,,2\nW01-Q01,C,"Somewhat difficult",5.0,academic_low,3\nW01-Q01,D,"Very difficult",2.5,academic_low,4`}
+                  required
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <Button variant="primary" type="submit">
+                <Upload size={14} aria-hidden="true" /> Validate & Import CSVs
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        {importHistory.length > 0 && (
+          <Card padding="lg">
+            <h3 class="card-section-title">Question Import Audit History</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Filename</th>
+                    <th>Total Questions</th>
+                    <th>Successful</th>
+                    <th>Import Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importHistory.map((imp) => (
+                    <tr>
+                      <td class="font-medium">{imp.filename}</td>
+                      <td>{imp.total_rows}</td>
+                      <td><Badge variant="stable" size="sm">{imp.successful_rows} imported</Badge></td>
+                      <td>{new Date(imp.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
     )}
 
     <PrivacyNotice variant="full" />
@@ -390,7 +947,44 @@ const importHistory = await getImportHistory(supabase);
 </SuperAdminLayout>
 
 <style>
-  .questions-management-layout {
+  .master-workspace-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .workspace-tabs {
+    display: flex;
+    gap: var(--space-2);
+    border-bottom: 2px solid var(--color-border-subtle);
+    padding-bottom: var(--space-2);
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .tab-btn:hover {
+    color: var(--color-text-main);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .tab-btn.active {
+    color: var(--color-primary-800);
+    background-color: var(--color-primary-100);
+  }
+
+  .tab-content {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
@@ -427,7 +1021,7 @@ const importHistory = await getImportHistory(supabase);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .filter-group {
@@ -481,13 +1075,31 @@ const importHistory = await getImportHistory(supabase);
     background-color: var(--color-bg-subtle);
   }
 
+  .font-bold {
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
   .font-medium {
     font-weight: 600;
     color: var(--color-text-main);
   }
 
+  .font-sm {
+    font-size: 0.8125rem;
+  }
+
+  .text-subtle {
+    color: var(--color-text-muted);
+  }
+
   .question-text-cell {
-    max-width: 320px;
+    max-width: 280px;
+  }
+
+  .archived-row {
+    opacity: 0.6;
+    background-color: var(--color-bg-subtle);
   }
 
   .code-badge {
@@ -515,15 +1127,58 @@ const importHistory = await getImportHistory(supabase);
     padding: var(--space-6) !important;
   }
 
-  .question-form {
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .action-link {
+    background: none;
+    border: none;
+    color: var(--color-primary-700);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  .action-link-danger {
+    background: none;
+    border: none;
+    color: var(--color-danger-700, #c53030);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .standard-form {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
   }
 
-  .form-grid {
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .form-grid-3 {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .form-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: var(--space-4);
   }
 

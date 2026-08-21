@@ -127,6 +127,62 @@ export interface Database {
           updated_at?: string;
         };
       };
+      weekly_cycles: {
+        Row: {
+          id: string;
+          week_number: number;
+          name: string;
+          description: string | null;
+          starts_at: string;
+          ends_at: string;
+          status: string;
+          total_questions: number;
+          common_questions: number;
+          adaptive_questions: number;
+          session_duration_minutes: number;
+          reflection_required: boolean;
+          adaptive_questions_enabled: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          week_number: number;
+          name: string;
+          description?: string | null;
+          starts_at: string;
+          ends_at: string;
+          status?: string;
+          total_questions?: number;
+          common_questions?: number;
+          adaptive_questions?: number;
+          session_duration_minutes?: number;
+          reflection_required?: boolean;
+          adaptive_questions_enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          week_number?: number;
+          name?: string;
+          description?: string | null;
+          starts_at?: string;
+          ends_at?: string;
+          status?: string;
+          total_questions?: number;
+          common_questions?: number;
+          adaptive_questions?: number;
+          session_duration_minutes?: number;
+          reflection_required?: boolean;
+          adaptive_questions_enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       assessment_cycles: {
         Row: {
           id: string;
@@ -135,6 +191,13 @@ export interface Database {
           starts_at: string;
           ends_at: string;
           status: string;
+          total_questions: number;
+          common_questions: number;
+          adaptive_questions: number;
+          session_duration_minutes: number;
+          reflection_required: boolean;
+          adaptive_questions_enabled: boolean;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -145,6 +208,13 @@ export interface Database {
           starts_at: string;
           ends_at: string;
           status?: string;
+          total_questions?: number;
+          common_questions?: number;
+          adaptive_questions?: number;
+          session_duration_minutes?: number;
+          reflection_required?: boolean;
+          adaptive_questions_enabled?: boolean;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -155,6 +225,13 @@ export interface Database {
           starts_at?: string;
           ends_at?: string;
           status?: string;
+          total_questions?: number;
+          common_questions?: number;
+          adaptive_questions?: number;
+          session_duration_minutes?: number;
+          reflection_required?: boolean;
+          adaptive_questions_enabled?: boolean;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -174,6 +251,11 @@ export interface Database {
           target_department: string;
           adaptive_trigger_group: string | null;
           required: boolean;
+          reusable: boolean;
+          cooldown_weeks: number;
+          maximum_uses: number | null;
+          adaptive_enabled: boolean;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -191,6 +273,11 @@ export interface Database {
           target_department?: string;
           adaptive_trigger_group?: string | null;
           required?: boolean;
+          reusable?: boolean;
+          cooldown_weeks?: number;
+          maximum_uses?: number | null;
+          adaptive_enabled?: boolean;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -208,8 +295,89 @@ export interface Database {
           target_department?: string;
           adaptive_trigger_group?: string | null;
           required?: boolean;
+          reusable?: boolean;
+          cooldown_weeks?: number;
+          maximum_uses?: number | null;
+          adaptive_enabled?: boolean;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      question_selection_rules: {
+        Row: {
+          id: string;
+          question_id: string;
+          trigger_category: WellnessCategory | null;
+          trigger_condition: string;
+          trigger_value: number | null;
+          priority: number;
+          enabled: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          trigger_category?: WellnessCategory | null;
+          trigger_condition: string;
+          trigger_value?: number | null;
+          priority?: number;
+          enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          trigger_category?: WellnessCategory | null;
+          trigger_condition?: string;
+          trigger_value?: number | null;
+          priority?: number;
+          enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      student_question_assignments: {
+        Row: {
+          id: string;
+          student_id: string;
+          cycle_id: string;
+          question_id: string;
+          selection_type: string;
+          selection_priority: number | null;
+          position: number;
+          answered: boolean;
+          answered_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          cycle_id: string;
+          question_id: string;
+          selection_type: string;
+          selection_priority?: number | null;
+          position: number;
+          answered?: boolean;
+          answered_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          cycle_id?: string;
+          question_id?: string;
+          selection_type?: string;
+          selection_priority?: number | null;
+          position?: number;
+          answered?: boolean;
+          answered_at?: string | null;
+          created_at?: string;
         };
       };
       question_options: {

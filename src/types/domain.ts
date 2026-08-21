@@ -87,7 +87,58 @@ export interface Question {
   target_department?: string;
   adaptive_trigger_group?: string | null;
   required?: boolean;
+  reusable?: boolean;
+  cooldown_weeks?: number;
+  maximum_uses?: number | null;
+  adaptive_enabled?: boolean;
+  created_by?: string | null;
+  updated_at?: string;
   options?: QuestionOption[];
+}
+
+export interface WeeklyCycle {
+  id: string;
+  week_number: number;
+  name: string;
+  description?: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: 'draft' | 'scheduled' | 'active' | 'closed';
+  total_questions: number;
+  common_questions: number;
+  adaptive_questions: number;
+  session_duration_minutes: number;
+  reflection_required: boolean;
+  adaptive_questions_enabled: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuestionSelectionRule {
+  id: string;
+  question_id: string;
+  trigger_category?: WellnessCategory | null;
+  trigger_condition: string;
+  trigger_value?: number | null;
+  priority: number;
+  enabled: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentQuestionAssignment {
+  id: string;
+  student_id: string;
+  cycle_id: string;
+  question_id: string;
+  selection_type: 'common' | 'adaptive';
+  selection_priority?: number | null;
+  position: number;
+  answered: boolean;
+  answered_at?: string | null;
+  created_at: string;
 }
 
 export interface QuestionOption {

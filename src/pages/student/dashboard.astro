@@ -106,11 +106,13 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
           <h3 class="widget-title">This Week</h3>
           <p class="widget-sub">Active tasks, completion progress, and well-being credits.</p>
         </div>
-        <a href="/student/tasks">
-          <Button variant="outline" size="sm">
-            View My Tasks <ArrowRight size={14} aria-hidden="true" />
-          </Button>
-        </a>
+        <div class="widget-actions">
+          <a href="/student/progress">
+            <Button variant="outline" size="sm">
+              View Journey Progress <ArrowRight size={14} aria-hidden="true" />
+            </Button>
+          </a>
+        </div>
       </div>
 
       <div class="your-week-stats">

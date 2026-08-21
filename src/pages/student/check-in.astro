@@ -9,17 +9,18 @@ import QuestionCard from '../../components/assessment/QuestionCard.astro';
 import ReflectionBox from '../../components/assessment/ReflectionBox.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import {
-  getActiveAssessmentCycle,
   getOrCreateStudentAssessment,
   getBaseQuestions,
   submitAssessmentResponsesAndScore,
 } from '../../services/assessments';
-import { generateRecommendationsForAssessment } from '../../services/recommendations';
+import { getActiveWeeklyCycle } from '../../services/weekly-cycles';
 import {
-  Clock3,
-  CheckCircle2,
-  ShieldCheck,
-} from '@lucide/astro';
+  generateStudentQuestionAssignment,
+  getStudentQuestionAssignments,
+} from '../../services/adaptive-question-selection';
+import { generateRecommendationsForAssessment } from '../../services/recommendations';
+import type { Question } from '../../types/domain';
+import { Clock3, CheckCircle2, ShieldCheck } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
@@ -29,45 +30,61 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-if (profile?.role !== 'student') {
-  return Astro.redirect('/login');
+if (profile && profile.role !== 'student') {
+  return Astro.redirect('/student/dashboard');
 }
 
 let errorMessage = '';
 
-// Load active assessment cycle
-const activeCycle = await getActiveAssessmentCycle(supabase);
+// 1. Resolve Active Weekly Cycle
+const activeCycle = await getActiveWeeklyCycle(supabase);
 
 if (!activeCycle) {
-  errorMessage = 'No active assessment cycle is open at this time. Please check back soon.';
+  errorMessage = 'Your next weekly reflection is not available yet. Please check back soon.';
 }
 
-// Fetch or create student assessment for the active cycle
+// 2. Fetch or Create Student Assessment for Active Cycle
 const assessment = activeCycle ? await getOrCreateStudentAssessment(supabase, user.id, activeCycle.id) : null;
 
-// Determine student department code dynamically
+// 3. Resolve Student Department Code
 let studentDeptCode = 'ALL';
 if (profile?.department_id) {
-  const { data: dept } = await supabase
-    .from('departments')
+  const { data: dept } = await (supabase.from('departments') as any)
     .select('code')
     .eq('id', profile.department_id)
     .single();
   if (dept) studentDeptCode = (dept as any).code;
 }
 
-// Fetch base questions for active week and student department
-const baseQuestions = activeCycle
-  ? await getBaseQuestions(supabase, activeCycle.week_number, studentDeptCode)
-  : [];
+// 4. Resolve / Generate Student Question Assignments
+let displayQuestions: Question[] = [];
 
-// Fetch existing responses if assessment is in progress
+if (activeCycle) {
+  // Check existing assignments for this cycle
+  let currentAssignments = await getStudentQuestionAssignments(supabase, user.id, activeCycle.id);
+
+  // If no assignment exists for this student & cycle, generate deterministic assignment
+  if (currentAssignments.length === 0 && assessment && assessment.status !== 'completed') {
+    const genRes = await generateStudentQuestionAssignment(supabase, user.id, activeCycle.id, studentDeptCode);
+    if (genRes.success) {
+      currentAssignments = await getStudentQuestionAssignments(supabase, user.id, activeCycle.id);
+    }
+  }
+
+  if (currentAssignments.length > 0) {
+    displayQuestions = currentAssignments.map((a) => a.question).filter(Boolean);
+  } else {
+    // Fallback for legacy environments where weekly_cycles is unpopulated
+    displayQuestions = await getBaseQuestions(supabase, activeCycle.week_number, studentDeptCode);
+  }
+}
+
+// 5. Fetch Existing Responses for In-Progress Assessment Resume
 const existingResponseMap = new Map<string, string>();
 let existingReflectionText = '';
 
 if (assessment) {
-  const { data: respData } = await supabase
-    .from('assessment_responses')
+  const { data: respData } = await (supabase.from('assessment_responses') as any)
     .select('question_id, selected_option_id, text_response')
     .eq('assessment_id', assessment.id);
 
@@ -79,15 +96,16 @@ if (assessment) {
   }
 }
 
-// Calculate server-authoritative session timer (20 minutes = 1200 seconds)
-const REQUIRED_SESSION_SECONDS = 1200;
+// 6. Calculate Server-Authoritative Session Duration
+const sessionDurationMins = activeCycle?.session_duration_minutes || 20;
+const REQUIRED_SESSION_SECONDS = sessionDurationMins * 60;
 const startedAtMs = assessment?.started_at ? new Date(assessment.started_at).getTime() : Date.now();
 const nowMs = Date.now();
 const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
 const remainingSeconds = Math.max(0, REQUIRED_SESSION_SECONDS - elapsedSeconds);
 const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
 
-// Handle POST Form Submission
+// 7. Handle POST Form Submission
 if (Astro.request.method === 'POST' && user && assessment) {
   try {
     if (assessment.status === 'completed') {
@@ -110,7 +128,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
 
       let missingRequired = false;
 
-      for (const q of baseQuestions) {
+      for (const q of displayQuestions) {
         const val = formData.get(`q_${q.id}`)?.toString();
         if (q.required !== false && !val) {
           missingRequired = true;
@@ -135,25 +153,39 @@ if (Astro.request.method === 'POST' && user && assessment) {
         errorMessage = 'Please answer all required reflection questions before completing your session.';
       } else {
         const reflectionText = (formData.get('reflection_text') as string || '').trim();
-        if (reflectionText && rawResponses.length > 0) {
-          rawResponses[0].textResponse = reflectionText;
-        }
-
-        const submitResult = await submitAssessmentResponsesAndScore(
-          supabase,
-          assessment.id,
-          rawResponses
-        );
-
-        if (submitResult.success) {
-          try {
-            await generateRecommendationsForAssessment(supabase, user.id, assessment.id);
-          } catch (recErr) {
-            // Log safely without rolling back assessment completion
-          }
-          return Astro.redirect('/student/wellness');
+        if (activeCycle?.reflection_required && !reflectionText && displayQuestions.length > 0) {
+          errorMessage = 'Please share a brief personal reflection before completing your weekly session.';
         } else {
-          errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
+          if (reflectionText && rawResponses.length > 0) {
+            rawResponses[0].textResponse = reflectionText;
+          }
+
+          const submitResult = await submitAssessmentResponsesAndScore(
+            supabase,
+            assessment.id,
+            rawResponses
+          );
+
+          if (submitResult.success) {
+            // Update student_question_assignments state to answered = true
+            const answeredQIds = rawResponses.map((r) => r.questionId);
+            if (answeredQIds.length > 0 && activeCycle) {
+              await (supabase.from('student_question_assignments') as any)
+                .update({ answered: true, answered_at: new Date().toISOString() })
+                .eq('student_id', user.id)
+                .eq('cycle_id', activeCycle.id)
+                .in('question_id', answeredQIds);
+            }
+
+            try {
+              await generateRecommendationsForAssessment(supabase, user.id, assessment.id);
+            } catch (recErr) {
+              // Log safely without rolling back assessment completion
+            }
+            return Astro.redirect('/student/wellness');
+          } else {
+            errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
+          }
         }
       }
     }
@@ -180,8 +212,8 @@ if (Astro.request.method === 'POST' && user && assessment) {
       <Card padding="lg">
         <div class="empty-cycle-box">
           <Clock3 size={32} class="text-muted" aria-hidden="true" />
-          <h3>No Active Assessment Cycle</h3>
-          <p>There are no active weekly check-in cycles available currently. Please check back soon.</p>
+          <h3>Your next weekly reflection is not available yet</h3>
+          <p>There are no active weekly check-in cycles open currently. Please check back soon.</p>
         </div>
       </Card>
     ) : assessment?.status === 'completed' ? (
@@ -223,12 +255,12 @@ if (Astro.request.method === 'POST' && user && assessment) {
           <div class="header-flex-bottom">
             <div class="progress-bar-wrap">
               <div class="progress-bar-track">
-                <div class="progress-bar-fill" style={`width: 100%`}></div>
+                <div class="progress-bar-fill" style="width: 100%"></div>
               </div>
-              <span class="progress-text">Question 1 of {baseQuestions.length}</span>
+              <span class="progress-text">{displayQuestions.length} questions</span>
             </div>
             <span class="save-status-text">
-              <ShieldCheck size={14} aria-hidden="true" /> Your responses are saved as you continue.
+              <ShieldCheck size={14} aria-hidden="true" /> Your responses are private and used to personalize future reflection content.
             </span>
           </div>
         </Card>
@@ -237,7 +269,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
         <Card padding="lg" class="questions-card">
           <form method="POST" id="reflection-form">
             <div class="questions-list">
-              {baseQuestions.map((q, idx) => (
+              {displayQuestions.map((q, idx) => (
                 <QuestionCard
                   question={q}
                   questionNumber={idx + 1}
@@ -246,7 +278,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
               ))}
             </div>
 
-            {/* Optional Final Reflection Box */}
+            {/* Reflection Box */}
             <ReflectionBox value={existingReflectionText} />
 
             {/* Pre-completion UI status notice */}

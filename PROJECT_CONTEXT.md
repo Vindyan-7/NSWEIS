@@ -1,16 +1,16 @@
 # NSWEIS — Persistent Project Context & Source of Truth
 
 **Product Name:** National Student Well-being Early Intervention System (NSWEIS)  
-**Version:** 2.5.2 (Phase 7 Slice 5 Final Security Correction Baseline)  
-**Status:** Phase 7 Slice 5 Final Security Correction — Recommendation Engine RPC Security & Database Hardening (COMPLETED)  
-**Date:** August 20, 2026  
+**Version:** 4.0.0 (Phase 9 Slice 1 Baseline)  
+**Status:** Phase 9 Slice 1 — Week 1 Question Architecture (COMPLETED)  
+**Date:** August 21, 2026  
 
 ---
 
 ## A. Project Identity
 - **Product Name:** NSWEIS (National Student Well-being Early Intervention System)
 - **Product Purpose:** A privacy-conscious, non-clinical student well-being early-intervention companion and institutional platform. It empowers higher education students through weekly self-reflection, personalized well-being activities, task completion, and progress tracking, while providing institutions with anonymized aggregate wellness insights and targeted non-clinical interventions.
-- **Product Pivot (Phase 7):** Transitioning from hackathon-dashboard-first implementation into a student-first viable MVP. Preserving existing Astro SSR, Supabase Auth, PostgreSQL database baseline, and RLS security model.
+- **Product Pivot (Phase 8 & 9):** Transitioning from static weekly questionnaires to an adaptive weekly journey architecture. Master question library, configurable weekly cycles, question selection rules, deterministic adaptive selection engine, student question assignment history, longitudinal well-being journey experience, and evidence-based non-clinical Week 1 Question Architecture.
 - **Safety & Boundary Guarantee:** NSWEIS is a non-clinical well-being companion. It is **not** a psychiatric diagnostic tool, does **not** generate clinical/medical risk scores, and does **not** replace professional medical/counselling services.
 
 ---
@@ -26,23 +26,27 @@ Senior Developer → Antigravity
 
 ## C. Target Student-First Architecture Vision
 ```text
-Weekly Assessment Cycle (Week 1..N)
+Master Question Library (reusable, cooldown_weeks, maximum_uses, adaptive_enabled)
         ↓
-Targeted Question Set (Base + Department/Branch + Adaptive)
+Super Admin Workspace (/superadmin/questions: Cycles, Library, Rules, CSV Import)
         ↓
-Super Admin Question Bank & Dual CSV Importer (/superadmin/questions)
+Configurable Weekly Cycle (public.weekly_cycles: total, common, adaptive, duration)
         ↓
-Student Weekly Check-in Session & Server-Authoritative 20-min Timer Gate (/student/check-in)
+Adaptive Selection Engine (src/services/adaptive-question-selection.ts)
+        ↓
+Student Question Assignments (public.student_question_assignments)
+        ↓
+Student Weekly Reflection Session & Dynamic Duration Gate (/student/check-in)
         ↓
 Category-Level Support Signal Aggregation (0.0–10.0 Internal Support Signals)
         ↓
-SECURITY DEFINER Generation RPC (public.generate_assessment_recommendations(UUID) -> BOOLEAN)
+SECURITY DEFINER Generation RPC (public.generate_assessment_recommendations)
         ↓
 Supportive Recommendations (Max 3 Category-Diverse Actions) & Generated Student Tasks (/student/wellness)
         ↓
 SECURITY DEFINER RPC Task Completion & Ledger Award (+10 Credits) (/student/tasks)
         ↓
-Longitudinal Progress View & Participation History (/student/progress)
+Longitudinal Well-being Journey View & Participation History (/student/progress)
 ```
 
 ---
@@ -71,30 +75,37 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 | `03_college_institutional_intelligence.sql` | College Analytics | Aggregation functions (>=10 threshold), RLS & interventions seed | `00..02` | **PENDING MANUAL EXECUTION** |
 | `04_government_intelligence.sql` | Government Scope & Aggregation | `government_admin_scopes` table, RPC functions with >=10 threshold | `00..03` | **PENDING MANUAL EXECUTION** |
 | `05_demo_government_dataset.sql` | Synthetic Regional Dataset | Seed Institution 2, departments, gov admin & super admin profiles | `00..04` | **PENDING MANUAL EXECUTION** |
-| `06_hackathon_demo_dataset.sql` | Scenario B Demo Dataset | Seed 10 student check-ins for NIT Apex (Configured with 10 real Auth UIDs) | `00..05` | **PENDING MANUAL EXECUTION** |
+| `06_hackathon_demo_dataset.sql` | Synthetic Baseline | Cleaned database baseline | `00..05` | **PENDING MANUAL EXECUTION** |
 | `07_student_first_mvp_schema.sql` | Student-First MVP Schema | Section code, digital_balance category, credits ledger, student tasks, question targeting & task completion RPC (Hardened) | `00..06` | **PENDING MANUAL EXECUTION** |
 | `08_question_management.sql` | Question Management RLS | RLS management policies for super_admin on questions, options, and imports | `00..07` | **PENDING MANUAL EXECUTION** |
 | `09_recommendation_engine.sql` | Recommendation Security Hardening | Hardened `recommendation_rules` RLS (super_admin only), DB unique indexes on `assessment_recommendations` & `student_tasks`, SECURITY DEFINER `generate_assessment_recommendations` RPC returning BOOLEAN only | `00..08` | **PENDING MANUAL EXECUTION** |
+| `10_adaptive_weekly_architecture.sql` | Adaptive Journey DB Foundation | `weekly_cycles` table, partial active index, `questions` metadata extensions, `question_selection_rules`, `student_question_assignments`, indexes & RLS policies | `00..09` | **EXECUTED SUCCESSFULLY** |
+| `11_week1_question_library.sql` | Week 1 Question Architecture Seed | Seeds Week 1 active cycle (7 common + 3 adaptive baseline questions `W01-Q01`..`W01-Q10`), 5-option answer choices, and follow-up groups | `00..10` | **PENDING MANUAL EXECUTION** |
 
 ---
 
-## F. Security & Database Boundary Verification (Final Security Correction)
+## F. Week 1 Question Architecture (Phase 9 Slice 1)
 
-### 1. `recommendation_rules` Table Boundary & RPC Leak Fix
-- Removed direct student `SELECT` access policy on `public.recommendation_rules`.
-- Dropped/removed unsafe `public.get_active_recommendation_rules()` RPC which returned rule thresholds to `authenticated` users.
-- Implemented `public.generate_assessment_recommendations(p_assessment_id UUID)` RPC returning ONLY `BOOLEAN` status (`true`/`false`). Rule thresholds (`minimum_signal`, `maximum_signal`, `priority`) are evaluated entirely server-side inside PostgreSQL and are NEVER exposed to browser JavaScript.
-
-### 2. Database Uniqueness & Idempotency
-- Unique Index `idx_assessment_recs_unique` on `public.assessment_recommendations(assessment_id, recommendation_id)`.
-- Partial Unique Index `idx_student_tasks_assessment_title_unique` on `public.student_tasks(student_id, assessment_id, title) WHERE assessment_id IS NOT NULL`.
+### 1. Master Question Set (`W01-Q01` to `W01-Q10`)
+- **W01-Q01**: Daily Energy & Functioning (`physical_wellbeing`, `energy_support`)
+- **W01-Q02**: Sleep & Rest (`sleep_rest`, `sleep_support`)
+- **W01-Q03**: Academic Routine (`academic`, `academic_routine`)
+- **W01-Q04**: Focus & Digital Balance (`digital_balance`, `focus_support`)
+- **W01-Q05**: Physical Activity (`physical_wellbeing`, `movement_support`)
+- **W01-Q06**: Social Connection (`social_connection`, `connection_support`)
+- **W01-Q07**: Personal Balance (`emotional_wellbeing`, `balance_support`)
+- **W01-Q08**: Adaptive Baseline — Academic/Future (`career`, `academic_future`)
+- **W01-Q09**: Adaptive Baseline — Personal Routine (`family_home`, `routine_support`)
+- **W01-Q10**: Adaptive Baseline — Student-Defined Priority (`emotional_wellbeing`, `personal_priority`)
 
 ---
 
 ## G. Diagnostics & Build Verification
-- **`npx astro check`**: Passed cleanly (`Result (87 files): 0 errors, 0 warnings, 17 hints`).
-- **`npm run build`**: Production build succeeded in 3.59s with Vercel adapter compilation.
-- **Phase 7 Slice 5 Final Security Correction Status**: Complete.
+- **SQL File Created**: `supabase/sql/11_week1_question_library.sql` (marked `PENDING MANUAL EXECUTION`).
+- **`npx tsx scratch/test_adaptive_selection_engine.mjs`**: PASSED (20/20 unit tests passed).
+- **`npx astro check`**: Passed cleanly (`Result (92 files): 0 errors, 0 warnings, 23 hints`).
+- **`npm run build`**: Production build succeeded in 5.90s with Vercel adapter compilation.
+- **Phase 9 Slice 1 Status**: Complete.
 - **Git Execution Status**: Local changes remain uncommitted and unpushed as directed.
 
 ---

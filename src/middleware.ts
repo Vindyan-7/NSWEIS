@@ -20,14 +20,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Authenticated user on login page redirect to role dashboard
-  if (user && profile && pathname === '/login') {
-    return context.redirect(getDashboardForRole(profile.role));
+  if (user && pathname === '/login') {
+    const role = profile?.role || 'student';
+    return context.redirect(getDashboardForRole(role));
   }
 
   // Authenticated user attempting to access route disallowed for their role
-  if (user && profile && !isPublicRoute) {
-    if (!isRouteAllowedForRole(pathname, profile.role)) {
-      return context.redirect(getDashboardForRole(profile.role));
+  if (user && !isPublicRoute) {
+    const role = profile?.role || 'student';
+    if (!isRouteAllowedForRole(pathname, role)) {
+      return context.redirect(getDashboardForRole(role));
     }
   }
 

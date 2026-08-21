@@ -39,7 +39,8 @@ supabase/
 │   ├── 06_hackathon_demo_dataset.sql              # Scenario B demo dataset (Requires 10 manual Auth user UIDs)
 │   ├── 07_student_first_mvp_schema.sql            # Student-first MVP schema extensions & task RPC
 │   ├── 08_question_management.sql                 # Super Admin question management & import RLS policies
-│   └── 09_recommendation_engine.sql               # Recommendation engine rules & task generation (PENDING MANUAL EXECUTION)
+│   ├── 09_recommendation_engine.sql               # Recommendation engine rules & task generation (PENDING MANUAL EXECUTION)
+│   └── 10_adaptive_weekly_architecture.sql        # Adaptive weekly cycle database foundation & question selection rules (PENDING MANUAL EXECUTION)
 ├── migrations/                                    # Preserved historical migration archives
 ├── seed.sql                                       # Historical seed archive
 └── README.md                                      # Workflow guide
