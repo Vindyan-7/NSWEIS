@@ -1,9 +1,11 @@
 ---
 import Card from '../ui/Card.astro';
+import Badge from '../ui/Badge.astro';
+import { CheckCircle2 } from '@lucide/astro';
 
 interface TrendPoint {
   week: string;
-  score: number;
+  completed?: boolean;
 }
 
 interface Props {
@@ -13,33 +15,27 @@ interface Props {
 
 const {
   points = [
-    { week: 'W1', score: 6.5 },
-    { week: 'W2', score: 7.0 },
-    { week: 'W3', score: 7.2 },
-    { week: 'W4', score: 7.8 },
+    { week: 'W1', completed: true },
   ],
-  title = 'Wellness Trend',
+  title = 'Reflection Consistency',
 } = Astro.props;
 ---
 
 <Card padding="md">
   <div class="trend-header">
     <h4 class="trend-title">{title}</h4>
-    <span class="trend-tag">4-Week Progression</span>
+    <span class="trend-tag">Weekly Participation</span>
   </div>
-  <div class="trend-chart">
-    {points.map((p) => {
-      const heightPercent = Math.min(Math.max((p.score / 10) * 100, 10), 100);
-      return (
-        <div class="trend-bar-wrapper">
-          <div class="trend-bar-track">
-            <div class="trend-bar-fill" style={`height: ${heightPercent}%;`}></div>
-          </div>
-          <span class="trend-bar-val">{p.score}</span>
-          <span class="trend-bar-label">{p.week}</span>
+  <div class="trend-grid">
+    {points.map((p) => (
+      <div class="trend-item">
+        <span class="trend-week">{p.week}</span>
+        <div class="trend-status-icon">
+          <CheckCircle2 size={20} class="text-success" aria-hidden="true" />
         </div>
-      );
-    })}
+        <Badge variant="stable" size="sm">Completed</Badge>
+      </div>
+    ))}
   </div>
 </Card>
 
@@ -62,48 +58,36 @@ const {
     color: var(--color-text-muted);
   }
 
-  .trend-chart {
+  .trend-grid {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-around;
-    height: 120px;
-    padding-top: var(--space-4);
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
   }
 
-  .trend-bar-wrapper {
+  .trend-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-1);
-    height: 100%;
-    width: 2.5rem;
-  }
-
-  .trend-bar-track {
-    flex: 1;
-    width: 0.75rem;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-full);
-    display: flex;
-    align-items: flex-end;
-    overflow: hidden;
+    border-radius: var(--radius-md);
   }
 
-  .trend-bar-fill {
-    width: 100%;
-    background-color: var(--color-primary-600);
-    border-radius: var(--radius-full);
-    transition: height var(--transition-normal);
-  }
-
-  .trend-bar-val {
-    font-size: 0.75rem;
-    font-weight: 600;
+  .trend-week {
+    font-size: 0.8125rem;
+    font-weight: 700;
     color: var(--color-text-main);
   }
 
-  .trend-bar-label {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
+  .trend-status-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .text-success {
+    color: #047857;
   }
 </style>

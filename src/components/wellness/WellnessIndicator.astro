@@ -1,28 +1,24 @@
 ---
-import type { WellnessBand } from '../../types/domain';
 import Badge from '../ui/Badge.astro';
+import { CheckCircle2 } from '@lucide/astro';
 
 interface Props {
-  score?: number | null;
-  band?: WellnessBand | null;
+  status?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
-const { score = 7.5, band = 'stable', size = 'md' } = Astro.props;
-
-const bandLabel = band ? band.replace('_', ' ') : 'stable';
+const { status = 'Completed', size = 'md' } = Astro.props;
 ---
 
 <div class={`wellness-indicator indicator-${size}`}>
-  <div class="score-dial">
-    <span class="score-value">{score ? score.toFixed(1) : '--'}</span>
-    <span class="score-max">/10</span>
+  <div class="indicator-icon-wrap">
+    <CheckCircle2 class="status-icon" aria-hidden="true" />
   </div>
   <div class="indicator-meta">
-    <Badge variant={band || 'stable'} size={size === 'lg' ? 'md' : 'sm'}>
-      {bandLabel}
+    <Badge variant="stable" size={size === 'lg' ? 'md' : 'sm'}>
+      {status}
     </Badge>
-    <span class="indicator-tag">Overall Indicator</span>
+    <span class="indicator-tag">Weekly Self-Reflection</span>
   </div>
 </div>
 
@@ -38,33 +34,26 @@ const bandLabel = band ? band.replace('_', ' ') : 'stable';
     box-shadow: var(--shadow-sm);
   }
 
-  .score-dial {
+  .indicator-icon-wrap {
     display: flex;
-    align-items: baseline;
-  }
-
-  .score-value {
-    font-weight: 800;
+    align-items: center;
+    justify-content: center;
     color: var(--color-primary-600);
-    line-height: 1;
   }
 
-  .score-max {
-    font-size: 0.875rem;
-    color: var(--color-text-subtle);
-    font-weight: 500;
+  .indicator-md .status-icon {
+    width: 2rem;
+    height: 2rem;
   }
 
-  .indicator-md .score-value {
-    font-size: 2.25rem;
+  .indicator-lg .status-icon {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
-  .indicator-lg .score-value {
-    font-size: 3rem;
-  }
-
-  .indicator-sm .score-value {
-    font-size: 1.5rem;
+  .indicator-sm .status-icon {
+    width: 1.5rem;
+    height: 1.5rem;
   }
 
   .indicator-meta {

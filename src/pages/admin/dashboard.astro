@@ -11,9 +11,8 @@ import { TrendingUp, TrendingDown, Minus } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import {
-  getGovernmentParticipationMetrics,
+  getLiveGovernmentDashboardData,
   getGovernmentCategorySummaries,
-  getGovernmentInstitutionSummaries,
   getGovernmentTrends,
 } from '../../services/analytics';
 
@@ -32,12 +31,12 @@ if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_
 }
 
 // Server-side scope-authorized analytics
-const metrics = await getGovernmentParticipationMetrics(supabase, user.id);
+const dashboardData = await getLiveGovernmentDashboardData(supabase, user.id);
+const { cycle, participation, institution_summaries, privacy } = dashboardData;
 const categorySummaries = await getGovernmentCategorySummaries(supabase, user.id);
-const institutionSummaries = await getGovernmentInstitutionSummaries(supabase, user.id);
 const trends = await getGovernmentTrends(supabase, user.id);
 
-const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) => cs.is_suppressed);
+const isDataSuppressed = participation.is_suppressed;
 
 const attentionCategories = isDataSuppressed
   ? []
@@ -49,7 +48,7 @@ const attentionCategories = isDataSuppressed
 <GovernmentLayout title="Government Intelligence Overview" activePath="/admin/dashboard">
   <PageHeader
     title="Government Regional & Institutional Intelligence"
-    subtitle={`Aggregate well-being signals across authorized institutions for ${metrics.active_cycle_name}`}
+    subtitle={`Aggregate well-being signals across authorized institutions for ${cycle ? cycle.name : 'Weekly Cycle'}`}
   >
     <a href="/admin/institutions">
       <Button variant="outline" size="sm">View Authorized Directory &rarr;</Button>
@@ -61,19 +60,19 @@ const attentionCategories = isDataSuppressed
     <div class="metrics-grid">
       <MetricCard
         title="Authorized Institutions"
-        value={metrics.authorized_institutions_count.toString()}
-        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics.active_reporting_institutions_count} Reporting Active Data`}
+        value={participation.total_institutions.toString()}
+        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${participation.institutions_with_activity} Reporting Active Data`}
         changeType="neutral"
       />
       <MetricCard
         title="Participating Students"
-        value={isDataSuppressed ? "Insufficient data" : metrics.participating_students.toLocaleString()}
-        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `Out of ${metrics.total_eligible_students.toLocaleString()} Eligible`}
+        value={isDataSuppressed ? "Insufficient data" : participation.completed_students.toLocaleString()}
+        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `Out of ${participation.total_eligible_students.toLocaleString()} Eligible`}
         changeType="neutral"
       />
       <MetricCard
         title="Regional Engagement Rate"
-        value={isDataSuppressed ? "Insufficient data" : `${metrics.participation_rate.toFixed(1)}%`}
+        value={isDataSuppressed ? "Insufficient data" : `${participation.completion_percentage.toFixed(1)}%`}
         change={isDataSuppressed ? "Campus-wide Reflection Rate (Suppressed)" : "Campus-wide Reflection Rate"}
         changeType={isDataSuppressed ? "neutral" : "positive"}
       />
@@ -186,7 +185,7 @@ const attentionCategories = isDataSuppressed
             </tr>
           </thead>
           <tbody>
-            {institutionSummaries.map((inst) => (
+            {institution_summaries.map((inst) => (
               <tr>
                 <td class="font-medium">{inst.institution_name}</td>
                 <td><span class="code-badge">{inst.institution_code}</span></td>
@@ -195,15 +194,15 @@ const attentionCategories = isDataSuppressed
                   {inst.is_suppressed ? (
                     <span class="suppressed-text">Insufficient data</span>
                   ) : (
-                    inst.participating_student_count
+                    inst.completed_students
                   )}
                 </td>
                 <td>
                   {inst.is_suppressed ? (
                     <span class="suppressed-text">Suppressed (&lt;10)</span>
                   ) : (
-                    <Badge variant={inst.dominant_band || 'neutral'} size="sm">
-                      {inst.dominant_band?.replace('_', ' ')}
+                    <Badge variant="neutral" size="sm">
+                      {inst.completion_percentage.toFixed(1)}%
                     </Badge>
                   )}
                 </td>

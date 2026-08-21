@@ -1,4 +1,5 @@
 import { createServerClient, parseCookieHeader } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import type { AstroCookieSetOptions, AstroCookies } from 'astro';
 import type { Database } from '../../types/database';
 
@@ -20,5 +21,14 @@ export function createSupabaseServerClient(context: {
         });
       },
     },
+  });
+}
+
+export function createSupabaseAdminClient() {
+  const supabaseUrl = (import.meta.env as any).PUBLIC_SUPABASE_URL || '';
+  const serviceKey = (import.meta.env as any).SUPABASE_SERVICE_ROLE_KEY || '';
+
+  return createClient<Database>(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 }

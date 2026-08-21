@@ -14,7 +14,16 @@ import { calculateCategoryScores, calculateOverallIndicator } from '../lib/scori
 export async function getActiveAssessmentCycle(
   supabase: SupabaseClient<Database>
 ): Promise<AssessmentCycle | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase.from('weekly_cycles') as any)
+    .select('*')
+    .eq('status', 'active')
+    .order('starts_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!error && data) return data as unknown as AssessmentCycle;
+
+  const { data: legacy } = await supabase
     .from('assessment_cycles')
     .select('*')
     .eq('status', 'active')
@@ -22,8 +31,8 @@ export async function getActiveAssessmentCycle(
     .limit(1)
     .single();
 
-  if (error || !data) return null;
-  return data as AssessmentCycle;
+  if (error || !legacy) return null;
+  return legacy as AssessmentCycle;
 }
 
 export async function getStudentAssessmentForCycle(
@@ -48,13 +57,30 @@ export async function getStudentAssessmentHistory(
 ): Promise<Assessment[]> {
   const { data, error } = await supabase
     .from('assessments')
-    .select('*, cycle:assessment_cycles(*)')
+    .select('*')
     .eq('student_id', studentId)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false });
 
   if (error || !data) return [];
-  return data as unknown as Assessment[];
+
+  const result: Assessment[] = [];
+  for (const item of data as any[]) {
+    if (item.cycle_id) {
+      const { data: cycle } = await (supabase.from('weekly_cycles') as any)
+        .select('*')
+        .eq('id', item.cycle_id)
+        .single();
+      result.push({
+        ...item,
+        cycle: cycle || null,
+      });
+    } else {
+      result.push(item);
+    }
+  }
+
+  return result;
 }
 
 export async function getLatestCompletedAssessment(

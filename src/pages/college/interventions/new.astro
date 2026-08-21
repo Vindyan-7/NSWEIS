@@ -7,10 +7,13 @@ import Input from '../../../components/ui/Input.astro';
 import Select from '../../../components/ui/Select.astro';
 import Textarea from '../../../components/ui/Textarea.astro';
 import Alert from '../../../components/ui/Alert.astro';
+import Badge from '../../../components/ui/Badge.astro';
 import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
+import { Sparkles, Calendar, ShieldCheck } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../../lib/supabase/server';
 import { getProfile } from '../../../services/users';
 import { createIntervention } from '../../../services/interventions';
+import { getLiveCollegeDashboardData } from '../../../services/analytics';
 import type { WellnessCategory } from '../../../types/domain';
 
 const user = Astro.locals.user;
@@ -28,6 +31,10 @@ if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_a
 }
 
 const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
+
+// Load safe aggregate context
+const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
+
 let formTitle = '';
 let formCategory: WellnessCategory = (Astro.url.searchParams.get('category') as WellnessCategory) || 'academic';
 let formDescription = '';
@@ -84,6 +91,26 @@ if (Astro.request.method === 'POST') {
   </PageHeader>
 
   <div class="new-intervention-layout">
+    {/* Safe Aggregate Context Card */}
+    <Card padding="md" class="analytics-context-card">
+      <div class="context-header">
+        <Sparkles size={18} class="text-primary" aria-hidden="true" />
+        <h4 class="context-title">Live Campus Analytics Context</h4>
+        <Badge variant="neutral" size="sm">Anonymous Aggregate Only</Badge>
+      </div>
+      <div class="context-details">
+        <p><strong>Current Cycle:</strong> {dashboardData.cycle ? `${dashboardData.cycle.name} (Week ${dashboardData.cycle.week_number})` : 'Active Cycle'}</p>
+        {dashboardData.recommendation_distribution.length > 0 ? (
+          <p>
+            <strong>Top Observed Focus Areas:</strong>{' '}
+            {dashboardData.recommendation_distribution.slice(0, 3).map((r) => `${r.title} (${r.percentage}%)`).join(', ')}
+          </p>
+        ) : (
+          <p><strong>Observed Pattern:</strong> Institutional wellness indicators active.</p>
+        )}
+      </div>
+    </Card>
+
     <Card padding="lg">
       {errorMessage && (
         <Alert variant="error" title="Submission Error" class="mb-4">
@@ -168,6 +195,33 @@ if (Astro.request.method === 'POST') {
     max-width: 800px;
     margin: 0 auto;
     width: 100%;
+  }
+
+  .analytics-context-card {
+    background: linear-gradient(135deg, #ffffff 0%, var(--color-primary-50) 100%);
+    border-left: 4px solid var(--color-primary-600);
+  }
+
+  .context-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .context-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    flex-grow: 1;
+  }
+
+  .context-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: 0.84375rem;
+    color: var(--color-text-muted);
   }
 
   .intervention-form {

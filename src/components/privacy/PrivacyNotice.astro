@@ -3,7 +3,7 @@ import Alert from '../ui/Alert.astro';
 import { ShieldCheck } from '@lucide/astro';
 
 interface Props {
-  variant?: 'compact' | 'full';
+  variant?: 'compact' | 'full' | 'notice';
 }
 
 const { variant = 'compact' } = Astro.props;
@@ -11,20 +11,40 @@ const { variant = 'compact' } = Astro.props;
 
 {variant === 'compact' ? (
   <div class="privacy-notice-compact">
-    <ShieldCheck size={18} class="privacy-icon-svg" />
+    <ShieldCheck size={18} class="privacy-icon-svg" aria-hidden="true" />
     <span class="privacy-text">
-      <strong>Privacy Protection Enforced:</strong> Individual response PII is strictly isolated. Institutional dashboards receive aggregated insights only.
+      <strong>Privacy Protection:</strong> Individual responses are strictly confidential. Institutional reporting uses anonymous aggregate data only (&ge;10 threshold).
     </span>
+  </div>
+) : variant === 'notice' ? (
+  <div class="privacy-notice-card">
+    <div class="notice-header">
+      <ShieldCheck size={20} class="text-primary" />
+      <h4 class="notice-title">Your Well-being Check-in Privacy & Voluntary Notice</h4>
+    </div>
+    <p class="notice-intro">NSWEIS uses your responses to:</p>
+    <ul class="notice-bullets">
+      <li>Support your personal well-being reflection</li>
+      <li>Provide supportive personal focus suggestions</li>
+      <li>Understand anonymous group-level well-being trends</li>
+    </ul>
+    <p class="notice-confidential">
+      Your individual responses are <strong>never</strong> shown to College Officers, Government Administrators, or other students.
+    </p>
+    <div class="notice-footer">
+      <span>Participation is voluntary.</span>
+      <a href="/student/privacy" class="privacy-link">View Privacy Center &rarr;</a>
+    </div>
   </div>
 ) : (
   <Alert type="info" title="Privacy Architecture & Safety Guarantee">
     <p>
-      NSWEIS is a student well-being early-intervention platform designed with strict privacy boundaries:
+      NSWEIS is a student well-being early-intervention platform designed with strict DPDP privacy boundaries:
     </p>
     <ul class="privacy-list">
-      <li><strong>No Clinical Diagnostic Claim:</strong> Indicators measure subjective well-being trends, not psychiatric diagnoses.</li>
-      <li><strong>Strict Row Isolation:</strong> Individual student responses are secured by PostgreSQL Row Level Security (RLS).</li>
-      <li><strong>Aggregation Only:</strong> College officers and government administrators view anonymized, aggregate metrics only.</li>
+      <li><strong>Non-Clinical Design:</strong> Indicators measure subjective well-being trends, not medical or psychiatric diagnoses.</li>
+      <li><strong>Strict Row Isolation:</strong> Individual student responses are secured by Row Level Security (RLS).</li>
+      <li><strong>Aggregation & Suppression:</strong> Institutional metrics apply an anonymity threshold (&ge;10 completed students).</li>
     </ul>
   </Alert>
 )}
@@ -35,20 +55,88 @@ const { variant = 'compact' } = Astro.props;
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    background-color: var(--color-primary-50);
-    border: 1px solid var(--color-primary-200);
+    background-color: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.2);
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
-    color: var(--color-primary-900);
+    color: var(--color-text-main);
   }
 
-  .privacy-icon {
-    font-size: 1rem;
+  .privacy-icon-svg {
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .privacy-notice-card {
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .notice-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .notice-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .notice-intro {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-1);
+  }
+
+  .notice-bullets {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-main);
+    padding-left: var(--space-4);
+    margin-bottom: var(--space-2);
+    line-height: 1.5;
+  }
+
+  .notice-confidential {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    border-top: 1px dashed var(--color-border);
+    padding-top: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .notice-confidential strong {
+    color: var(--color-text-main);
+  }
+
+  .notice-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-3);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+
+  .privacy-link {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .privacy-link:hover {
+    text-decoration: underline;
   }
 
   .privacy-list {
     margin-top: var(--space-2);
     padding-left: var(--space-4);
-    line-height: 1.6;
+    font-size: var(--font-size-sm);
   }
 </style>

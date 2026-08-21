@@ -1,0 +1,49 @@
+---
+import { ShieldAlert } from '@lucide/astro';
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<div class={`non-clinical-disclaimer ${className}`}>
+  <div class="disclaimer-icon">
+    <ShieldAlert size={18} aria-hidden="true" />
+  </div>
+  <p class="disclaimer-text">
+    <strong>Non-Clinical Early Awareness System:</strong> NSWEIS is designed to support personal self-reflection and anonymous institutional intelligence. It does not provide medical diagnosis, clinical treatment, or crisis intervention services.
+  </p>
+</div>
+
+<style>
+  .non-clinical-disclaimer {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .disclaimer-icon {
+    color: var(--color-primary);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .disclaimer-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .disclaimer-text strong {
+    color: var(--color-text-main);
+    font-weight: 600;
+  }
+</style>

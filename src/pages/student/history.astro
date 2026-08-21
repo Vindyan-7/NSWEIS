@@ -38,21 +38,20 @@ const history = user ? await getStudentAssessmentHistory(supabase, user.id) : []
         <Card padding="md" class="history-card">
           <div class="history-header">
             <div>
-              <h4 class="history-title">{item.cycle?.name || 'Weekly Check-in'}</h4>
+              <h4 class="history-title">{item.cycle?.name || 'Weekly Reflection'}</h4>
               <span class="history-date">
                 Completed on {new Date(item.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             </div>
             <div class="history-meta">
-              <Badge variant={item.overall_band || 'stable'}>
-                {(item.overall_band || 'stable').replace('_', ' ')}
+              <Badge variant="stable">
+                Completed
               </Badge>
-              <span class="history-score">{item.overall_indicator ? item.overall_indicator.toFixed(1) : '--'} / 10</span>
             </div>
           </div>
           <div class="history-footer">
             <a href={`/student/wellness/${item.id}`}>
-              <Button variant="outline" size="sm">View Result Details &rarr;</Button>
+              <Button variant="outline" size="sm">View Reflection Details &rarr;</Button>
             </a>
           </div>
         </Card>

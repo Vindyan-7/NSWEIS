@@ -3,12 +3,14 @@ import CollegeLayout from '../../../layouts/CollegeLayout.astro';
 import PageHeader from '../../../components/navigation/PageHeader.astro';
 import Card from '../../../components/ui/Card.astro';
 import Button from '../../../components/ui/Button.astro';
+import Badge from '../../../components/ui/Badge.astro';
 import EmptyState from '../../../components/ui/EmptyState.astro';
 import InterventionCard from '../../../components/interventions/InterventionCard.astro';
 import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../../lib/supabase/server';
 import { getProfile } from '../../../services/users';
-import { getInstitutionInterventions } from '../../../services/interventions';
+import { getInstitutionInterventions, updateInterventionStatus } from '../../../services/interventions';
+import type { InterventionStatus } from '../../../types/domain';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -25,7 +27,35 @@ if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_a
 }
 
 const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
-const interventions = await getInstitutionInterventions(supabase, institutionId);
+
+// Handle POST status transitions
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
+    const interventionId = formData.get('intervention_id')?.toString();
+
+    if (interventionId && actionType) {
+      let targetStatus: InterventionStatus | null = null;
+      if (actionType === 'mark_ongoing') targetStatus = 'ongoing';
+      if (actionType === 'mark_completed') targetStatus = 'completed';
+      if (actionType === 'mark_cancelled') targetStatus = 'cancelled';
+
+      if (targetStatus) {
+        await updateInterventionStatus(supabase, interventionId, institutionId, targetStatus);
+      }
+    }
+  } catch (err) {
+    console.error('Error updating intervention status:', err);
+  }
+}
+
+const allInterventions = await getInstitutionInterventions(supabase, institutionId);
+
+const activeFilter = Astro.url.searchParams.get('status') || 'all';
+const interventions = activeFilter === 'all'
+  ? allInterventions
+  : allInterventions.filter((i) => i.status === activeFilter);
 ---
 
 <CollegeLayout title="Intervention Management" activePath="/college/interventions">
@@ -39,11 +69,30 @@ const interventions = await getInstitutionInterventions(supabase, institutionId)
   </PageHeader>
 
   <div class="interventions-page-layout">
+    {/* Filter Navigation Tabs */}
+    <div class="filter-tabs">
+      <a href="/college/interventions?status=all" class={`tab-link ${activeFilter === 'all' ? 'active' : ''}`}>
+        All ({allInterventions.length})
+      </a>
+      <a href="/college/interventions?status=scheduled" class={`tab-link ${activeFilter === 'scheduled' ? 'active' : ''}`}>
+        Scheduled ({allInterventions.filter((i) => i.status === 'scheduled').length})
+      </a>
+      <a href="/college/interventions?status=ongoing" class={`tab-link ${activeFilter === 'ongoing' ? 'active' : ''}`}>
+        Ongoing ({allInterventions.filter((i) => i.status === 'ongoing').length})
+      </a>
+      <a href="/college/interventions?status=completed" class={`tab-link ${activeFilter === 'completed' ? 'active' : ''}`}>
+        Completed ({allInterventions.filter((i) => i.status === 'completed').length})
+      </a>
+      <a href="/college/interventions?status=cancelled" class={`tab-link ${activeFilter === 'cancelled' ? 'active' : ''}`}>
+        Cancelled ({allInterventions.filter((i) => i.status === 'cancelled').length})
+      </a>
+    </div>
+
     {interventions.length === 0 ? (
       <Card padding="lg">
         <EmptyState
-          title="No interventions created yet"
-          description="Create preventative wellness programs, workload management workshops, or sleep recovery sessions for your campus."
+          title="No institutional interventions created yet"
+          description="Design preventative wellness programs, workload management workshops, or sleep recovery sessions for your campus based on weekly reflection analytics."
         >
           <a href="/college/interventions/new">
             <Button variant="primary">Create First Intervention</Button>
@@ -67,6 +116,34 @@ const interventions = await getInstitutionInterventions(supabase, institutionId)
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: var(--space-2);
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: var(--space-2);
+    overflow-x: auto;
+  }
+
+  .tab-link {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .tab-link:hover {
+    color: var(--color-primary-600);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .tab-link.active {
+    color: var(--color-primary-700);
+    background-color: var(--color-primary-50);
   }
 
   .interventions-grid {

@@ -144,9 +144,16 @@ export async function getStudentProgress(
   const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   // Fetch student completed assessments to derive weekly participation
-  const { data: cycles } = await (supabase.from('assessment_cycles') as any)
+  let { data: cycles } = await (supabase.from('weekly_cycles') as any)
     .select('id, week_number')
     .order('week_number', { ascending: true });
+
+  if (!cycles || cycles.length === 0) {
+    const { data: legacyCycles } = await (supabase.from('assessment_cycles') as any)
+      .select('id, week_number')
+      .order('week_number', { ascending: true });
+    cycles = legacyCycles;
+  }
 
   const { data: assessments } = await (supabase.from('assessments') as any)
     .select('cycle_id, status')

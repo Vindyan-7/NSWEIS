@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import type { WellnessCategory, WellnessBand } from '../types/domain';
 import { getAuthorizedInstitutions } from './institutions';
+import { logPrivacyAuditEvent } from './privacy';
 
 export interface ParticipationMetrics {
   total_eligible_students: number;
@@ -60,72 +61,359 @@ export interface CategoryTrendItem {
   trend_direction: 'improving' | 'stable' | 'declining' | 'first_check_in';
 }
 
+export interface CollegeDashboardDTO {
+  cycle: {
+    id: string;
+    name: string;
+    week_number: number;
+    starts_at: string;
+    ends_at: string;
+    status: string;
+  } | null;
+  participation: {
+    total_eligible_students: number;
+    started_students: number;
+    completed_students: number;
+    completion_percentage: number;
+  };
+  analytics: {
+    average_overall_indicator: number | null;
+    category_summaries: Array<{
+      category: WellnessCategory;
+      average_score: number | null;
+      dominant_band: WellnessBand | null;
+      participating_count: number;
+    }>;
+    is_suppressed: boolean;
+  };
+  recommendation_distribution: Array<{
+    category: WellnessCategory;
+    title: string;
+    count: number;
+    percentage: number;
+  }>;
+  task_activity: {
+    tasks_assigned: number;
+    tasks_completed: number;
+    completion_rate: number;
+    total_credits_earned: number;
+  };
+}
+
+export interface GovernmentDashboardDTO {
+  cycle: {
+    id: string;
+    name: string;
+    week_number: number;
+    starts_at: string;
+    ends_at: string;
+    status: string;
+  } | null;
+  participation: {
+    total_institutions: number;
+    institutions_with_activity: number;
+    total_eligible_students: number;
+    started_students: number;
+    completed_students: number;
+    completion_percentage: number;
+    is_suppressed: boolean;
+  };
+  institution_summaries: Array<{
+    institution_id: string;
+    institution_name: string;
+    institution_code: string;
+    state: string;
+    eligible_students: number;
+    started_students: number;
+    completed_students: number;
+    completion_percentage: number;
+    is_suppressed: boolean;
+    active_interventions_count: number;
+  }>;
+  privacy: {
+    threshold_min_students: number;
+    notice: string;
+  };
+}
+
 export const PRIVACY_THRESHOLD_MIN_STUDENTS = 10;
 
-export async function getCollegeParticipationMetrics(
+/**
+ * Build server-authoritative live dashboard data for College Officers from authentic database rows.
+ * Enforces privacy suppression if completed_students < 10 threshold. Excludes private reflection text.
+ */
+export async function getLiveCollegeDashboardData(
   supabase: SupabaseClient<Database>,
   institutionId: string
-): Promise<ParticipationMetrics> {
-  const { data, error } = await (supabase as any).rpc('get_college_participation_metrics', {
-    p_institution_id: institutionId,
-  });
-
-  if (!error && data && data.length > 0) {
-    const row = data[0];
-    return {
-      total_eligible_students: Number(row.total_eligible_students || 0),
-      participating_students: Number(row.participating_students || 0),
-      participation_rate: Number(row.participation_rate || 0),
-      active_cycle_name: row.active_cycle_name || 'Active Check-in',
-      active_cycle_id: row.active_cycle_id,
-    };
+): Promise<CollegeDashboardDTO> {
+  const env = (import.meta as any).env || (globalThis as any).process?.env || {};
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL || '';
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
+  
+  // Use server-authoritative client if service role key is available to avoid RLS filtering of aggregate student profiles
+  let db: any = supabase;
+  if (serviceKey && supabaseUrl) {
+    const { createClient } = await import('@supabase/supabase-js');
+    db = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
   }
 
-  // Fallback query directly from profiles & assessment tables
-  const { count: eligibleCount } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('institution_id', institutionId)
-    .eq('role', 'student')
-    .eq('active', true);
-
-  const { data: cycleData } = await supabase
-    .from('assessment_cycles')
+  // 1. Resolve Active Weekly Cycle from public.weekly_cycles
+  let activeCycle: any = null;
+  const { data: cycleData } = await (db.from('weekly_cycles') as any)
     .select('*')
     .eq('status', 'active')
     .order('starts_at', { ascending: false })
     .limit(1)
     .single();
 
-  const cycle = cycleData as any;
-  const eligible = eligibleCount || 0;
+  if (cycleData) {
+    activeCycle = cycleData;
+  } else {
+    const { data: legacyCycle } = await (db.from('assessment_cycles') as any)
+      .select('*')
+      .eq('status', 'active')
+      .order('starts_at', { ascending: false })
+      .limit(1)
+      .single();
+    activeCycle = legacyCycle;
+  }
 
-  if (!cycle) {
+  // 2. Fetch Eligible Students in Institution Scope
+  let eligibleQuery = db
+    .from('profiles')
+    .select('id', { count: 'exact' })
+    .eq('role', 'student')
+    .eq('active', true);
+
+  if (institutionId) {
+    eligibleQuery = eligibleQuery.eq('institution_id', institutionId);
+  }
+
+  const { count: eligibleCount, data: studentProfiles } = await eligibleQuery;
+  const totalEligible = eligibleCount || (studentProfiles ? studentProfiles.length : 0);
+  const studentIds = new Set((studentProfiles || []).map((s: any) => s.id));
+
+  if (!activeCycle) {
     return {
-      total_eligible_students: eligible,
-      participating_students: 0,
-      participation_rate: 0,
-      active_cycle_name: 'No Active Cycle',
+      cycle: null,
+      participation: {
+        total_eligible_students: totalEligible,
+        started_students: 0,
+        completed_students: 0,
+        completion_percentage: 0,
+      },
+      analytics: {
+        average_overall_indicator: null,
+        category_summaries: [],
+        is_suppressed: true,
+      },
+      recommendation_distribution: [],
+      task_activity: {
+        tasks_assigned: 0,
+        tasks_completed: 0,
+        completion_rate: 0,
+        total_credits_earned: 0,
+      },
     };
   }
 
-  const { data: assessmentsData } = await supabase
-    .from('assessments')
-    .select('student_id')
-    .eq('cycle_id', cycle.id)
-    .eq('status', 'completed');
+  // 3. Fetch Assessments for Active Cycle
+  const { data: cycleAssessments } = await (db.from('assessments') as any)
+    .select('*')
+    .eq('cycle_id', activeCycle.id);
 
-  const assessments = (assessmentsData || []) as any[];
+  const assessments = (cycleAssessments || []) as any[];
 
-  const participating = assessments.length > 0 ? new Set(assessments.map((a) => a.student_id)).size : 0;
-  const rate = eligible > 0 ? Math.round((participating / eligible) * 1000) / 10 : 0;
+  // Filter assessments strictly to institution's student set
+  const filteredAssessments = assessments.filter((a) => studentIds.has(a.student_id));
+
+  const startedCount = filteredAssessments.length;
+  const completedAssessments = filteredAssessments.filter((a) => a.status === 'completed');
+  const completedCount = completedAssessments.length;
+  const completionPercentage = totalEligible > 0 ? Math.round((completedCount / totalEligible) * 1000) / 10 : 0;
+
+  // 4. Calculate Aggregate Analytics & Suppression
+  const isSuppressed = completedCount < PRIVACY_THRESHOLD_MIN_STUDENTS;
+
+  let averageOverallIndicator: number | null = null;
+  if (!isSuppressed && completedAssessments.length > 0) {
+    const validScores = completedAssessments
+      .map((a) => a.overall_indicator)
+      .filter((s) => s !== null && s !== undefined && !isNaN(s));
+
+    if (validScores.length > 0) {
+      averageOverallIndicator = Math.round((validScores.reduce((sum, s) => sum + s, 0) / validScores.length) * 10) / 10;
+    }
+  }
+
+  // Category Score Aggregates
+  const categorySummaries: Array<{
+    category: WellnessCategory;
+    average_score: number | null;
+    dominant_band: WellnessBand | null;
+    participating_count: number;
+  }> = [];
+
+  const completedAssessmentIds = completedAssessments.map((a) => a.id);
+
+  if (completedAssessmentIds.length > 0) {
+    const { data: scoreRows } = await (db.from('assessment_category_scores') as any)
+      .select('category, score, band')
+      .in('assessment_id', completedAssessmentIds);
+
+    const catMap = new Map<WellnessCategory, { sum: number; count: number; bands: Record<string, number> }>();
+
+    for (const row of (scoreRows || []) as any[]) {
+      const cat = row.category as WellnessCategory;
+      if (!catMap.has(cat)) {
+        catMap.set(cat, { sum: 0, count: 0, bands: {} });
+      }
+      const entry = catMap.get(cat)!;
+      if (row.score !== null && row.score !== undefined) {
+        entry.sum += Number(row.score);
+        entry.count += 1;
+      }
+      if (row.band) {
+        entry.bands[row.band] = (entry.bands[row.band] || 0) + 1;
+      }
+    }
+
+    for (const [cat, data] of catMap.entries()) {
+      let dominantBand: WellnessBand | null = null;
+      let maxBandCount = 0;
+      for (const [bandName, count] of Object.entries(data.bands)) {
+        if (count > maxBandCount) {
+          maxBandCount = count;
+          dominantBand = bandName as WellnessBand;
+        }
+      }
+
+      categorySummaries.push({
+        category: cat,
+        average_score: !isSuppressed && data.count > 0 ? Math.round((data.sum / data.count) * 10) / 10 : null,
+        dominant_band: !isSuppressed ? dominantBand : null,
+        participating_count: data.count,
+      });
+    }
+  }
+
+  // 5. Calculate Focus / Recommendation Distribution
+  const recommendationDistribution: Array<{
+    category: WellnessCategory;
+    title: string;
+    count: number;
+    percentage: number;
+  }> = [];
+
+  if (completedAssessmentIds.length > 0) {
+    const { data: recLinks } = await (db.from('assessment_recommendations') as any)
+      .select('recommendation_id, recommendation:recommendations(category, title)')
+      .in('assessment_id', completedAssessmentIds);
+
+    const recCounts = new Map<string, { category: WellnessCategory; title: string; count: number }>();
+    let totalRecs = 0;
+
+    for (const link of (recLinks || []) as any[]) {
+      if (link.recommendation) {
+        const key = `${link.recommendation.category}:${link.recommendation.title}`;
+        if (!recCounts.has(key)) {
+          recCounts.set(key, {
+            category: link.recommendation.category,
+            title: link.recommendation.title,
+            count: 0,
+          });
+        }
+        const item = recCounts.get(key)!;
+        item.count += 1;
+        totalRecs += 1;
+      }
+    }
+
+    for (const item of recCounts.values()) {
+      recommendationDistribution.push({
+        category: item.category,
+        title: item.title,
+        count: item.count,
+        percentage: totalRecs > 0 ? Math.round((item.count / totalRecs) * 100) : 0,
+      });
+    }
+
+    recommendationDistribution.sort((a, b) => b.count - a.count);
+  }
+
+  // 6. Calculate Task Activity & Credits
+  let taskQuery = db.from('student_tasks').select('id, status');
+  let creditsQuery = (db.from('student_credits_log') as any).select('amount');
+
+  if (studentIds.size > 0) {
+    const sIdArr = Array.from(studentIds);
+    taskQuery = taskQuery.in('student_id', sIdArr);
+    creditsQuery = creditsQuery.in('student_id', sIdArr);
+  }
+
+  const { data: tasksData } = await taskQuery;
+  const { data: creditsData } = await creditsQuery;
+
+  const tasks = (tasksData || []) as any[];
+  const tasksAssigned = tasks.length;
+  const tasksCompleted = tasks.filter((t) => t.status === 'completed').length;
+  const taskCompletionRate = tasksAssigned > 0 ? Math.round((tasksCompleted / tasksAssigned) * 100) : 0;
+  const totalCreditsEarned = ((creditsData || []) as any[]).reduce((sum, c) => sum + (c.amount || 0), 0);
+
+  await logPrivacyAuditEvent(
+    supabase,
+    null,
+    'college_officer',
+    'OFFICER_ANALYTICS_VIEWED',
+    'institution_analytics',
+    institutionId,
+    'anonymous_institutional_intelligence',
+    { completed_students: completedCount, is_suppressed: isSuppressed }
+  );
 
   return {
-    total_eligible_students: eligible,
-    participating_students: participating,
-    participation_rate: rate,
-    active_cycle_name: cycle.name,
-    active_cycle_id: cycle.id,
+    cycle: {
+      id: activeCycle.id,
+      name: activeCycle.name,
+      week_number: activeCycle.week_number,
+      starts_at: activeCycle.starts_at,
+      ends_at: activeCycle.ends_at,
+      status: activeCycle.status,
+    },
+    participation: {
+      total_eligible_students: totalEligible,
+      started_students: startedCount,
+      completed_students: completedCount,
+      completion_percentage: completionPercentage,
+    },
+    analytics: {
+      average_overall_indicator: averageOverallIndicator,
+      category_summaries: categorySummaries,
+      is_suppressed: isSuppressed,
+    },
+    recommendation_distribution: recommendationDistribution,
+    task_activity: {
+      tasks_assigned: tasksAssigned,
+      tasks_completed: tasksCompleted,
+      completion_rate: taskCompletionRate,
+      total_credits_earned: totalCreditsEarned,
+    },
+  };
+}
+
+export async function getCollegeParticipationMetrics(
+  supabase: SupabaseClient<Database>,
+  institutionId: string
+): Promise<ParticipationMetrics> {
+  const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
+  return {
+    total_eligible_students: dashboardData.participation.total_eligible_students,
+    participating_students: dashboardData.participation.completed_students,
+    participation_rate: dashboardData.participation.completion_percentage,
+    active_cycle_name: dashboardData.cycle ? dashboardData.cycle.name : 'No Active Cycle',
+    active_cycle_id: dashboardData.cycle ? dashboardData.cycle.id : null,
   };
 }
 
@@ -133,20 +421,7 @@ export async function getCollegeCategorySummaries(
   supabase: SupabaseClient<Database>,
   institutionId: string
 ): Promise<CategoryAggregateSummary[]> {
-  const { data, error } = await (supabase as any).rpc('get_college_category_summary', {
-    p_institution_id: institutionId,
-  });
-
-  if (!error && data && data.length > 0) {
-    return data.map((r: any) => ({
-      category: r.category as WellnessCategory,
-      average_score: r.average_score !== null ? Number(r.average_score) : null,
-      dominant_band: r.dominant_band as WellnessBand | null,
-      participating_student_count: Number(r.participating_student_count || 0),
-      is_suppressed: Boolean(r.is_suppressed),
-    }));
-  }
-
+  const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
   const categories: WellnessCategory[] = [
     'academic',
     'sleep_rest',
@@ -159,13 +434,18 @@ export async function getCollegeCategorySummaries(
     'physical_wellbeing',
   ];
 
-  return categories.map((cat) => ({
-    category: cat,
-    average_score: null,
-    dominant_band: null,
-    participating_student_count: 0,
-    is_suppressed: true,
-  }));
+  const map = new Map(dashboardData.analytics.category_summaries.map((s) => [s.category, s]));
+
+  return categories.map((cat) => {
+    const summary = map.get(cat);
+    return {
+      category: cat,
+      average_score: summary ? summary.average_score : null,
+      dominant_band: summary ? summary.dominant_band : null,
+      participating_student_count: summary ? summary.participating_count : 0,
+      is_suppressed: dashboardData.analytics.is_suppressed,
+    };
+  });
 }
 
 export async function getCollegeDepartmentSummaries(
@@ -215,63 +495,165 @@ export async function getCollegeDepartmentSummaries(
 // GOVERNMENT & SUPER ADMIN AGGREGATIONS
 // -------------------------------------------------------------
 
+export async function getLiveGovernmentDashboardData(
+  supabase: SupabaseClient<Database>,
+  adminId: string
+): Promise<GovernmentDashboardDTO> {
+  const env = (import.meta as any).env || (globalThis as any).process?.env || {};
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL || '';
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+  let db: any = supabase;
+  if (serviceKey && supabaseUrl) {
+    const { createClient } = await import('@supabase/supabase-js');
+    db = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+
+  // 1. Resolve Active Weekly Cycle
+  let activeCycle: any = null;
+  const { data: cycleData } = await (db.from('weekly_cycles') as any)
+    .select('*')
+    .eq('status', 'active')
+    .order('starts_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (cycleData) {
+    activeCycle = cycleData;
+  } else {
+    const { data: legacyCycle } = await (db.from('assessment_cycles') as any)
+      .select('*')
+      .eq('status', 'active')
+      .order('starts_at', { ascending: false })
+      .limit(1)
+      .single();
+    activeCycle = legacyCycle;
+  }
+
+  // 2. Fetch Authorized Active Institutions
+  const authorizedInsts = await getAuthorizedInstitutions(db, adminId);
+  const institutionSummaries: GovernmentDashboardDTO['institution_summaries'] = [];
+
+  let globalEligible = 0;
+  let globalStarted = 0;
+  let globalCompleted = 0;
+  let activeInstsCount = 0;
+
+  for (const inst of authorizedInsts) {
+    // Eligible active students for this institution
+    const { data: studentProfiles } = await db
+      .from('profiles')
+      .select('id')
+      .eq('role', 'student')
+      .eq('active', true)
+      .eq('institution_id', inst.id);
+
+    const eligibleCount = studentProfiles ? studentProfiles.length : 0;
+    const studentIds = new Set((studentProfiles || []).map((s: any) => s.id));
+
+    let startedCount = 0;
+    let completedCount = 0;
+
+    if (activeCycle && studentIds.size > 0) {
+      const { data: cycleAssessments } = await (db.from('assessments') as any)
+        .select('id, student_id, status')
+        .eq('cycle_id', activeCycle.id);
+
+      const filteredAssessments = (cycleAssessments || []).filter((a: any) => studentIds.has(a.student_id));
+      startedCount = filteredAssessments.length;
+      completedCount = filteredAssessments.filter((a: any) => a.status === 'completed').length;
+    }
+
+    const completionRate = eligibleCount > 0 ? Math.round((completedCount / eligibleCount) * 1000) / 10 : 0;
+    const isSuppressed = completedCount < PRIVACY_THRESHOLD_MIN_STUDENTS;
+
+    const { count: interventionCount } = await db
+      .from('interventions')
+      .select('*', { count: 'exact', head: true })
+      .eq('institution_id', inst.id);
+
+    if (startedCount > 0) {
+      activeInstsCount += 1;
+    }
+
+    globalEligible += eligibleCount;
+    globalStarted += startedCount;
+    globalCompleted += completedCount;
+
+    institutionSummaries.push({
+      institution_id: inst.id,
+      institution_name: inst.name,
+      institution_code: inst.code,
+      state: inst.state || 'National',
+      eligible_students: eligibleCount,
+      started_students: startedCount,
+      completed_students: completedCount,
+      completion_percentage: completionRate,
+      is_suppressed: isSuppressed,
+      active_interventions_count: interventionCount || 0,
+    });
+  }
+
+  // Sort comparative benchmarking table by completion percentage descending
+  institutionSummaries.sort((a, b) => b.completion_percentage - a.completion_percentage);
+
+  const globalCompletionRate = globalEligible > 0 ? Math.round((globalCompleted / globalEligible) * 1000) / 10 : 0;
+  const globalIsSuppressed = globalCompleted < PRIVACY_THRESHOLD_MIN_STUDENTS;
+
+  await logPrivacyAuditEvent(
+    supabase,
+    adminId,
+    'government_admin',
+    'GOVERNMENT_ANALYTICS_VIEWED',
+    'government_analytics',
+    adminId,
+    'aggregate_government_oversight',
+    { total_institutions: authorizedInsts.length, completed_students: globalCompleted, is_suppressed: globalIsSuppressed }
+  );
+
+  return {
+    cycle: activeCycle
+      ? {
+          id: activeCycle.id,
+          name: activeCycle.name,
+          week_number: activeCycle.week_number || 1,
+          starts_at: activeCycle.starts_at,
+          ends_at: activeCycle.ends_at,
+          status: activeCycle.status,
+        }
+      : null,
+    participation: {
+      total_institutions: authorizedInsts.length,
+      institutions_with_activity: activeInstsCount,
+      total_eligible_students: globalEligible,
+      started_students: globalStarted,
+      completed_students: globalCompleted,
+      completion_percentage: globalCompletionRate,
+      is_suppressed: globalIsSuppressed,
+    },
+    institution_summaries: institutionSummaries,
+    privacy: {
+      threshold_min_students: PRIVACY_THRESHOLD_MIN_STUDENTS,
+      notice: 'Individual student reflection data is strictly private. Aggregate analytics are suppressed for institutions with fewer than 10 completed check-ins.',
+    },
+  };
+}
+
 export async function getGovernmentParticipationMetrics(
   supabase: SupabaseClient<Database>,
   adminId: string
 ): Promise<GovernmentParticipationMetrics> {
-  const { data, error } = await (supabase as any).rpc('get_government_participation_metrics', {
-    p_admin_id: adminId,
-  });
-
-  if (!error && data && data.length > 0) {
-    const row = data[0];
-    const participating = Number(row.participating_students || 0);
-    const isSuppressed = participating < PRIVACY_THRESHOLD_MIN_STUDENTS;
-
-    return {
-      authorized_institutions_count: Number(row.authorized_institutions_count || 0),
-      active_reporting_institutions_count: isSuppressed ? 0 : Number(row.active_reporting_institutions_count || 0),
-      total_eligible_students: Number(row.total_eligible_students || 0),
-      participating_students: participating,
-      participation_rate: Number(row.participation_rate || 0),
-      active_cycle_name: row.active_cycle_name || 'Active Cycle',
-      is_suppressed: isSuppressed,
-    };
-  }
-
-  // Pure fallback: count using authorized institutions service
-  const authorizedInsts = await getAuthorizedInstitutions(supabase, adminId);
-  const instIds = authorizedInsts.map((i) => i.id);
-
-  if (instIds.length === 0) {
-    return {
-      authorized_institutions_count: 0,
-      active_reporting_institutions_count: 0,
-      total_eligible_students: 0,
-      participating_students: 0,
-      participation_rate: 0,
-      active_cycle_name: 'No Active Cycle',
-      is_suppressed: true,
-    };
-  }
-
-  const { count: totalEligible } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .in('institution_id', instIds)
-    .eq('role', 'student')
-    .eq('active', true);
-
-  const eligible = totalEligible || 0;
-
+  const liveGovData = await getLiveGovernmentDashboardData(supabase, adminId);
   return {
-    authorized_institutions_count: authorizedInsts.length,
-    active_reporting_institutions_count: 0,
-    total_eligible_students: eligible,
-    participating_students: 0,
-    participation_rate: 0,
-    active_cycle_name: 'Weekly Wellness Check-in Cycle',
-    is_suppressed: true,
+    authorized_institutions_count: liveGovData.participation.total_institutions,
+    active_reporting_institutions_count: liveGovData.participation.institutions_with_activity,
+    total_eligible_students: liveGovData.participation.total_eligible_students,
+    participating_students: liveGovData.participation.completed_students,
+    participation_rate: liveGovData.participation.completion_percentage,
+    active_cycle_name: liveGovData.cycle ? liveGovData.cycle.name : 'Weekly Wellness Check-in Cycle',
+    is_suppressed: liveGovData.participation.is_suppressed,
   };
 }
 

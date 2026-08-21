@@ -11,7 +11,7 @@
 Phase 9 Pre-Flight Stabilization Pass is complete:
 1. **Check-in Persistence & Timer Fix** ([`src/pages/student/check-in.astro`](file:///c:/Projects/YI/NSWEIS/src/pages/student/check-in.astro)): Implemented immediate response saving to `assessment_responses` upon POST submit attempt. Fixed server-side timer gate evaluation and session state persistence so refreshing or retrying never resets selected radio options or creates duplicate assessments.
 2. **10-Minute Reflection Duration**: Updated active cycle duration to 10 minutes (`activeCycle.session_duration_minutes`).
-3. **Super Admin Testing Control**: Added server-side verified `"Admin Test Submit"` for `super_admin` role only. Bypasses duration gate while executing the exact full completion, recommendation, task creation, and assignment update pipeline.
+3. **Student Test Submit Control**: Student Test Submit is a temporary development-only timer bypass. It is controlled by server-side TEST MODE and must be disabled before production/presentation deployment. Bypasses duration gate on student check-in while executing the exact full completion, recommendation, task creation, and assignment update pipeline.
 4. **Diagnostics & Build**: Verified 20/20 unit tests pass in `npx tsx scratch/test_adaptive_selection_engine.mjs`, 0 errors across 92 files in `npx astro check`, and clean compilation in `npm run build`.
 
 ---

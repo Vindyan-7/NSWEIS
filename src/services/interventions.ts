@@ -30,6 +30,22 @@ export async function getInstitutionInterventions(
   return data as Intervention[];
 }
 
+export async function getInterventionById(
+  supabase: SupabaseClient<Database>,
+  interventionId: string,
+  institutionId: string
+): Promise<Intervention | null> {
+  const { data, error } = await supabase
+    .from('interventions')
+    .select('*')
+    .eq('id', interventionId)
+    .eq('institution_id', institutionId)
+    .single();
+
+  if (error || !data) return null;
+  return data as Intervention;
+}
+
 export async function createIntervention(
   supabase: SupabaseClient<Database>,
   input: CreateInterventionInput
@@ -63,11 +79,13 @@ export async function createIntervention(
 export async function updateInterventionStatus(
   supabase: SupabaseClient<Database>,
   interventionId: string,
+  institutionId: string,
   newStatus: InterventionStatus
 ): Promise<{ success: boolean; error?: string }> {
   const { error } = await (supabase.from('interventions' as any) as any)
     .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', interventionId);
+    .eq('id', interventionId)
+    .eq('institution_id', institutionId);
 
   if (error) return { success: false, error: error.message };
   return { success: true };

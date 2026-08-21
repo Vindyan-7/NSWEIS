@@ -1,35 +1,24 @@
 ---
-import type { WellnessCategory, WellnessBand } from '../../types/domain';
+import type { WellnessCategory } from '../../types/domain';
 import Badge from '../ui/Badge.astro';
-import Progress from '../ui/Progress.astro';
 
 interface Props {
   category: WellnessCategory;
-  score: number;
-  band: WellnessBand;
+  score?: number;
+  band?: string;
 }
 
-const { category, score, band } = Astro.props;
+const { category } = Astro.props;
 
 const formattedCategory = category.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-
-const progressVariantMap: Record<WellnessBand, 'stable' | 'improving' | 'attention' | 'elevated'> = {
-  stable: 'stable',
-  watch: 'improving',
-  needs_attention: 'attention',
-  elevated: 'elevated',
-};
 ---
 
 <div class="category-indicator">
   <div class="cat-header">
     <span class="cat-name">{formattedCategory}</span>
-    <Badge variant={band} size="sm">{band.replace('_', ' ')}</Badge>
+    <Badge variant="neutral" size="sm">Reflection Focus</Badge>
   </div>
-  <div class="cat-body">
-    <Progress value={score * 10} variant={progressVariantMap[band]} />
-    <span class="cat-score">{score.toFixed(1)} / 10</span>
-  </div>
+  <p class="cat-desc">Self-reflection topic for your weekly focus steps and activities.</p>
 </div>
 
 <style>
@@ -55,16 +44,9 @@ const progressVariantMap: Record<WellnessBand, 'stable' | 'improving' | 'attenti
     color: var(--color-text-main);
   }
 
-  .cat-body {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .cat-score {
-    font-size: 0.8125rem;
-    font-weight: 600;
+  .cat-desc {
+    font-size: 0.75rem;
     color: var(--color-text-muted);
-    white-space: nowrap;
+    margin: 0;
   }
 </style>

@@ -40,14 +40,34 @@ export async function getAuthSession(context: {
       ? 'college_officer'
       : 'student';
 
-    profile = {
+    const newProfile = {
       id: user.id,
       full_name: user.user_metadata?.full_name || email.split('@')[0] || 'Student',
       role: inferredRole,
+      institution_id: '11111111-1111-1111-1111-111111111111',
       active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    } as any;
+    };
+
+    // Auto-persist missing profile row into public.profiles database table to satisfy FK constraints
+    const { data: createdProfile, error: upsertErr } = await (supabase.from('profiles') as any)
+      .upsert(newProfile, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (upsertErr) {
+      console.error('[AUTH SESSION] Profile upsert error for user:', user.id, upsertErr);
+    }
+
+    // Read-back verification to guarantee profile row exists in public.profiles table
+    const { data: verifiedProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    profile = verifiedProfile || createdProfile || (newProfile as any);
   }
 
   return {

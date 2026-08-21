@@ -1,0 +1,532 @@
+---
+import StudentLayout from '../../layouts/StudentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Alert from '../../components/ui/Alert.astro';
+import FiveStagePrivacyFlow from '../../components/privacy/FiveStagePrivacyFlow.astro';
+import NonClinicalDisclaimer from '../../components/privacy/NonClinicalDisclaimer.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import { ShieldCheck, Lock, Eye, EyeOff, FileText, CheckCircle2, XCircle, AlertCircle, Send } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getStudentConsent,
+  updateStudentConsent,
+  getStudentPrivacyRequests,
+  createPrivacyRequest,
+  getDataProcessingPurposes,
+  getDataRetentionPolicies,
+} from '../../services/privacy';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'student') {
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+  if (profile?.role === 'government_admin' || profile?.role === 'super_admin') return Astro.redirect('/admin/dashboard');
+}
+
+let actionMessage = '';
+let actionSuccess = true;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const formAction = formData.get('action') as string;
+
+    if (formAction === 'update_consent') {
+      const newStatus = formData.get('consent_status') as 'active' | 'withdrawn';
+      await updateStudentConsent(supabase, user.id, newStatus);
+      actionMessage = `Consent status updated to "${newStatus}".`;
+    } else if (formAction === 'create_request') {
+      const reqType = formData.get('request_type') as any;
+      const notes = formData.get('notes') as string;
+      await createPrivacyRequest(supabase, user.id, reqType, notes);
+      actionMessage = `Privacy request (${reqType}) submitted successfully.`;
+    }
+  } catch (err: any) {
+    actionMessage = err?.message || 'Failed to process privacy action.';
+    actionSuccess = false;
+  }
+}
+
+const consent = await getStudentConsent(supabase, user.id);
+const requests = await getStudentPrivacyRequests(supabase, user.id);
+const purposes = getDataProcessingPurposes();
+const retentionPolicies = getDataRetentionPolicies();
+---
+
+<StudentLayout title="Privacy & Data Governance Center" activePath="/student/privacy">
+  <PageHeader
+    title="Privacy & Data Governance Center"
+    subtitle="Designed around DPDP privacy principles: Transparent control, purpose limitation, and role-isolated data boundaries."
+  />
+
+  <div class="privacy-center-layout">
+    {actionMessage && (
+      <Alert type={actionSuccess ? 'success' : 'error'} title="Privacy Action Notice">
+        <p>{actionMessage}</p>
+      </Alert>
+    )}
+
+    {/* Section 1: Active Consent Management */}
+    <Card padding="lg" class="consent-card">
+      <div class="card-header-flex">
+        <div>
+          <div class="badge-title-row">
+            <h3 class="card-section-title">Data Processing Consent</h3>
+            {consent.consent_status === 'active' ? (
+              <Badge variant="stable" size="md">&bull; Consent Active</Badge>
+            ) : (
+              <Badge variant="elevated" size="md">&bull; Consent Withdrawn</Badge>
+            )}
+          </div>
+          <p class="section-subtext">Manage your voluntary participation consent for weekly well-being reflections and personal support.</p>
+        </div>
+      </div>
+
+      <div class="consent-details-grid">
+        <div class="detail-box">
+          <span class="detail-label">Purpose of Processing</span>
+          <span class="detail-val font-semibold">Student Well-being Reflection & Supportive Suggestions</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Policy Version</span>
+          <span class="detail-val">v1.0 (DPDP Principle Aligned)</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Consented On</span>
+          <span class="detail-val">{new Date(consent.consented_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Institutional Access</span>
+          <span class="detail-val text-primary font-semibold">Anonymous Aggregates Only (&ge;10 threshold)</span>
+        </div>
+      </div>
+
+      <form method="POST" class="consent-action-form">
+        <input type="hidden" name="action" value="update_consent" />
+        {consent.consent_status === 'active' ? (
+          <input type="hidden" name="consent_status" value="withdrawn" />
+        ) : (
+          <input type="hidden" name="consent_status" value="active" />
+        )}
+        <Button variant={consent.consent_status === 'active' ? 'secondary' : 'primary'} size="sm" type="submit">
+          {consent.consent_status === 'active' ? 'Withdraw Data Consent' : 'Re-activate Consent'}
+        </Button>
+      </form>
+    </Card>
+
+    {/* Section 2: Data Usage & Prohibited Uses */}
+    <div class="two-col-grid">
+      <Card padding="lg">
+        <h3 class="card-section-title">Permitted Data Processing</h3>
+        <p class="section-subtext">How your information is used to support your well-being.</p>
+        <ul class="purpose-check-list">
+          <li><CheckCircle2 size={16} class="text-success" /> Personal wellness self-reflection and progress tracking</li>
+          <li><CheckCircle2 size={16} class="text-success" /> Confidential supportive activity & focus area suggestions</li>
+          <li><CheckCircle2 size={16} class="text-success" /> Anonymous campus-level well-being trend indicators</li>
+          <li><CheckCircle2 size={16} class="text-success" /> High-level regional educational well-being insights</li>
+        </ul>
+      </Card>
+
+      <Card padding="lg">
+        <h3 class="card-section-title">Strictly Prohibited Uses</h3>
+        <p class="section-subtext">Architectural safeguards prevent unauthorized processing.</p>
+        <ul class="purpose-check-list">
+          <li><XCircle size={16} class="text-danger" /> Academic grading or evaluation</li>
+          <li><XCircle size={16} class="text-danger" /> Disciplinary or punitive action</li>
+          <li><XCircle size={16} class="text-danger" /> Student surveillance or individual tracking</li>
+          <li><XCircle size={16} class="text-danger" /> Commercial profiling or third-party data sharing</li>
+        </ul>
+      </Card>
+    </div>
+
+    {/* Section 3: Who Can See What Visual Matrix */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Role-Based Data Access Boundaries</h3>
+      <p class="section-subtext">Data isolation is enforced server-side via Supabase Row Level Security.</p>
+
+      <div class="matrix-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Information Category</th>
+              <th>Student (You)</th>
+              <th>College Officer</th>
+              <th>Government Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="font-medium">Personal Account Profile</td>
+              <td><span class="access-tag allowed"><Eye size={14} /> Full Access</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Hidden</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Hidden</span></td>
+            </tr>
+            <tr>
+              <td class="font-medium">Reflection Answers & Responses</td>
+              <td><span class="access-tag allowed"><Eye size={14} /> Confidential</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Blocked</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Blocked</span></td>
+            </tr>
+            <tr>
+              <td class="font-medium">Personal Focus Suggestions</td>
+              <td><span class="access-tag allowed"><Eye size={14} /> Visible</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Blocked</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Blocked</span></td>
+            </tr>
+            <tr>
+              <td class="font-medium">Campus Aggregate Trends</td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> N/A</span></td>
+              <td><span class="access-tag allowed"><Eye size={14} /> Anonymous (&ge;10)</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Aggregate Only</span></td>
+            </tr>
+            <tr>
+              <td class="font-medium">Regional Multi-College Overview</td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> N/A</span></td>
+              <td><span class="access-tag blocked"><EyeOff size={14} /> Blocked</span></td>
+              <td><span class="access-tag allowed"><Eye size={14} /> High-Level Only</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Section 4: Five-Stage Privacy Data Flow */}
+    <FiveStagePrivacyFlow />
+
+    {/* Section 5: Submit & View Privacy Requests */}
+    <div class="two-col-grid">
+      <Card padding="lg">
+        <h3 class="card-section-title">Submit a Privacy Request</h3>
+        <p class="section-subtext">Exercise your rights under the NSWEIS Data Governance Framework.</p>
+
+        <form method="POST" class="request-form">
+          <input type="hidden" name="action" value="create_request" />
+          
+          <div class="form-group">
+            <label for="request_type" class="form-label">Request Type</label>
+            <select id="request_type" name="request_type" class="form-select" required>
+              <option value="access">Data Access Request</option>
+              <option value="correction">Data Correction Request</option>
+              <option value="withdrawal">Consent Withdrawal Request</option>
+              <option value="deletion">Account Deletion Request</option>
+              <option value="grievance">Privacy Grievance</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="notes" class="form-label">Description / Notes</label>
+            <textarea id="notes" name="notes" class="form-textarea" rows="3" placeholder="Specify your request details..."></textarea>
+          </div>
+
+          <Button variant="primary" size="md" type="submit">
+            <Send size={16} /> Submit Privacy Request
+          </Button>
+        </form>
+      </Card>
+
+      <Card padding="lg">
+        <h3 class="card-section-title">Your Privacy Requests</h3>
+        <p class="section-subtext">Track the status of your submitted data governance requests.</p>
+
+        {requests.length === 0 ? (
+          <div class="empty-state-box">
+            <ShieldCheck size={32} class="text-muted" />
+            <p>No active privacy requests submitted.</p>
+          </div>
+        ) : (
+          <div class="requests-list">
+            {requests.map((req) => (
+              <div class="request-item">
+                <div class="req-top">
+                  <span class="req-type font-semibold">{req.request_type.toUpperCase()}</span>
+                  <Badge variant={req.status === 'resolved' ? 'stable' : 'elevated'} size="sm">
+                    {req.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <p class="req-date">Submitted: {new Date(req.requested_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                {req.notes && <p class="req-notes">{req.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+
+    {/* Section 6: Retention & Age Governance Safeguards */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Data Retention & Age Governance Safeguards</h3>
+      <p class="section-subtext">Controlled retention timelines and higher education student protections.</p>
+
+      <div class="retention-grid">
+        {retentionPolicies.map((pol) => (
+          <div class="policy-item">
+            <h4 class="policy-cat">{pol.data_category}</h4>
+            <p class="policy-desc">{pol.retention_description}</p>
+          </div>
+        ))}
+        <div class="policy-item age-note">
+          <h4 class="policy-cat">Minor / Under-18 Higher Education Safeguard</h4>
+          <p class="policy-desc">Under-18 students in higher education institutions require appropriate additional parental/guardian consent verification prior to data processing.</p>
+        </div>
+      </div>
+    </Card>
+
+    <NonClinicalDisclaimer />
+    <PrivacyNotice variant="full" />
+  </div>
+</StudentLayout>
+
+<style>
+  .privacy-center-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .consent-card {
+    background-color: var(--color-bg-card);
+    border-left: 4px solid var(--color-primary);
+  }
+
+  .card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .badge-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .card-section-title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+  }
+
+  .consent-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-4);
+    background: var(--color-bg-secondary);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .detail-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .detail-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .detail-val {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+  }
+
+  .consent-action-form {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .two-col-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .purpose-check-list {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+  }
+
+  .purpose-check-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .matrix-table-wrapper {
+    overflow-x: auto;
+    margin-top: var(--space-4);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+    text-align: left;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .data-table th {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+  }
+
+  .access-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+  }
+
+  .access-tag.allowed {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .access-tag.blocked {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .request-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .form-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .form-select,
+  .form-textarea {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-main);
+    color: var(--color-text-main);
+    font-size: var(--font-size-sm);
+  }
+
+  .empty-state-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-8);
+    color: var(--color-text-muted);
+    text-align: center;
+    font-size: var(--font-size-sm);
+  }
+
+  .requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+
+  .request-item {
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+  }
+
+  .req-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .req-date {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+  }
+
+  .req-notes {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-main);
+    margin-top: var(--space-2);
+  }
+
+  .retention-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .policy-item {
+    padding: var(--space-4);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--color-primary);
+  }
+
+  .policy-item.age-note {
+    border-left-color: var(--color-warning, #f59e0b);
+  }
+
+  .policy-cat {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .policy-desc {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+</style>

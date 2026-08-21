@@ -9,7 +9,6 @@ import WellnessSnapshot from '../../components/wellness/WellnessSnapshot.astro';
 import CategoryIndicator from '../../components/wellness/CategoryIndicator.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
-import { calculateTrend } from '../../lib/scoring/engine';
 import {
   getLatestCompletedAssessment,
   getStudentAssessmentHistory,
@@ -23,13 +22,6 @@ const supabase = createSupabaseServerClient(Astro);
 const latestData = user ? await getLatestCompletedAssessment(supabase, user.id) : null;
 const history = user ? await getStudentAssessmentHistory(supabase, user.id) : [];
 
-const previousAssessment = history.length > 1 ? history[1] : null;
-
-const trend = calculateTrend(
-  latestData?.assessment.overall_indicator || 7.5,
-  previousAssessment?.overall_indicator
-);
-
 let recommendations: any[] = [];
 if (latestData?.assessment?.id) {
   recommendations = await getRecommendationsForAssessment(supabase, latestData.assessment.id);
@@ -39,7 +31,7 @@ if (latestData?.assessment?.id) {
 <StudentLayout title="Wellness Summary" activePath="/student/wellness">
   <PageHeader
     title="Wellness Summary & Focus Actions"
-    subtitle="Personalized self-reflection results and supportive well-being focus steps"
+    subtitle="Personalized self-reflection summary and supportive well-being focus steps"
   />
 
   {!latestData ? (
@@ -57,40 +49,28 @@ if (latestData?.assessment?.id) {
     <div class="wellness-summary-layout">
       {/* Wellness Snapshot */}
       <WellnessSnapshot
-        score={latestData.assessment.overall_indicator || 7.5}
-        band={latestData.assessment.overall_band || 'stable'}
         lastCheckInDate={new Date(latestData.assessment.completed_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         totalCheckIns={history.length}
       />
 
-      {/* What Changed Section */}
+      {/* Reflection Continuity Section */}
       <Card padding="lg">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <h3 class="card-section-title" style="margin-bottom: 0;">What Changed</h3>
-          <Badge variant={trend === 'improving' ? 'improving' : trend === 'declining' ? 'declining' : 'neutral'}>
-            Trend: {trend.replace('_', ' ')}
-          </Badge>
+          <h3 class="card-section-title" style="margin-bottom: 0;">Weekly Reflection Progress</h3>
+          <Badge variant="stable">Routine Active</Badge>
         </div>
-        {previousAssessment ? (
-          <p class="comparison-text">
-            Compared with your previous check-in on {new Date(previousAssessment.completed_at || '').toLocaleDateString()}, your overall indicator shifted from <strong>{previousAssessment.overall_indicator}</strong> to <strong>{latestData.assessment.overall_indicator}</strong> ({trend}).
-          </p>
-        ) : (
-          <p class="comparison-text">
-            This is your first completed reflection. Future check-ins will track your progress over time.
-          </p>
-        )}
+        <p class="comparison-text">
+          Thank you for completing your reflection. Below are your supportive focus steps and practical activities for this week.
+        </p>
       </Card>
 
       {/* Category Breakdown */}
       <div class="category-breakdown-section">
-        <h3 class="card-section-title">Category Breakdown</h3>
+        <h3 class="card-section-title">Reflection Focus Areas</h3>
         <div class="category-grid">
           {latestData.scores.map((cs) => (
             <CategoryIndicator
               category={cs.category}
-              score={cs.score}
-              band={cs.band}
             />
           ))}
         </div>

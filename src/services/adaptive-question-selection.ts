@@ -400,8 +400,22 @@ export async function generateStudentQuestionAssignment(
     const adaptiveCount = cycle.adaptive_questions_enabled ? cycle.adaptive_questions : 0;
     const commonCount = cycle.total_questions - adaptiveCount;
 
-    // A. Select Adaptive Questions
-    const selectedAdaptive = selectAdaptiveQuestions(
+    // A. Select Common Questions (Positions 1-7)
+    const selectedCommon = selectCommonQuestions(
+      allQuestions,
+      assignedQuestionIds,
+      studentDepartment,
+      previousAssignments,
+      cycle.week_number,
+      commonCount
+    );
+
+    for (const q of selectedCommon) {
+      assignedQuestionIds.add(q.id);
+    }
+
+    // B. Select Adaptive Questions via Selection Rules
+    let selectedAdaptive = selectAdaptiveQuestions(
       allQuestions,
       selectionRules,
       evaluationContext,
@@ -416,18 +430,44 @@ export async function generateStudentQuestionAssignment(
       assignedQuestionIds.add(q.id);
     }
 
-    // B. Select Common Questions
-    const selectedCommon = selectCommonQuestions(
-      allQuestions,
-      assignedQuestionIds,
-      studentDepartment,
-      previousAssignments,
-      cycle.week_number,
-      commonCount
-    );
+    // C. Fill remaining adaptive slots if fewer than adaptiveCount were selected via rules (e.g., Week 1 baseline with no prior signals)
+    if (selectedAdaptive.length < adaptiveCount) {
+      const needed = adaptiveCount - selectedAdaptive.length;
+      const fallbackAdaptive = allQuestions.filter((q) => {
+        if (!q.active) return false;
+        if (q.adaptive_enabled === false) return false;
+        if (assignedQuestionIds.has(q.id)) return false;
+        const deptMatch = !q.target_department || q.target_department === 'ALL' || (studentDepartment && q.target_department === studentDepartment);
+        if (!deptMatch) return false;
+        if (!isQuestionEligibleByHistory(q, previousAssignments, cycle.week_number)) return false;
+        return true;
+      }).sort((a, b) => a.order_index - b.order_index).slice(0, needed);
 
-    for (const q of selectedCommon) {
-      assignedQuestionIds.add(q.id);
+      for (const q of fallbackAdaptive) {
+        assignedQuestionIds.add(q.id);
+      }
+      selectedAdaptive = [...selectedAdaptive, ...fallbackAdaptive];
+    }
+
+    // D. Top-up safety: Ensure total assigned questions equals cycle.total_questions (10)
+    const totalTarget = cycle.total_questions;
+    let totalAssigned = selectedCommon.length + selectedAdaptive.length;
+
+    if (totalAssigned < totalTarget) {
+      const topUpNeeded = totalTarget - totalAssigned;
+      const topUpQuestions = allQuestions.filter((q) => {
+        if (!q.active) return false;
+        if (assignedQuestionIds.has(q.id)) return false;
+        const deptMatch = !q.target_department || q.target_department === 'ALL' || (studentDepartment && q.target_department === studentDepartment);
+        if (!deptMatch) return false;
+        if (!isQuestionEligibleByHistory(q, previousAssignments, cycle.week_number)) return false;
+        return true;
+      }).sort((a, b) => a.order_index - b.order_index).slice(0, topUpNeeded);
+
+      for (const q of topUpQuestions) {
+        assignedQuestionIds.add(q.id);
+      }
+      selectedAdaptive = [...selectedAdaptive, ...topUpQuestions];
     }
 
     // Combine: Common questions first, followed by Adaptive questions

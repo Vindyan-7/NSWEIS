@@ -45,8 +45,8 @@ const topRecommendation = userRecs.length > 0 ? userRecs[0] : null;
 const checkInStatus = currentAssessment ? currentAssessment.status : 'not_started';
 
 const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
-  week: `W${idx + 1}`,
-  score: h.overall_indicator || 7.0,
+  week: `Week ${idx + 1}`,
+  completed: h.status === 'completed',
 }));
 ---
 
@@ -156,8 +156,6 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
     {/* Personal Wellness Snapshot */}
     {latestData ? (
       <WellnessSnapshot
-        score={latestData.assessment.overall_indicator || 7.5}
-        band={latestData.assessment.overall_band || 'stable'}
         lastCheckInDate={new Date(latestData.assessment.completed_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         totalCheckIns={history.length}
       />
@@ -174,25 +172,23 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
       </Card>
     )}
 
-    {/* Category Scores Breakdown */}
+    {/* Category Breakdown */}
     {latestData && latestData.scores.length > 0 && (
       <div class="category-grid-section">
-        <h3 class="section-heading">Recent Category Breakdown</h3>
+        <h3 class="section-heading">Reflection Focus Areas</h3>
         <div class="category-grid">
           {latestData.scores.map((cs) => (
             <CategoryIndicator
               category={cs.category}
-              score={cs.score}
-              band={cs.band}
             />
           ))}
         </div>
       </div>
     )}
 
-    {/* Wellness Trend */}
-    {trendPoints.length > 1 ? (
-      <WellnessTrend points={trendPoints} title="Your Recent Wellness Trend" />
+    {/* Reflection Consistency */}
+    {trendPoints.length > 0 ? (
+      <WellnessTrend points={trendPoints} title="Your Reflection Consistency" />
     ) : null}
 
     {/* Privacy Guarantee Notice */}

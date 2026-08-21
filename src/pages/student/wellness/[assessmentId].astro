@@ -41,20 +41,16 @@ const { assessment, scores, recommendations } = details;
   <div class="wellness-summary-layout">
     {/* Wellness Snapshot */}
     <WellnessSnapshot
-      score={assessment.overall_indicator || 7.5}
-      band={assessment.overall_band || 'stable'}
       lastCheckInDate={new Date(assessment.completed_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
     />
 
     {/* Category Breakdown */}
     <div class="category-breakdown-section">
-      <h3 class="card-section-title">Category Breakdown</h3>
+      <h3 class="card-section-title">Reflection Focus Areas</h3>
       <div class="category-grid">
         {scores.map((cs) => (
           <CategoryIndicator
             category={cs.category}
-            score={cs.score}
-            band={cs.band}
           />
         ))}
       </div>

@@ -1,36 +1,35 @@
 ---
 import Card from '../ui/Card.astro';
 import WellnessIndicator from './WellnessIndicator.astro';
-import type { WellnessBand } from '../../types/domain';
 
 interface Props {
-  score: number;
-  band: WellnessBand;
+  score?: number;
+  band?: string;
   lastCheckInDate?: string;
   totalCheckIns?: number;
 }
 
-const { score, band, lastCheckInDate = 'Recent', totalCheckIns = 1 } = Astro.props;
+const { lastCheckInDate = 'Recent', totalCheckIns = 1 } = Astro.props;
 ---
 
 <Card padding="lg">
   <div class="snapshot-header">
     <div>
-      <h3 class="snapshot-title">Personal Wellness Snapshot</h3>
-      <p class="snapshot-sub">Non-clinical self-reflection summary</p>
+      <h3 class="snapshot-title">Personal Reflection Summary</h3>
+      <p class="snapshot-sub">Confidential self-reflection overview</p>
     </div>
-    <span class="snapshot-date">Last updated: {lastCheckInDate}</span>
+    <span class="snapshot-date">Last completed: {lastCheckInDate}</span>
   </div>
   <div class="snapshot-body">
-    <WellnessIndicator score={score} band={band} size="lg" />
+    <WellnessIndicator status="Completed" size="lg" />
     <div class="snapshot-stats">
       <div class="stat-item">
-        <span class="stat-label">Total Weekly Check-ins</span>
+        <span class="stat-label">Total Reflections Completed</span>
         <span class="stat-val">{totalCheckIns}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">Status Band</span>
-        <span class="stat-val capitalize">{band.replace('_', ' ')}</span>
+        <span class="stat-label">Reflection Routine</span>
+        <span class="stat-val active-text">Active</span>
       </div>
     </div>
   </div>
@@ -88,7 +87,7 @@ const { score, band, lastCheckInDate = 'Recent', totalCheckIns = 1 } = Astro.pro
     color: var(--color-text-main);
   }
 
-  .capitalize {
-    text-transform: capitalize;
+  .active-text {
+    color: var(--color-primary-600);
   }
 </style>

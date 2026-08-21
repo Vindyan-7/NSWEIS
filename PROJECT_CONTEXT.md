@@ -89,7 +89,7 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 ### 1. Root Cause Resolution & Immediate Response Persistence ([`src/pages/student/check-in.astro`](file:///c:/Projects/YI/NSWEIS/src/pages/student/check-in.astro))
 - **Timer Reset Bug Fixed**: Server-side POST timer gate now immediately saves all answered questions into `assessment_responses` BEFORE checking completion conditions. If server time vs client timer gate differs slightly, selected options are NOT wiped out, remaining preserved on page reload.
 - **10-Minute Cycle Duration**: Updated `session_duration_minutes` to 10 in `11_week1_question_library.sql` and `check-in.astro`.
-- **Super Admin Testing Control**: Added server-verified `Admin Test Submit` control for `super_admin` role only. Server validates caller's server session (`profile?.role === 'super_admin'`) before bypassing minimum duration gate. Executes identical validation, persistence, scoring, recommendation, and task creation pipeline.
+- **Student Test Submit Control**: Student Test Submit is a temporary development-only timer bypass. It is controlled by server-side TEST MODE and must be disabled before production/presentation deployment. On `/student/check-in`, when server-side `NSWEIS_TEST_MODE` is enabled, all authenticated student users see the `Test Submit` button beside `Complete Weekly Reflection`, allowing rapid testing across multiple student accounts (`demo_student_01`, `demo_student_02`, etc.) while executing identical response persistence, scoring, recommendation, and task creation pipelines.
 
 ---
 
