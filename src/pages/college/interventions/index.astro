@@ -10,6 +10,7 @@ import PrivacyNotice from '../../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../../lib/supabase/server';
 import { getProfile } from '../../../services/users';
 import { getInstitutionInterventions, updateInterventionStatus } from '../../../services/interventions';
+import { logPrivacyAuditEvent } from '../../../services/privacy';
 import type { InterventionStatus } from '../../../types/domain';
 
 const user = Astro.locals.user;
@@ -42,7 +43,19 @@ if (Astro.request.method === 'POST') {
       if (actionType === 'mark_cancelled') targetStatus = 'cancelled';
 
       if (targetStatus) {
-        await updateInterventionStatus(supabase, interventionId, institutionId, targetStatus);
+        const res = await updateInterventionStatus(supabase, interventionId, institutionId, targetStatus);
+        if (res.success) {
+          await logPrivacyAuditEvent(
+            supabase,
+            user.id,
+            'college_officer',
+            'INTERVENTION_STATUS_CHANGED',
+            'intervention',
+            interventionId,
+            'institutional_action',
+            { new_status: targetStatus, institution_id: institutionId }
+          );
+        }
       }
     }
   } catch (err) {

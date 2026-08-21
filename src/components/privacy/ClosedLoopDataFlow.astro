@@ -1,0 +1,179 @@
+---
+import Card from '../ui/Card.astro';
+import Badge from '../ui/Badge.astro';
+import { Lock, EyeOff, ShieldCheck, Sparkles, Building, TrendingUp } from '@lucide/astro';
+
+const steps = [
+  {
+    step: '1',
+    title: 'Private Reflection',
+    icon: Lock,
+    tag: 'Student Privacy',
+    desc: 'Students privately reflect on weekly wellness categories. Individual responses are strictly confidential.',
+    color: 'var(--color-primary)',
+  },
+  {
+    step: '2',
+    title: 'Anonymous Aggregation',
+    icon: EyeOff,
+    tag: 'No PII',
+    desc: 'Personal details and text responses are stripped. Only anonymous numeric indicators enter the aggregate pool.',
+    color: 'var(--color-accent-purple)',
+  },
+  {
+    step: '3',
+    title: 'Privacy Threshold (≥10)',
+    icon: ShieldCheck,
+    tag: 'DPDP Safeguard',
+    desc: 'Analytics remain strictly withheld until at least 10 completed reflections exist for the campus cohort.',
+    color: 'var(--color-warning)',
+  },
+  {
+    step: '4',
+    title: 'Institutional Insight',
+    icon: Sparkles,
+    tag: 'Non-Clinical Signals',
+    desc: 'College Officers receive anonymous, non-clinical category signals highlighting campus support opportunities.',
+    color: 'var(--color-info)',
+  },
+  {
+    step: '5',
+    title: 'Supportive Action',
+    icon: Building,
+    tag: 'Campus Programs',
+    desc: 'Leadership creates targeted campus wellness workshops, fitness drives, or academic planning sessions.',
+    color: 'var(--color-primary-dark)',
+  },
+  {
+    step: '6',
+    title: 'Outcome Tracking',
+    icon: TrendingUp,
+    tag: 'Closed Loop',
+    desc: 'Campus-wide participation and task activity trends validate program impact over active weekly cycles.',
+    color: 'var(--color-success)',
+  },
+];
+---
+
+<Card padding="lg" class="closed-loop-card">
+  <div class="closed-loop-header">
+    <div class="header-left">
+      <Badge variant="primary" size="md">&bull; CLOSED-LOOP ARCHITECTURE</Badge>
+      <h3 class="card-section-title">Privacy-Preserving Action Intelligence Flow</h3>
+    </div>
+    <p class="section-subtext">
+      How NSWEIS transforms confidential student reflections into safe campus-wide support actions without ever compromising student identity.
+    </p>
+  </div>
+
+  <div class="closed-loop-grid">
+    {steps.map((item) => {
+      const IconComponent = item.icon;
+      return (
+        <div class="loop-step-card">
+          <div class="step-header">
+            <span class="step-number" style={`background: ${item.color};`}>
+              {item.step}
+            </span>
+            <span class="step-tag">{item.tag}</span>
+          </div>
+
+          <div class="step-icon-wrap" style={`color: ${item.color};`}>
+            <IconComponent size={24} aria-hidden="true" />
+          </div>
+
+          <h4 class="step-title">{item.title}</h4>
+          <p class="step-desc">{item.desc}</p>
+        </div>
+      );
+    })}
+  </div>
+</Card>
+
+<style>
+  .closed-loop-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .closed-loop-header {
+    margin-bottom: var(--space-5);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-1);
+  }
+
+  .closed-loop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .loop-step-card {
+    background: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    border: 1px solid var(--color-border-subtle);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .loop-step-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .step-number {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .step-tag {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .step-icon-wrap {
+    margin-top: var(--space-1);
+  }
+
+  .step-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .step-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 768px) {
+    .closed-loop-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

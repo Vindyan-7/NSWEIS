@@ -61,6 +61,20 @@ export interface CategoryTrendItem {
   trend_direction: 'improving' | 'stable' | 'declining' | 'first_check_in';
 }
 
+export interface InstitutionalActionSuggestion {
+  category: WellnessCategory;
+  focus_title: string;
+  action_suggestion: string;
+  signal_strength: 'ELEVATED' | 'MODERATE' | 'BALANCED';
+  participating_count: number;
+}
+
+export interface InstitutionalActionIntelligenceDTO {
+  is_suppressed: boolean;
+  suppression_notice?: string;
+  suggestions: InstitutionalActionSuggestion[];
+}
+
 export interface CollegeDashboardDTO {
   cycle: {
     id: string;
@@ -86,6 +100,7 @@ export interface CollegeDashboardDTO {
     }>;
     is_suppressed: boolean;
   };
+  action_intelligence: InstitutionalActionIntelligenceDTO;
   recommendation_distribution: Array<{
     category: WellnessCategory;
     title: string;
@@ -218,6 +233,11 @@ export async function getLiveCollegeDashboardData(
         average_overall_indicator: null,
         category_summaries: [],
         is_suppressed: true,
+      },
+      action_intelligence: {
+        is_suppressed: true,
+        suppression_notice: "Privacy Protection Active: Detailed reflection analytics and institutional action signals are withheld until the minimum anonymous participation threshold (10 completed reflections) is reached.",
+        suggestions: [],
       },
       recommendation_distribution: [],
       task_activity: {
@@ -372,6 +392,89 @@ export async function getLiveCollegeDashboardData(
   const taskCompletionRate = tasksAssigned > 0 ? Math.round((tasksCompleted / tasksAssigned) * 100) : 0;
   const totalCreditsEarned = ((creditsData || []) as any[]).reduce((sum, c) => sum + (c.amount || 0), 0);
 
+  // 7. Calculate Privacy-Preserving Institutional Action Intelligence
+  const actionSuggestions: InstitutionalActionSuggestion[] = [];
+
+  const CATEGORY_ACTION_MAP: Record<WellnessCategory, { title: string; suggestion: string }> = {
+    academic: {
+      title: 'Academic Support Focus',
+      suggestion: 'Consider an academic planning, study-skills, and time-management workshop.',
+    },
+    sleep_rest: {
+      title: 'Sleep & Rest Focus',
+      suggestion: 'Consider a campus sleep-health awareness and circadian routine session.',
+    },
+    physical_wellbeing: {
+      title: 'Physical Wellbeing Focus',
+      suggestion: 'Consider a campus active-lifestyle, fitness, and nutrition campaign.',
+    },
+    digital_balance: {
+      title: 'Digital Wellbeing Focus',
+      suggestion: 'Consider a digital balance and screen-time mindfulness workshop.',
+    },
+    social_connection: {
+      title: 'Social Connection Focus',
+      suggestion: 'Consider a peer interaction, group activity, and campus community event.',
+    },
+    emotional_wellbeing: {
+      title: 'Emotional Support Focus',
+      suggestion: 'Consider a stress-management, relaxation, and supportive mindfulness drive.',
+    },
+    career: {
+      title: 'Career Readiness Focus',
+      suggestion: 'Consider a career planning, resume guidance, and skill-building seminar.',
+    },
+    family_home: {
+      title: 'Family & Home Support Focus',
+      suggestion: 'Consider student support counseling, life-balance guidance, and mentor pairing.',
+    },
+    financial: {
+      title: 'Financial Wellbeing Focus',
+      suggestion: 'Consider campus financial literacy, budgeting, and student aid guidance.',
+    },
+    campus_experience: {
+      title: 'Campus Life & Engagement Focus',
+      suggestion: 'Consider campus orientation, student life events, and facility feedback drives.',
+    },
+  };
+
+  if (!isSuppressed && categorySummaries.length > 0) {
+    for (const cs of categorySummaries) {
+      const config = CATEGORY_ACTION_MAP[cs.category] || {
+        title: `${cs.category.replace('_', ' ')} Focus`,
+        suggestion: `Consider a campus-wide supportive activity for ${cs.category.replace('_', ' ')}.`,
+      };
+
+      let strength: 'ELEVATED' | 'MODERATE' | 'BALANCED' = 'BALANCED';
+      if (cs.average_score !== null && cs.average_score < 6.0) {
+        strength = 'ELEVATED';
+      } else if (cs.average_score !== null && cs.average_score < 7.5) {
+        strength = 'MODERATE';
+      }
+
+      actionSuggestions.push({
+        category: cs.category,
+        focus_title: config.title,
+        action_suggestion: config.suggestion,
+        signal_strength: strength,
+        participating_count: cs.participating_count,
+      });
+    }
+
+    actionSuggestions.sort((a, b) => {
+      const order = { ELEVATED: 0, MODERATE: 1, BALANCED: 2 };
+      return order[a.signal_strength] - order[b.signal_strength];
+    });
+  }
+
+  const actionIntelligence: InstitutionalActionIntelligenceDTO = {
+    is_suppressed: isSuppressed,
+    suppression_notice: isSuppressed
+      ? "Privacy Protection Active: Detailed reflection analytics and institutional action signals are withheld until the minimum anonymous participation threshold (10 completed reflections) is reached."
+      : undefined,
+    suggestions: actionSuggestions,
+  };
+
   await logPrivacyAuditEvent(
     supabase,
     null,
@@ -403,6 +506,7 @@ export async function getLiveCollegeDashboardData(
       category_summaries: categorySummaries,
       is_suppressed: isSuppressed,
     },
+    action_intelligence: actionIntelligence,
     recommendation_distribution: recommendationDistribution,
     task_activity: {
       tasks_assigned: tasksAssigned,

@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button.astro';
 import Badge from '../../components/ui/Badge.astro';
 import ParticipationDonut from '../../components/analytics/ParticipationDonut.astro';
 import FiveStagePrivacyFlow from '../../components/privacy/FiveStagePrivacyFlow.astro';
+import ClosedLoopDataFlow from '../../components/privacy/ClosedLoopDataFlow.astro';
 import NonClinicalDisclaimer from '../../components/privacy/NonClinicalDisclaimer.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import {
@@ -16,6 +17,8 @@ import {
   ListChecks,
   Building,
   ShieldCheck,
+  Lightbulb,
+  ArrowRight,
 } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
@@ -42,7 +45,7 @@ const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111
 const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
 const interventions = await getInstitutionInterventions(supabase, institutionId);
 
-const { cycle, participation, analytics, recommendation_distribution, task_activity } = dashboardData;
+const { cycle, participation, analytics, action_intelligence, recommendation_distribution, task_activity } = dashboardData;
 
 const ongoingInterventions = interventions.filter((i) => i.status === 'ongoing').length;
 const scheduledInterventions = interventions.filter((i) => i.status === 'scheduled').length;
@@ -249,7 +252,80 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
       </Card>
     </div>
 
-    {/* Section 4: Task Activity & Credits Metrics Card */}
+    {/* Section 4: Institutional Action Intelligence */}
+    <Card padding="lg" class="action-intelligence-card">
+      <div class="card-title-row">
+        <div>
+          <h3 class="card-section-title">Institutional Action Intelligence</h3>
+          <p class="section-subtext">Automated, privacy-safe campus support recommendations derived from aggregate student reflection signals.</p>
+        </div>
+        <Badge variant={action_intelligence.is_suppressed ? "neutral" : "improving"} size="sm">
+          {action_intelligence.is_suppressed ? "Privacy Protected (<10 Completed)" : "Active Action Signals"}
+        </Badge>
+      </div>
+
+      {action_intelligence.is_suppressed ? (
+        <div class="suppressed-privacy-card">
+          <div class="suppressed-lock-icon">
+            <LockKeyhole size={28} />
+          </div>
+          <div class="suppressed-content">
+            <span class="suppressed-badge-tag">&bull; PRIVACY PROTECTION ACTIVE</span>
+            <h4 class="suppressed-heading">Action Signals Withheld</h4>
+            <p class="suppressed-body">
+              {action_intelligence.suppression_notice}
+            </p>
+            <div class="suppressed-meta-row">
+              <span class="meta-pill">Completed Reflections: <strong>{participation.completed_students}</strong></span>
+              <span class="meta-pill">Required Anonymity Threshold: <strong>10</strong></span>
+            </div>
+          </div>
+        </div>
+      ) : action_intelligence.suggestions.length > 0 ? (
+        <div class="action-suggestions-grid">
+          {action_intelligence.suggestions.map((sug) => (
+            <div class={`action-sug-item strength-${sug.signal_strength.toLowerCase()}`}>
+              <div class="sug-header">
+                <div class="sug-title-wrap">
+                  <Lightbulb size={18} class="sug-icon" aria-hidden="true" />
+                  <span class="sug-focus-title font-semibold">{sug.focus_title}</span>
+                </div>
+                <Badge
+                  variant={
+                    sug.signal_strength === 'ELEVATED'
+                      ? 'declining'
+                      : sug.signal_strength === 'MODERATE'
+                      ? 'improving'
+                      : 'neutral'
+                  }
+                  size="sm"
+                >
+                  {sug.signal_strength} SIGNAL
+                </Badge>
+              </div>
+
+              <p class="sug-text">{sug.action_suggestion}</p>
+
+              <div class="sug-footer">
+                <span class="sug-meta text-muted">
+                  Based on {sug.participating_count} anonymous completed check-ins
+                </span>
+                <a href={`/college/interventions/new?category=${sug.category}`} class="sug-action-link font-medium">
+                  Create Campus Program &rarr;
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="empty-int-box">
+          <Lightbulb size={24} class="text-muted" aria-hidden="true" />
+          <p class="empty-state-text">No aggregate action signals requiring campus intervention at this time.</p>
+        </div>
+      )}
+    </Card>
+
+    {/* Section 5: Task Activity & Credits Metrics Card */}
     <Card padding="lg" class="task-activity-card">
       <div class="card-title-row">
         <h3 class="card-section-title">Activity & Task Completion Metrics</h3>
@@ -277,7 +353,7 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
       </div>
     </Card>
 
-    {/* Section 5: Institutional Interventions */}
+    {/* Section 6: Institutional Interventions */}
     <Card padding="lg" class="interventions-summary-card">
       <div class="card-title-row">
         <div>
@@ -331,7 +407,10 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
       )}
     </Card>
 
-    {/* Section 6: Institutional Privacy Protection Panel (Feature 3) */}
+    {/* Section 7: Closed-Loop Data Flow Component (Feature 6) */}
+    <ClosedLoopDataFlow />
+
+    {/* Section 8: Institutional Privacy Protection Panel (Feature 3) */}
     <Card padding="lg" class="officer-privacy-panel">
       <div class="privacy-header">
         <div class="flex-title">
@@ -377,7 +456,7 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
       </div>
     </Card>
 
-    {/* Section 7: Compact Five-Stage Privacy Data Flow */}
+    {/* Section 9: Compact Five-Stage Privacy Data Flow */}
     <FiveStagePrivacyFlow />
 
     <NonClinicalDisclaimer />
@@ -850,5 +929,85 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
     color: var(--color-text-muted);
     margin-top: 2px;
     line-height: 1.4;
+  }
+
+  /* Action Suggestions Grid */
+  .action-suggestions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .action-sug-item {
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition: transform 0.2s ease;
+  }
+
+  .action-sug-item:hover {
+    transform: translateY(-2px);
+  }
+
+  .action-sug-item.strength-elevated {
+    border-left: 4px solid var(--color-warning);
+  }
+
+  .action-sug-item.strength-moderate {
+    border-left: 4px solid var(--color-primary);
+  }
+
+  .action-sug-item.strength-balanced {
+    border-left: 4px solid var(--color-success);
+  }
+
+  .sug-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sug-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .sug-icon {
+    color: var(--color-primary);
+  }
+
+  .sug-focus-title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+  }
+
+  .sug-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-subtle);
+    line-height: 1.5;
+  }
+
+  .sug-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--font-size-xs);
+    margin-top: auto;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .sug-action-link {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .sug-action-link:hover {
+    text-decoration: underline;
   }
 </style>

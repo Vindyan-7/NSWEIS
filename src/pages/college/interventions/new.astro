@@ -14,6 +14,7 @@ import { createSupabaseServerClient } from '../../../lib/supabase/server';
 import { getProfile } from '../../../services/users';
 import { createIntervention } from '../../../services/interventions';
 import { getLiveCollegeDashboardData } from '../../../services/analytics';
+import { logPrivacyAuditEvent } from '../../../services/privacy';
 import type { WellnessCategory } from '../../../types/domain';
 
 const user = Astro.locals.user;
@@ -69,6 +70,16 @@ if (Astro.request.method === 'POST') {
       });
 
       if (result.success) {
+        await logPrivacyAuditEvent(
+          supabase,
+          user.id,
+          'college_officer',
+          'INTERVENTION_CREATED',
+          'intervention',
+          result.data?.id,
+          'institutional_action',
+          { category: formCategory, title: formTitle, institution_id: institutionId }
+        );
         return Astro.redirect('/college/interventions');
       } else {
         errorMessage = 'Unable to create the intervention right now. Please review the form and try again.';
