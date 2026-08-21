@@ -641,4 +641,17 @@ const { status_distribution } = participation;
   .inline-icon {
     vertical-align: text-bottom;
   }
+
+  @media (max-width: 767px) {
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-top: var(--space-2);
+    }
+
+    .benchmarking-table {
+      min-width: 650px;
+    }
+  }
 </style>

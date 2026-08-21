@@ -52,6 +52,12 @@ const { items, roleTitle = 'NSWEIS Ecosystem' } = Astro.props;
     flex-shrink: 0;
   }
 
+  @media (max-width: 1023px) {
+    .sidebar {
+      display: none !important;
+    }
+  }
+
   .sidebar-brand {
     display: flex;
     align-items: center;

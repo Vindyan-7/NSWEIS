@@ -8,13 +8,14 @@
 }
 
 html, body {
-  height: 100%;
+  min-height: 100%;
   font-family: var(--font-sans);
   background-color: var(--color-bg-app);
   color: var(--color-text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 a {
@@ -32,6 +33,34 @@ button, input, select, textarea {
 }
 
 /* Layout Utilities */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.app-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
+
+.app-content {
+  flex: 1;
+  width: 100%;
+  padding-top: var(--space-6);
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .app-content {
+    padding-bottom: var(--space-8);
+  }
+}
+
 .container {
   width: 100%;
   max-width: 1200px;
@@ -46,6 +75,13 @@ button, input, select, textarea {
   border-radius: var(--radius-xl);
 }
 
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--space-4);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -56,4 +92,53 @@ button, input, select, textarea {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Responsive Utilities & Typography Clamps */
+@media (max-width: 767px) {
+  .container {
+    width: 100%;
+    max-width: none;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  h1, .page-title, .hero-title {
+    font-size: clamp(1.5rem, 6vw, 2.25rem) !important;
+    overflow-wrap: break-word;
+    word-break: normal;
+    line-height: 1.25 !important;
+  }
+
+  h2 {
+    font-size: clamp(1.25rem, 5vw, 1.75rem) !important;
+  }
+
+  h3, .section-heading {
+    font-size: clamp(1.125rem, 4vw, 1.375rem) !important;
+  }
+
+  /* Full width layout grids on mobile */
+  .two-col-dashboard-grid, .two-col-grid, .dashboard-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-4) !important;
+  }
+
+  .kpi-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-3) !important;
+  }
+
+  @media (max-width: 480px) {
+    .kpi-cards-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* Tap targets for touch */
+  button, .btn, a.btn, input[type="submit"] {
+    min-height: 44px;
+  }
 }
