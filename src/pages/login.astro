@@ -63,7 +63,7 @@ if (Astro.request.method === 'POST') {
           label="Email Address"
           type="email"
           name="email"
-          placeholder="student@demo.nsweis.gov.in"
+          placeholder="user@nsweis.gov.in"
           required
         />
         <Input
@@ -77,16 +77,6 @@ if (Astro.request.method === 'POST') {
           Sign In &rarr;
         </Button>
       </form>
-
-      <div class="demo-hints">
-        <p class="hints-title">Demo Role Credentials:</p>
-        <ul class="hints-list">
-          <li><strong>Student:</strong> <code>student@demo.nsweis.gov.in</code> &bull; <code>DemoPass2026!</code></li>
-          <li><strong>College Officer:</strong> <code>college@demo.nsweis.gov.in</code> &bull; <code>DemoCollege123!</code></li>
-          <li><strong>Government Admin:</strong> <code>admin@demo.nsweis.gov.in</code> &bull; <code>DemoPass2026!</code></li>
-          <li><strong>Super Admin:</strong> <code>super@demo.nsweis.gov.in</code> &bull; <code>DemoPass2026!</code></li>
-        </ul>
-      </div>
     </Card>
   </div>
 </PublicLayout>
@@ -133,38 +123,5 @@ if (Astro.request.method === 'POST') {
   .login-submit {
     width: 100%;
     margin-top: var(--space-2);
-  }
-
-  .demo-hints {
-    background-color: var(--color-bg-subtle);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    font-size: 0.8125rem;
-    color: var(--color-text-muted);
-  }
-
-  .hints-title {
-    font-weight: 600;
-    color: var(--color-text-main);
-    margin-bottom: var(--space-2);
-  }
-
-  .demo-hints ul {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-
-  .demo-hints code {
-    background-color: var(--color-bg-surface);
-    padding: 0.1rem 0.3rem;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-  }
-
-  .hint-pass {
-    margin-top: var(--space-2);
-    font-size: 0.8125rem;
   }
 </style>
