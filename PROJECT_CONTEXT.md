@@ -1,8 +1,8 @@
 # NSWEIS — Persistent Project Context & Source of Truth
 
 **Product Name:** National Student Well-being Early Intervention System (NSWEIS)  
-**Version:** 4.0.0 (Phase 9 Slice 1 Baseline)  
-**Status:** Phase 9 Slice 1 — Week 1 Question Architecture (COMPLETED)  
+**Version:** 4.1.0 (Phase 9 Pre-Flight Stabilization Baseline)  
+**Status:** Phase 9 Pre-Flight Stabilization Pass (COMPLETED & VERIFIED)  
 **Date:** August 21, 2026  
 
 ---
@@ -36,7 +36,7 @@ Adaptive Selection Engine (src/services/adaptive-question-selection.ts)
         ↓
 Student Question Assignments (public.student_question_assignments)
         ↓
-Student Weekly Reflection Session & Dynamic Duration Gate (/student/check-in)
+Student Weekly Reflection Session & 10-Min Session Gate (/student/check-in)
         ↓
 Category-Level Support Signal Aggregation (0.0–10.0 Internal Support Signals)
         ↓
@@ -80,33 +80,25 @@ The remote Supabase database is **MANUALLY ADMINISTERED** by the Project Manager
 | `08_question_management.sql` | Question Management RLS | RLS management policies for super_admin on questions, options, and imports | `00..07` | **PENDING MANUAL EXECUTION** |
 | `09_recommendation_engine.sql` | Recommendation Security Hardening | Hardened `recommendation_rules` RLS (super_admin only), DB unique indexes on `assessment_recommendations` & `student_tasks`, SECURITY DEFINER `generate_assessment_recommendations` RPC returning BOOLEAN only | `00..08` | **PENDING MANUAL EXECUTION** |
 | `10_adaptive_weekly_architecture.sql` | Adaptive Journey DB Foundation | `weekly_cycles` table, partial active index, `questions` metadata extensions, `question_selection_rules`, `student_question_assignments`, indexes & RLS policies | `00..09` | **EXECUTED SUCCESSFULLY** |
-| `11_week1_question_library.sql` | Week 1 Question Architecture Seed | Seeds Week 1 active cycle (7 common + 3 adaptive baseline questions `W01-Q01`..`W01-Q10`), 5-option answer choices, and follow-up groups | `00..10` | **PENDING MANUAL EXECUTION** |
+| `11_week1_question_library.sql` | Week 1 Question Architecture Seed | Seeds Week 1 active cycle (session_duration_minutes = 10), 7 common + 3 adaptive baseline questions (`W01-Q01`..`W01-Q10`), 5-option answer choices, and follow-up groups | `00..10` | **PENDING MANUAL EXECUTION** |
 
 ---
 
-## F. Week 1 Question Architecture (Phase 9 Slice 1)
+## F. Pre-Flight Stabilization & Check-in Persistence (Phase 9 Pre-Flight)
 
-### 1. Master Question Set (`W01-Q01` to `W01-Q10`)
-- **W01-Q01**: Daily Energy & Functioning (`physical_wellbeing`, `energy_support`)
-- **W01-Q02**: Sleep & Rest (`sleep_rest`, `sleep_support`)
-- **W01-Q03**: Academic Routine (`academic`, `academic_routine`)
-- **W01-Q04**: Focus & Digital Balance (`digital_balance`, `focus_support`)
-- **W01-Q05**: Physical Activity (`physical_wellbeing`, `movement_support`)
-- **W01-Q06**: Social Connection (`social_connection`, `connection_support`)
-- **W01-Q07**: Personal Balance (`emotional_wellbeing`, `balance_support`)
-- **W01-Q08**: Adaptive Baseline — Academic/Future (`career`, `academic_future`)
-- **W01-Q09**: Adaptive Baseline — Personal Routine (`family_home`, `routine_support`)
-- **W01-Q10**: Adaptive Baseline — Student-Defined Priority (`emotional_wellbeing`, `personal_priority`)
+### 1. Root Cause Resolution & Immediate Response Persistence ([`src/pages/student/check-in.astro`](file:///c:/Projects/YI/NSWEIS/src/pages/student/check-in.astro))
+- **Timer Reset Bug Fixed**: Server-side POST timer gate now immediately saves all answered questions into `assessment_responses` BEFORE checking completion conditions. If server time vs client timer gate differs slightly, selected options are NOT wiped out, remaining preserved on page reload.
+- **10-Minute Cycle Duration**: Updated `session_duration_minutes` to 10 in `11_week1_question_library.sql` and `check-in.astro`.
+- **Super Admin Testing Control**: Added server-verified `Admin Test Submit` control for `super_admin` role only. Server validates caller's server session (`profile?.role === 'super_admin'`) before bypassing minimum duration gate. Executes identical validation, persistence, scoring, recommendation, and task creation pipeline.
 
 ---
 
 ## G. Diagnostics & Build Verification
-- **SQL File Created**: `supabase/sql/11_week1_question_library.sql` (marked `PENDING MANUAL EXECUTION`).
 - **`npx tsx scratch/test_adaptive_selection_engine.mjs`**: PASSED (20/20 unit tests passed).
 - **`npx astro check`**: Passed cleanly (`Result (92 files): 0 errors, 0 warnings, 23 hints`).
-- **`npm run build`**: Production build succeeded in 5.90s with Vercel adapter compilation.
-- **Phase 9 Slice 1 Status**: Complete.
-- **Git Execution Status**: Pushed to GitHub repository (`main` branch commit `0f46114`).
+- **`npm run build`**: Production build succeeded in 4.61s with Vercel adapter compilation.
+- **Phase 9 Pre-Flight Status**: Complete & Verified.
+- **Git Execution Status**: Local changes remain uncommitted and unpushed as directed.
 
 ---
 

@@ -49,7 +49,7 @@ BEGIN
       10,
       7,
       3,
-      20,
+      10,
       TRUE,
       TRUE
     ) RETURNING id INTO v_cycle_id;
@@ -59,7 +59,7 @@ BEGIN
         total_questions = 10,
         common_questions = 7,
         adaptive_questions = 3,
-        session_duration_minutes = 20,
+        session_duration_minutes = 10,
         reflection_required = TRUE
     WHERE id = v_cycle_id;
   END IF;

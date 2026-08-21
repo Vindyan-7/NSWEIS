@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from '../../lib/supabase/server';
 import {
   getOrCreateStudentAssessment,
   getBaseQuestions,
+  saveAssessmentResponses,
   submitAssessmentResponsesAndScore,
 } from '../../services/assessments';
 import { getActiveWeeklyCycle } from '../../services/weekly-cycles';
@@ -20,7 +21,7 @@ import {
 } from '../../services/adaptive-question-selection';
 import { generateRecommendationsForAssessment } from '../../services/recommendations';
 import type { Question } from '../../types/domain';
-import { Clock3, CheckCircle2, ShieldCheck } from '@lucide/astro';
+import { Clock3, CheckCircle2, ShieldCheck, ShieldAlert } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
@@ -30,10 +31,11 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-if (profile && profile.role !== 'student') {
+if (profile && profile.role !== 'student' && profile.role !== 'super_admin') {
   return Astro.redirect('/student/dashboard');
 }
 
+const isSuperAdmin = profile?.role === 'super_admin';
 let errorMessage = '';
 
 // 1. Resolve Active Weekly Cycle
@@ -60,10 +62,8 @@ if (profile?.department_id) {
 let displayQuestions: Question[] = [];
 
 if (activeCycle) {
-  // Check existing assignments for this cycle
   let currentAssignments = await getStudentQuestionAssignments(supabase, user.id, activeCycle.id);
 
-  // If no assignment exists for this student & cycle, generate deterministic assignment
   if (currentAssignments.length === 0 && assessment && assessment.status !== 'completed') {
     const genRes = await generateStudentQuestionAssignment(supabase, user.id, activeCycle.id, studentDeptCode);
     if (genRes.success) {
@@ -74,12 +74,11 @@ if (activeCycle) {
   if (currentAssignments.length > 0) {
     displayQuestions = currentAssignments.map((a) => a.question).filter(Boolean);
   } else {
-    // Fallback for legacy environments where weekly_cycles is unpopulated
     displayQuestions = await getBaseQuestions(supabase, activeCycle.week_number, studentDeptCode);
   }
 }
 
-// 5. Fetch Existing Responses for In-Progress Assessment Resume
+// 5. Fetch Existing Responses for Resume & Persistence
 const existingResponseMap = new Map<string, string>();
 let existingReflectionText = '';
 
@@ -96,8 +95,8 @@ if (assessment) {
   }
 }
 
-// 6. Calculate Server-Authoritative Session Duration
-const sessionDurationMins = activeCycle?.session_duration_minutes || 20;
+// 6. Calculate Server-Authoritative Session Duration (Defaulting to 10 mins / 600s if unconfigured)
+const sessionDurationMins = activeCycle?.session_duration_minutes || 10;
 const REQUIRED_SESSION_SECONDS = sessionDurationMins * 60;
 const startedAtMs = assessment?.started_at ? new Date(assessment.started_at).getTime() : Date.now();
 const nowMs = Date.now();
@@ -112,81 +111,100 @@ if (Astro.request.method === 'POST' && user && assessment) {
       return Astro.redirect('/student/wellness');
     }
 
-    // Server-side completion duration verification gate
-    if (elapsedSeconds < REQUIRED_SESSION_SECONDS) {
-      errorMessage = 'Your reflection session is still in progress. Please continue for a little longer.';
-    } else {
-      const formData = await Astro.request.formData();
-      const rawResponses: Array<{
-        questionId: string;
-        category: any;
-        selectedOptionId?: string;
-        score: number;
-        weight: number;
-        textResponse?: string;
-      }> = [];
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
 
-      let missingRequired = false;
+    // Server-Authoritative Super Admin Test Submit Bypass Check
+    const isAdminTestSubmit = isSuperAdmin && actionType === 'admin_test_submit';
+    const canPassTimeGate = isTimerCompleteOnServer || isAdminTestSubmit;
 
-      for (const q of displayQuestions) {
-        const val = formData.get(`q_${q.id}`)?.toString();
-        if (q.required !== false && !val) {
-          missingRequired = true;
-          break;
-        }
+    const rawResponses: Array<{
+      questionId: string;
+      category: any;
+      selectedOptionId?: string;
+      score: number;
+      weight: number;
+      textResponse?: string;
+    }> = [];
 
-        if (val && q.options) {
-          const opt = q.options.find((o) => o.id === val);
-          if (opt) {
-            rawResponses.push({
-              questionId: q.id,
-              category: q.category,
-              selectedOptionId: val,
-              score: Number(opt.score),
-              weight: Number(q.weight || 1.0),
-            });
-          }
-        }
+    let missingRequired = false;
+
+    for (const q of displayQuestions) {
+      const val = formData.get(`q_${q.id}`)?.toString();
+      if (q.required !== false && !val) {
+        missingRequired = true;
       }
 
-      if (missingRequired) {
-        errorMessage = 'Please answer all required reflection questions before completing your session.';
-      } else {
-        const reflectionText = (formData.get('reflection_text') as string || '').trim();
-        if (activeCycle?.reflection_required && !reflectionText && displayQuestions.length > 0) {
-          errorMessage = 'Please share a brief personal reflection before completing your weekly session.';
-        } else {
-          if (reflectionText && rawResponses.length > 0) {
-            rawResponses[0].textResponse = reflectionText;
-          }
-
-          const submitResult = await submitAssessmentResponsesAndScore(
-            supabase,
-            assessment.id,
-            rawResponses
-          );
-
-          if (submitResult.success) {
-            // Update student_question_assignments state to answered = true
-            const answeredQIds = rawResponses.map((r) => r.questionId);
-            if (answeredQIds.length > 0 && activeCycle) {
-              await (supabase.from('student_question_assignments') as any)
-                .update({ answered: true, answered_at: new Date().toISOString() })
-                .eq('student_id', user.id)
-                .eq('cycle_id', activeCycle.id)
-                .in('question_id', answeredQIds);
-            }
-
-            try {
-              await generateRecommendationsForAssessment(supabase, user.id, assessment.id);
-            } catch (recErr) {
-              // Log safely without rolling back assessment completion
-            }
-            return Astro.redirect('/student/wellness');
-          } else {
-            errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
-          }
+      if (val && q.options) {
+        const opt = q.options.find((o) => o.id === val);
+        if (opt) {
+          rawResponses.push({
+            questionId: q.id,
+            category: q.category,
+            selectedOptionId: val,
+            score: Number(opt.score),
+            weight: Number(q.weight || 1.0),
+          });
         }
+      }
+    }
+
+    const reflectionText = (formData.get('reflection_text') as string || '').trim();
+    if (reflectionText && rawResponses.length > 0) {
+      rawResponses[0].textResponse = reflectionText;
+    }
+
+    // Always persist available responses to DB immediately on submission attempt
+    if (rawResponses.length > 0) {
+      await saveAssessmentResponses(
+        supabase,
+        assessment.id,
+        rawResponses.map((r) => ({
+          questionId: r.questionId,
+          selectedOptionId: r.selectedOptionId,
+          textResponse: r.textResponse,
+        }))
+      );
+
+      for (const r of rawResponses) {
+        if (r.selectedOptionId) existingResponseMap.set(r.questionId, r.selectedOptionId);
+      }
+      if (reflectionText) existingReflectionText = reflectionText;
+    }
+
+    if (!canPassTimeGate) {
+      errorMessage = 'Your reflection session is still in progress. Please continue for a little longer.';
+    } else if (missingRequired) {
+      errorMessage = 'Please answer all required reflection questions before completing your session.';
+    } else if (activeCycle?.reflection_required && !reflectionText && displayQuestions.length > 0) {
+      errorMessage = 'Please share a brief personal reflection before completing your weekly session.';
+    } else {
+      const submitResult = await submitAssessmentResponsesAndScore(
+        supabase,
+        assessment.id,
+        rawResponses
+      );
+
+      if (submitResult.success) {
+        // Mark student_question_assignments as answered = true
+        const answeredQIds = rawResponses.map((r) => r.questionId);
+        if (answeredQIds.length > 0 && activeCycle) {
+          await (supabase.from('student_question_assignments') as any)
+            .update({ answered: true, answered_at: new Date().toISOString() })
+            .eq('student_id', user.id)
+            .eq('cycle_id', activeCycle.id)
+            .in('question_id', answeredQIds);
+        }
+
+        try {
+          await generateRecommendationsForAssessment(supabase, user.id, assessment.id);
+        } catch (recErr) {
+          // Log safely without rolling back assessment completion
+        }
+
+        assessment.status = 'completed';
+      } else {
+        errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
       }
     }
   } catch (err: any) {
@@ -208,6 +226,21 @@ if (Astro.request.method === 'POST' && user && assessment) {
       </Alert>
     )}
 
+    {isSuperAdmin && assessment?.status !== 'completed' && (
+      <Card padding="md" class="admin-test-card">
+        <div class="admin-test-flex">
+          <div class="admin-test-info">
+            <span class="admin-test-badge">
+              <ShieldAlert size={14} aria-hidden="true" /> Super Admin Testing Control
+            </span>
+            <p class="admin-test-text">
+              Testing only — bypasses the {sessionDurationMins}-minute waiting period for completion testing.
+            </p>
+          </div>
+        </div>
+      </Card>
+    )}
+
     {!activeCycle ? (
       <Card padding="lg">
         <div class="empty-cycle-box">
@@ -226,11 +259,18 @@ if (Astro.request.method === 'POST' && user && assessment) {
           <p class="completed-text">
             Thank you for taking time to complete your weekly reflection for {activeCycle.name}. Your responses have been securely stored.
           </p>
-          <a href="/student/wellness">
-            <Button variant="primary" size="md">
-              View Wellness Results &rarr;
-            </Button>
-          </a>
+          <div class="completed-actions">
+            <a href="/student/wellness">
+              <Button variant="primary" size="md">
+                View Wellness Results &rarr;
+              </Button>
+            </a>
+            <a href="/student/progress">
+              <Button variant="outline" size="md">
+                View Journey Progress &rarr;
+              </Button>
+            </a>
+          </div>
         </div>
       </Card>
     ) : (
@@ -299,17 +339,33 @@ if (Astro.request.method === 'POST' && user && assessment) {
                 </Button>
               </a>
               
-              <Button
-                variant="primary"
-                type="submit"
-                id="submit-btn"
-                disabled={!isTimerCompleteOnServer}
-              >
-                <CheckCircle2 size={16} aria-hidden="true" />
-                <span id="btn-label">
-                  {isTimerCompleteOnServer ? 'Complete Weekly Reflection' : 'Session In Progress'}
-                </span>
-              </Button>
+              <div class="submit-action-group">
+                {isSuperAdmin && (
+                  <Button
+                    variant="secondary"
+                    type="submit"
+                    name="action_type"
+                    value="admin_test_submit"
+                    class="admin-test-btn"
+                  >
+                    Admin Test Submit
+                  </Button>
+                )}
+                
+                <Button
+                  variant="primary"
+                  type="submit"
+                  id="submit-btn"
+                  name="action_type"
+                  value="student_submit"
+                  disabled={!isTimerCompleteOnServer}
+                >
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                  <span id="btn-label">
+                    {isTimerCompleteOnServer ? 'Complete Weekly Reflection' : 'Session In Progress'}
+                  </span>
+                </Button>
+              </div>
             </div>
           </form>
         </Card>
@@ -318,7 +374,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
   </div>
 </StudentLayout>
 
-<script is:inline define:vars={{ remainingSeconds, isTimerCompleteOnServer }}>
+<script is:inline define:vars={{ remainingSeconds, isTimerCompleteOnServer, isSuperAdmin }}>
   (function () {
     var timerDisplay = document.getElementById('timer-display');
     var submitBtn = document.getElementById('submit-btn');
@@ -364,7 +420,7 @@ if (Astro.request.method === 'POST' && user && assessment) {
         if (statusText) statusText.textContent = 'Complete all required reflections to continue.';
         if (submitBtn) submitBtn.disabled = true;
         if (btnLabel) btnLabel.textContent = 'Session In Progress';
-      } else if (!isTimeUp) {
+      } else if (!isTimeUp && !isSuperAdmin) {
         if (statusText) statusText.textContent = 'Your responses are complete. Please continue reflecting until your session is ready to complete.';
         if (submitBtn) submitBtn.disabled = true;
         if (btnLabel) btnLabel.textContent = 'Session In Progress (' + formatTime(secondsLeft) + ')';
@@ -444,6 +500,39 @@ if (Astro.request.method === 'POST' && user && assessment) {
     color: var(--color-text-muted);
     max-width: 500px;
     margin-bottom: var(--space-6);
+  }
+
+  .completed-actions {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .admin-test-card {
+    background-color: #fffbe6;
+    border: 1px solid #ffe58f;
+  }
+
+  .admin-test-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .admin-test-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #b78103;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-test-text {
+    font-size: 0.8125rem;
+    color: #8c6202;
+    margin-top: 0.125rem;
   }
 
   .session-container {
@@ -575,6 +664,12 @@ if (Astro.request.method === 'POST' && user && assessment) {
     margin-top: var(--space-6);
   }
 
+  .submit-action-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
   @media (max-width: 480px) {
     .header-flex-top {
       flex-direction: column;
@@ -590,6 +685,11 @@ if (Astro.request.method === 'POST' && user && assessment) {
     .session-nav-actions {
       flex-direction: column-reverse;
       gap: var(--space-3);
+      width: 100%;
+    }
+
+    .submit-action-group {
+      flex-direction: column;
       width: 100%;
     }
 
