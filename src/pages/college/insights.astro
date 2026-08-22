@@ -34,6 +34,21 @@ const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111
 const participation = await getCollegeParticipationMetrics(supabase, institutionId);
 const categorySummaries = await getCollegeCategorySummaries(supabase, institutionId);
 const departmentSummaries = await getCollegeDepartmentSummaries(supabase, institutionId);
+
+const categoryDisplayNames: Record<string, string> = {
+  academic: 'Academic Support',
+  sleep_rest: 'Sleep & Rest',
+  emotional_wellbeing: 'Emotional Support',
+  social_connection: 'Social Connection',
+  family_home: 'Family & Home Support',
+  financial: 'Financial Wellbeing',
+  career: 'Career Readiness',
+  campus_experience: 'Campus Life & Engagement',
+  physical_wellbeing: 'Physical Wellbeing',
+};
+
+const isSuppressed = categorySummaries.length > 0 ? categorySummaries[0].is_suppressed : false;
+const hasValidCategoryData = !isSuppressed && categorySummaries.some((cs) => cs.average_score !== null && cs.average_score !== undefined);
 ---
 
 <CollegeLayout title="Institutional Insights" activePath="/college/insights">
@@ -75,25 +90,52 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
         title="Category Wellness Indicators"
         subtitle="Aggregate average indicator scores (0.0 to 10.0)"
       >
-        <div class="category-chart-bars">
-          {categorySummaries.map((cs) => (
-            <div class="bar-row">
-              <span class="bar-label">{cs.category.replace('_', ' ')}</span>
-              <div class="bar-track">
-                {cs.is_suppressed ? (
-                  <div class="bar-suppressed">Suppressed (&lt;10 students)</div>
-                ) : (
-                  <div
-                    class={`bar-fill band-${cs.dominant_band}`}
-                    style={`width: ${((cs.average_score || 0) * 10)}%`}
-                  >
-                    <span class="bar-value">{cs.average_score?.toFixed(1)}</span>
+        {isSuppressed ? (
+          <div class="suppressed-notice-box">
+            <span class="font-semibold text-primary">&bull; PRIVACY THRESHOLD ACTIVE</span>
+            <p class="text-muted text-sm mt-1">
+              Detailed category indicators are withheld because fewer than 10 completed student reflections exist for this cycle.
+            </p>
+          </div>
+        ) : hasValidCategoryData ? (
+          <div class="category-chart-bars">
+            {categorySummaries.map((cs) => {
+              const displayName = categoryDisplayNames[cs.category] || cs.category.replace('_', ' ');
+              const scoreVal = cs.average_score !== null && cs.average_score !== undefined ? cs.average_score : null;
+              const fillWidth = scoreVal !== null ? Math.max(12, Math.min(100, scoreVal * 10)) : 0;
+              const bandClass = cs.dominant_band ? `band-${cs.dominant_band}` : 'band-stable';
+
+              return (
+                <div class="bar-row">
+                  <div class="bar-header">
+                    <span class="bar-label">{displayName}</span>
+                    {scoreVal !== null ? (
+                      <span class="bar-score font-bold">{scoreVal.toFixed(1)} / 10</span>
+                    ) : (
+                      <span class="bar-score text-muted">--</span>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div class="bar-track">
+                    {scoreVal !== null ? (
+                      <div class={`bar-fill ${bandClass}`} style={`width: ${fillWidth}%`}>
+                        <span class="bar-inside-val">{scoreVal.toFixed(1)}</span>
+                      </div>
+                    ) : (
+                      <div class="bar-no-data">No Data Recorded</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div class="empty-category-box">
+            <h4 class="empty-title font-semibold">Category analytics are not yet available for this cycle.</h4>
+            <p class="empty-desc text-muted text-sm">
+              Aggregate category indicators will appear automatically after completed reflections have been processed.
+            </p>
+          </div>
+        )}
       </ChartCard>
 
       {/* Section 3: Department Comparison */}
@@ -119,7 +161,7 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
                 <p class="dept-suppression-note">{dept.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
               ) : (
                 <div class="dept-stats-row">
-                  <span>Average Indicator: <strong>{dept.average_overall_score?.toFixed(1)} / 10</strong></span>
+                  <span>Average Indicator: <strong>{dept.average_overall_score !== null ? `${dept.average_overall_score.toFixed(1)} / 10` : '--'}</strong></span>
                   <span>Participating: <strong>{dept.participating_student_count} students</strong></span>
                 </div>
               )}
@@ -168,7 +210,7 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
   .category-chart-bars {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--space-4);
     margin-top: var(--space-2);
   }
 
@@ -178,19 +220,30 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
     gap: var(--space-1);
   }
 
+  .bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .bar-label {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--color-text-main);
-    text-transform: capitalize;
+  }
+
+  .bar-score {
+    font-size: 0.8125rem;
+    color: var(--color-text-main);
   }
 
   .bar-track {
-    height: 24px;
+    height: 26px;
     background-color: var(--color-bg-subtle);
     border-radius: var(--radius-md);
     overflow: hidden;
     position: relative;
+    border: 1px solid var(--color-border-subtle);
   }
 
   .bar-fill {
@@ -201,31 +254,32 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
     padding-right: var(--space-2);
     border-radius: var(--radius-md);
     transition: width 0.3s ease;
+    min-width: 32px;
   }
 
   .bar-fill.band-stable {
-    background-color: var(--color-band-stable);
+    background-color: var(--color-band-stable, #10b981);
   }
 
   .bar-fill.band-watch {
-    background-color: var(--color-band-improving);
+    background-color: var(--color-band-improving, #3b82f6);
   }
 
   .bar-fill.band-needs_attention {
-    background-color: var(--color-band-attention);
+    background-color: var(--color-band-attention, #f59e0b);
   }
 
   .bar-fill.band-elevated {
-    background-color: var(--color-band-elevated);
+    background-color: var(--color-band-elevated, #ef4444);
   }
 
-  .bar-value {
+  .bar-inside-val {
     font-size: 0.75rem;
     font-weight: 700;
-    color: var(--color-white);
+    color: #ffffff;
   }
 
-  .bar-suppressed {
+  .bar-no-data {
     height: 100%;
     display: flex;
     align-items: center;
@@ -233,6 +287,14 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
     font-size: 0.75rem;
     color: var(--color-text-muted);
     font-style: italic;
+  }
+
+  .empty-category-box, .suppressed-notice-box {
+    padding: var(--space-5);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+    text-align: center;
   }
 
   .dept-insights-list {
@@ -272,5 +334,11 @@ const departmentSummaries = await getCollegeDepartmentSummaries(supabase, instit
     font-size: 0.8125rem;
     color: var(--color-text-muted);
     margin-top: var(--space-1);
+  }
+
+  @media (max-width: 640px) {
+    .insights-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

@@ -289,9 +289,67 @@ export async function getLiveCollegeDashboardData(
   const completedAssessmentIds = completedAssessments.map((a) => a.id);
 
   if (completedAssessmentIds.length > 0) {
-    const { data: scoreRows } = await (db.from('assessment_category_scores') as any)
+    let { data: scoreRows } = await (db.from('assessment_category_scores') as any)
       .select('category, score, band')
       .in('assessment_id', completedAssessmentIds);
+
+    // Fallback: If category scores table is missing rows for completed assessments, calculate from responses & self-heal DB
+    if (!scoreRows || scoreRows.length === 0) {
+      const { data: responses } = await (db.from('assessment_responses') as any)
+        .select('assessment_id, question_id, selected_option_id')
+        .in('assessment_id', completedAssessmentIds);
+
+      if (responses && responses.length > 0) {
+        const { data: questions } = await (db.from('questions') as any).select('id, category, weight');
+        const { data: options } = await (db.from('question_options') as any).select('id, score');
+
+        if (questions && options) {
+          const qMap = new Map<string, any>(questions.map((q: any) => [q.id, q]));
+          const optMap = new Map<string, any>(options.map((o: any) => [o.id, o]));
+          const toInsert: any[] = [];
+
+          for (const assId of completedAssessmentIds) {
+            const assResponses = responses.filter((r: any) => r.assessment_id === assId);
+            const catGroup = new Map<string, { total: number; weight: number }>();
+
+            for (const resp of assResponses) {
+              const q = qMap.get(resp.question_id);
+              const opt = optMap.get(resp.selected_option_id);
+              if (!q || !opt || opt.score === null || opt.score === undefined) continue;
+
+              const cat = q.category;
+              if (!catGroup.has(cat)) catGroup.set(cat, { total: 0, weight: 0 });
+              const entry = catGroup.get(cat)!;
+              const w = Number(q.weight || 1.0);
+              entry.total += Number(opt.score) * w;
+              entry.weight += w;
+            }
+
+            for (const [cat, data] of catGroup.entries()) {
+              const rawScore = data.weight > 0 ? data.total / data.weight : 0;
+              const score = Math.round(rawScore * 10) / 10;
+              let band = 'stable';
+              if (score < 4.0) band = 'elevated';
+              else if (score < 6.0) band = 'needs_attention';
+              else if (score < 8.0) band = 'watch';
+
+              toInsert.push({ assessment_id: assId, category: cat, score, band });
+            }
+          }
+
+          if (toInsert.length > 0) {
+            await (db.from('assessment_category_scores') as any)
+              .upsert(toInsert, { onConflict: 'assessment_id,category' });
+
+            const { data: reFetchedScores } = await (db.from('assessment_category_scores') as any)
+              .select('category, score, band')
+              .in('assessment_id', completedAssessmentIds);
+
+            if (reFetchedScores) scoreRows = reFetchedScores;
+          }
+        }
+      }
+    }
 
     const catMap = new Map<WellnessCategory, { sum: number; count: number; bands: Record<string, number> }>();
 

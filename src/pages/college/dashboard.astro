@@ -210,7 +210,7 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
                   )}
                 </div>
                 <span class="score-display font-semibold">
-                  {cs.average_score !== null ? `${cs.average_score.toFixed(1)} / 10` : '--'}
+                  {cs.average_score !== null && cs.average_score !== undefined ? `${cs.average_score.toFixed(1)} / 10` : '--'}
                 </span>
               </div>
             ))}

@@ -10,6 +10,7 @@ import type {
   WellnessCategory,
 } from '../types/domain';
 import { calculateCategoryScores, calculateOverallIndicator } from '../lib/scoring/engine';
+import { createSupabaseAdminClient } from '../lib/supabase/server';
 
 export async function getActiveAssessmentCycle(
   supabase: SupabaseClient<Database>
@@ -296,9 +297,20 @@ export async function submitAssessmentResponsesAndScore(
     band: cs.band,
   }));
 
-  await supabase
+  const { error: scoreErr } = await supabase
     .from('assessment_category_scores')
     .upsert(scoreInserts as any, { onConflict: 'assessment_id,category' });
+
+  if (scoreErr) {
+    try {
+      const admin = createSupabaseAdminClient();
+      await admin
+        .from('assessment_category_scores')
+        .upsert(scoreInserts as any, { onConflict: 'assessment_id,category' });
+    } catch (adminErr) {
+      console.error('[SUBMIT] admin category score upsert fallback failed:', adminErr);
+    }
+  }
 
   // Select matching recommendations
   const categoriesToRecommend = categoryScores
