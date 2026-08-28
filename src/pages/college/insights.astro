@@ -13,7 +13,10 @@ import {
   getCollegeParticipationMetrics,
   getCollegeCategorySummaries,
   getCollegeDepartmentSummaries,
+  PRIVACY_THRESHOLD_MIN_STUDENTS,
+  parseCollegeAcademicFilters,
 } from '../../services/analytics';
+import CollegeAcademicFilters from '../../components/analytics/CollegeAcademicFilters.astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -31,8 +34,20 @@ if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_a
 
 const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
 
-const participation = await getCollegeParticipationMetrics(supabase, institutionId);
-const categorySummaries = await getCollegeCategorySummaries(supabase, institutionId);
+// Parse Academic Filters using shared helper (supports dept/department_id, year/year_level, section/section_code)
+const url = new URL(Astro.request.url);
+const filters = parseCollegeAcademicFilters(url.searchParams);
+const deptParam = filters.department_id || '';
+const yearParam = filters.year_level ? String(filters.year_level) : '';
+const sectionParam = filters.section_code || '';
+
+// Fetch departments for filter dropdown
+const { data: deptList } = await (supabase.from('departments') as any).select('id, name, code').order('name');
+const departments = deptList || [];
+
+// Load analytics with academic filters applied
+const participation = await getCollegeParticipationMetrics(supabase, institutionId, filters);
+const categorySummaries = await getCollegeCategorySummaries(supabase, institutionId, filters);
 const departmentSummaries = await getCollegeDepartmentSummaries(supabase, institutionId);
 
 const categoryDisplayNames: Record<string, string> = {
@@ -47,8 +62,12 @@ const categoryDisplayNames: Record<string, string> = {
   physical_wellbeing: 'Physical Wellbeing',
 };
 
-const isSuppressed = categorySummaries.length > 0 ? categorySummaries[0].is_suppressed : false;
+// Privacy threshold check: post-filter completed count must be >= 10
+const isSuppressed = participation.participating_students < PRIVACY_THRESHOLD_MIN_STUDENTS;
 const hasValidCategoryData = !isSuppressed && categorySummaries.some((cs) => cs.average_score !== null && cs.average_score !== undefined);
+
+// Preserve active filters when navigating back to dashboard
+const dashboardBackUrl = url.search ? `/college/dashboard${url.search}` : '/college/dashboard';
 ---
 
 <CollegeLayout title="Institutional Insights" activePath="/college/insights">
@@ -56,12 +75,24 @@ const hasValidCategoryData = !isSuppressed && categorySummaries.some((cs) => cs.
     title="Institutional Insights & Analytical Breakdown"
     subtitle={`Comparative trends across wellness domains and academic departments for ${participation.active_cycle_name}`}
   >
-    <a href="/college/dashboard">
+    <a href={dashboardBackUrl}>
       <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
     </a>
   </PageHeader>
 
   <div class="college-insights-layout">
+    {/* Reusable Shared Academic Filter Component */}
+    <CollegeAcademicFilters
+      departments={departments}
+      selectedDepartment={deptParam}
+      selectedYear={yearParam}
+      selectedSection={sectionParam}
+      baseUrl="/college/insights"
+      totalEligible={participation.total_eligible_students}
+      completedCount={participation.participating_students}
+      isSuppressed={isSuppressed}
+    />
+
     {/* Section 1: Overview Metrics */}
     <div class="metrics-grid">
       <MetricCard

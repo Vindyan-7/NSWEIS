@@ -1,0 +1,323 @@
+---
+import SuperAdminLayout from '../../layouts/SuperAdminLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { UserCheck, Shield, Plus, Power } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  provisionStaffAccount,
+  getManagedStaffAccounts,
+  toggleStaffAccountStatus,
+} from '../../services/provisioning';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'super_admin') {
+  return Astro.redirect('/superadmin/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString() || 'create_government_admin';
+
+    if (actionType === 'toggle_status') {
+      const targetUserId = formData.get('target_user_id')?.toString() || '';
+      const newStatus = formData.get('new_status')?.toString() === 'true';
+
+      const res = await toggleStaffAccountStatus(supabase, user.id, targetUserId, newStatus);
+      if (!res.success) {
+        message = res.error || 'Failed to update account status.';
+        isError = true;
+      } else {
+        message = `Account status updated successfully to ${newStatus ? 'Active' : 'Deactivated'}.`;
+      }
+    } else {
+      const fullName = formData.get('full_name')?.toString().trim() || '';
+      const email = formData.get('email')?.toString().trim() || '';
+      const password = formData.get('password')?.toString() || '';
+      const confirmPassword = formData.get('confirm_password')?.toString() || '';
+
+      const res = await provisionStaffAccount(supabase, user.id, {
+        fullName,
+        email,
+        password,
+        confirmPassword,
+        targetRole: 'government_admin',
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to provision Government Administrator.';
+        isError = true;
+      } else {
+        message = `Government Administrator account for '${fullName}' (${email}) provisioned successfully.`;
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
+  }
+}
+
+const govAdmins = await getManagedStaffAccounts(supabase, user.id);
+---
+
+<SuperAdminLayout title="Government Administrators Management" activePath="/superadmin/government-admins">
+  <PageHeader
+    title="Government Administrator Provisioning & Management"
+    subtitle="Provision and manage authorized Government Administrators with state/regional oversight authority"
+  >
+    <a href="/superadmin/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Overview</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-admins-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Notice' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    <div class="grid-layout">
+      {/* Create Government Admin Form */}
+      <Card padding="lg" class="form-card">
+        <div class="card-header-row">
+          <Shield size={20} class="text-primary" />
+          <h3 class="card-title">Provision New Government Admin</h3>
+        </div>
+        <p class="section-subtext">
+          Create credentials for a national or state government administrator. The account is immediately active.
+        </p>
+
+        <form method="POST" class="provision-form">
+          <input type="hidden" name="action_type" value="create_government_admin" />
+          <Input
+            label="Full Name"
+            name="full_name"
+            placeholder="Dr. Rajesh Sharma"
+            required
+          />
+
+          <Input
+            label="Official Email Address"
+            type="email"
+            name="email"
+            placeholder="admin.gov@nsweis.gov.in"
+            required
+          />
+
+          <div class="form-row-2">
+            <Input
+              label="Password (min 8 chars)"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              name="confirm_password"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <Button type="submit" variant="primary" class="btn-submit">
+            <Plus size={15} /> Provision Government Administrator
+          </Button>
+        </form>
+      </Card>
+
+      {/* Directory of Government Admins */}
+      <Card padding="lg" class="table-card">
+        <div class="card-header-row">
+          <UserCheck size={20} class="text-primary" />
+          <h3 class="card-title">Government Administrators Directory ({govAdmins.length})</h3>
+        </div>
+        <p class="section-subtext">
+          Authorized administrators who can manage regional officers and institutions.
+        </p>
+
+        {govAdmins.length === 0 ? (
+          <EmptyState
+            title="No Government Administrators"
+            description="Use the form on the left to provision the first government administrator."
+          />
+        ) : (
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Administrator</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {govAdmins.map((adm) => (
+                  <tr>
+                    <td>
+                      <div class="user-info">
+                        <strong class="user-name">{adm.full_name}</strong>
+                        <span class="user-sub">{adm.id.slice(0, 8)}...</span>
+                      </div>
+                    </td>
+                    <td>
+                      <Badge variant="primary" size="sm">Government Admin</Badge>
+                    </td>
+                    <td>
+                      <Badge variant={adm.active ? 'stable' : 'neutral'} size="sm">
+                        {adm.active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    <td class="date-cell">
+                      {new Date(adm.created_at).toLocaleDateString()}
+                    </td>
+                    <td>
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action_type" value="toggle_status" />
+                        <input type="hidden" name="target_user_id" value={adm.id} />
+                        <input type="hidden" name="new_status" value={adm.active ? 'false' : 'true'} />
+                        <Button
+                          type="submit"
+                          variant={adm.active ? 'outline' : 'primary'}
+                          size="sm"
+                        >
+                          <Power size={13} /> {adm.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  </div>
+</SuperAdminLayout>
+
+<style>
+  .gov-admins-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: var(--space-6);
+  }
+
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .provision-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .btn-submit {
+    margin-top: var(--space-2);
+    width: 100%;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-main);
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .user-name {
+    font-weight: 600;
+  }
+
+  .user-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .date-cell {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .inline-form {
+    display: inline-block;
+  }
+
+  @media (max-width: 1024px) {
+    .grid-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

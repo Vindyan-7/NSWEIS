@@ -1,0 +1,328 @@
+---
+import CollegeLayout from '../../layouts/CollegeLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { Layers, Plus, Building, Calendar, Grid3X3 } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getInstitutionAcademicStructure,
+  createDepartment,
+  createAcademicYear,
+  createAcademicSection,
+} from '../../services/provisioning';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  return Astro.redirect('/college/dashboard');
+}
+
+const institutionId = profile.institution_id || '';
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
+
+    if (actionType === 'create_department') {
+      const name = formData.get('dept_name')?.toString() || '';
+      const code = formData.get('dept_code')?.toString() || '';
+
+      const res = await createDepartment(supabase, user.id, {
+        institutionId,
+        name,
+        code,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to create department.';
+        isError = true;
+      } else {
+        message = `Department '${name}' (${code}) added successfully.`;
+      }
+    } else if (actionType === 'create_year') {
+      const yearLevel = parseInt(formData.get('year_level')?.toString() || '1', 10);
+      const label = formData.get('year_label')?.toString() || `${yearLevel}th Year`;
+
+      const res = await createAcademicYear(supabase, user.id, {
+        institutionId,
+        yearLevel,
+        label,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to configure academic year.';
+        isError = true;
+      } else {
+        message = `Academic Year '${label}' configured successfully.`;
+      }
+    } else if (actionType === 'create_section') {
+      const sectionCode = formData.get('section_code')?.toString() || '';
+      const departmentId = formData.get('department_id')?.toString() || undefined;
+      const yearLevel = formData.get('year_level') ? parseInt(formData.get('year_level')!.toString(), 10) : undefined;
+
+      const res = await createAcademicSection(supabase, user.id, {
+        institutionId,
+        sectionCode,
+        departmentId,
+        yearLevel,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to configure section.';
+        isError = true;
+      } else {
+        message = `Section '${sectionCode}' configured successfully.`;
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
+  }
+}
+
+const structure = await getInstitutionAcademicStructure(supabase, institutionId);
+const { departments, years, sections } = structure;
+---
+
+<CollegeLayout title="Academic Structure Configuration" activePath="/college/academic-structure">
+  <PageHeader
+    title="College Academic Structure Configuration"
+    subtitle="Configure the departments, academic years, and sections that power student self-registration and cohort analytics"
+  >
+    <a href="/college/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="academic-config-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Configuration Error' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    {/* Section 1: Departments Management */}
+    <Card padding="lg">
+      <div class="section-top-row">
+        <div class="flex items-center gap-2">
+          <Building size={20} class="text-primary" />
+          <div>
+            <h3 class="card-section-title">Departments & Branches ({departments.length})</h3>
+            <p class="section-subtext">Academic departments available for student registration.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="split-view">
+        <form method="POST" class="add-form">
+          <input type="hidden" name="action_type" value="create_department" />
+          <Input
+            label="Department / Branch Name"
+            name="dept_name"
+            placeholder="e.g. Electrical Engineering"
+            required
+          />
+          <Input
+            label="Department Code"
+            name="dept_code"
+            placeholder="e.g. EEE"
+            required
+          />
+          <Button type="submit" variant="primary" class="w-full">
+            <Plus size={15} /> Add Department
+          </Button>
+        </form>
+
+        <div class="items-list">
+          {departments.length === 0 ? (
+            <EmptyState title="No Departments Configured" description="Add your first department using the form." />
+          ) : (
+            <div class="tags-grid">
+              {departments.map((d) => (
+                <div class="structure-badge">
+                  <span class="badge-title">{d.name}</span>
+                  <span class="badge-code">({d.code})</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+
+    {/* Section 2: Academic Years & Sections Grid */}
+    <div class="two-col-grid">
+      {/* Years */}
+      <Card padding="lg">
+        <div class="section-top-row">
+          <div class="flex items-center gap-2">
+            <Calendar size={20} class="text-primary" />
+            <div>
+              <h3 class="card-section-title">Academic Years ({years.length})</h3>
+              <p class="section-subtext">Configured year levels for your institution.</p>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST" class="add-form mb-4">
+          <input type="hidden" name="action_type" value="create_year" />
+          <div class="grid grid-cols-2 gap-2">
+            <Input
+              label="Year Level (1-5)"
+              type="number"
+              name="year_level"
+              placeholder="5"
+              required
+            />
+            <Input
+              label="Display Label"
+              name="year_label"
+              placeholder="5th Year (Dual Degree)"
+              required
+            />
+          </div>
+          <Button type="submit" variant="outline" class="w-full mt-2">
+            <Plus size={15} /> Add Academic Year
+          </Button>
+        </form>
+
+        <div class="tags-grid">
+          {years.map((y) => (
+            <div class="structure-badge">
+              <span class="badge-title">{y.label}</span>
+              <span class="badge-code">(Level {y.year_level})</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Sections */}
+      <Card padding="lg">
+        <div class="section-top-row">
+          <div class="flex items-center gap-2">
+            <Grid3X3 size={20} class="text-primary" />
+            <div>
+              <h3 class="card-section-title">Class Sections ({sections.length})</h3>
+              <p class="section-subtext">Class sections (e.g. A, B, C, D) configured for student cohorts.</p>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST" class="add-form mb-4">
+          <input type="hidden" name="action_type" value="create_section" />
+          <Input
+            label="Section Code"
+            name="section_code"
+            placeholder="e.g. D"
+            required
+          />
+          <Button type="submit" variant="outline" class="w-full mt-2">
+            <Plus size={15} /> Add Section Code
+          </Button>
+        </form>
+
+        <div class="tags-grid">
+          {sections.map((s) => (
+            <div class="structure-badge">
+              <span class="badge-title">Section {s.section_code}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  </div>
+</CollegeLayout>
+
+<style>
+  .academic-config-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .split-view {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: var(--space-6);
+    margin-top: var(--space-4);
+  }
+
+  .two-col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+  }
+
+  .add-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .tags-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .structure-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 6px 12px;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+  }
+
+  .badge-title {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .badge-code {
+    color: var(--color-primary-600);
+    font-weight: 700;
+  }
+
+  @media (max-width: 1024px) {
+    .split-view,
+    .two-col-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

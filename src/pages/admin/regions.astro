@@ -1,0 +1,478 @@
+---
+import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { MapPin, UserCheck, Plus, Building2, Shield, Power } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getAllInstitutions } from '../../services/institutions';
+import {
+  getRegions,
+  createRegion,
+  provisionStaffAccount,
+  getManagedStaffAccounts,
+  toggleStaffAccountStatus,
+  createInstitutionWithRegion,
+} from '../../services/provisioning';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  return Astro.redirect('/government/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
+
+    if (actionType === 'toggle_status') {
+      const targetUserId = formData.get('target_user_id')?.toString() || '';
+      const newStatus = formData.get('new_status')?.toString() === 'true';
+
+      const res = await toggleStaffAccountStatus(supabase, user.id, targetUserId, newStatus);
+      if (!res.success) {
+        message = res.error || 'Failed to update account status.';
+        isError = true;
+      } else {
+        message = `Regional Officer status updated to ${newStatus ? 'Active' : 'Deactivated'}.`;
+      }
+    } else if (actionType === 'create_region') {
+      const name = formData.get('name')?.toString() || '';
+      const code = formData.get('code')?.toString() || '';
+
+      const res = await createRegion(supabase, user.id, { name, code });
+      if (!res.success) {
+        message = res.error || 'Failed to create region.';
+        isError = true;
+      } else {
+        message = `Region '${name}' (${code}) created successfully.`;
+      }
+    } else if (actionType === 'create_institution') {
+      const name = formData.get('inst_name')?.toString() || '';
+      const code = formData.get('inst_code')?.toString() || '';
+      const state = formData.get('state')?.toString() || 'National';
+      const regionId = formData.get('region_id')?.toString() || '';
+
+      const res = await createInstitutionWithRegion(supabase, user.id, {
+        name,
+        code,
+        state,
+        regionId,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to create institution.';
+        isError = true;
+      } else {
+        message = `Institution '${name}' (${code}) created and assigned to region successfully.`;
+      }
+    } else if (actionType === 'create_regional_officer') {
+      const fullName = formData.get('full_name')?.toString().trim() || '';
+      const email = formData.get('email')?.toString().trim() || '';
+      const password = formData.get('password')?.toString() || '';
+      const confirmPassword = formData.get('confirm_password')?.toString() || '';
+      const regionId = formData.get('region_id')?.toString() || '';
+
+      const res = await provisionStaffAccount(supabase, user.id, {
+        fullName,
+        email,
+        password,
+        confirmPassword,
+        targetRole: 'regional_officer',
+        regionId,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to provision Regional Officer.';
+        isError = true;
+      } else {
+        message = `Regional Officer account for '${fullName}' (${email}) provisioned successfully.`;
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
+  }
+}
+
+const regions = await getRegions(supabase);
+const regionalOfficers = await getManagedStaffAccounts(supabase, user.id);
+const allInstitutions = await getAllInstitutions(supabase);
+
+const regionOptions = regions.map((r) => ({
+  value: r.id,
+  label: `${r.name} (${r.code})`,
+}));
+---
+
+<GovernmentLayout title="Regional Governance & Officers" activePath="/admin/regions">
+  <PageHeader
+    title="Regional Governance, Officers & Colleges"
+    subtitle="Configure administrative regions, provision Regional Officers, and assign colleges to regional jurisdictions"
+  >
+    <a href="/government/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="gov-regions-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Notice' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    <div class="two-col-grid">
+      {/* 1. Create Regional Officer */}
+      <Card padding="lg">
+        <div class="card-header-row">
+          <Shield size={20} class="text-primary" />
+          <h3 class="card-title">Provision Regional Officer</h3>
+        </div>
+        <p class="section-subtext">
+          Create credentials for a regional officer assigned to a specific geographic jurisdiction.
+        </p>
+
+        <form method="POST" class="form-stack">
+          <input type="hidden" name="action_type" value="create_regional_officer" />
+
+          <Input
+            label="Full Name"
+            name="full_name"
+            placeholder="Dr. Ananya Sen"
+            required
+          />
+
+          <Input
+            label="Official Email Address"
+            type="email"
+            name="email"
+            placeholder="officer.south@nsweis.gov.in"
+            required
+          />
+
+          <Select
+            label="Assigned Region"
+            name="region_id"
+            options={regionOptions}
+            required
+          />
+
+          <div class="form-row-2">
+            <Input
+              label="Password (min 8 chars)"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              name="confirm_password"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <Button type="submit" variant="primary" class="btn-submit">
+            <Plus size={15} /> Provision Regional Officer
+          </Button>
+        </form>
+      </Card>
+
+      {/* 2. Create Region & Create College Form */}
+      <div class="stack-col">
+        <Card padding="lg">
+          <div class="card-header-row">
+            <MapPin size={20} class="text-primary" />
+            <h3 class="card-title">Create Administrative Region</h3>
+          </div>
+          <p class="section-subtext">
+            Define a new regional jurisdiction for grouping institutions and regional officers.
+          </p>
+
+          <form method="POST" class="form-stack">
+            <input type="hidden" name="action_type" value="create_region" />
+
+            <div class="form-row-2">
+              <Input
+                label="Region Name"
+                name="name"
+                placeholder="Central Western Zone"
+                required
+              />
+
+              <Input
+                label="Region Code"
+                name="code"
+                placeholder="CW01"
+                required
+              />
+            </div>
+
+            <Button type="submit" variant="outline" class="btn-submit">
+              <Plus size={15} /> Register Region
+            </Button>
+          </form>
+        </Card>
+
+        <Card padding="lg">
+          <div class="card-header-row">
+            <Building2 size={20} class="text-primary" />
+            <h3 class="card-title">Register College & Assign Region</h3>
+          </div>
+          <p class="section-subtext">
+            Add a new college / institution and assign it to a regional jurisdiction.
+          </p>
+
+          <form method="POST" class="form-stack">
+            <input type="hidden" name="action_type" value="create_institution" />
+
+            <Input
+              label="College / Institution Name"
+              name="inst_name"
+              placeholder="National Institute of Technology"
+              required
+            />
+
+            <div class="form-row-2">
+              <Input
+                label="College Code"
+                name="inst_code"
+                placeholder="NIT01"
+                required
+              />
+              <Input
+                label="State / Province"
+                name="state"
+                placeholder="Karnataka"
+                required
+              />
+            </div>
+
+            <Select
+              label="Assign to Region"
+              name="region_id"
+              options={regionOptions}
+              required
+            />
+
+            <Button type="submit" variant="primary" class="btn-submit">
+              <Plus size={15} /> Register & Assign College
+            </Button>
+          </form>
+        </Card>
+      </div>
+    </div>
+
+    {/* Regional Officers Directory */}
+    <Card padding="lg">
+      <div class="card-header-row">
+        <UserCheck size={20} class="text-primary" />
+        <h3 class="card-title">Regional Officers Management Directory ({regionalOfficers.length})</h3>
+      </div>
+      <p class="section-subtext">
+        Officers who govern question pools and manage clinicians and college officers in their region.
+      </p>
+
+      {regionalOfficers.length === 0 ? (
+        <EmptyState
+          title="No Regional Officers Provisioned"
+          description="Use the form above to provision the first regional officer."
+        />
+      ) : (
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Officer</th>
+                <th>Assigned Region</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Created Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {regionalOfficers.map((o) => (
+                <tr>
+                  <td>
+                    <div class="user-info">
+                      <strong class="user-name">{o.full_name}</strong>
+                      <span class="user-sub">{o.id.slice(0, 8)}...</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="region-tag">{o.region_name || (o as any).region_code || 'National'}</span>
+                  </td>
+                  <td>
+                    <Badge variant="primary" size="sm">Regional Officer</Badge>
+                  </td>
+                  <td>
+                    <Badge variant={o.active ? 'stable' : 'neutral'} size="sm">
+                      {o.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </td>
+                  <td class="date-cell">
+                    {new Date(o.created_at).toLocaleDateString()}
+                  </td>
+                  <td>
+                    <form method="POST" class="inline-form">
+                      <input type="hidden" name="action_type" value="toggle_status" />
+                      <input type="hidden" name="target_user_id" value={o.id} />
+                      <input type="hidden" name="new_status" value={o.active ? 'false' : 'true'} />
+                      <Button
+                        type="submit"
+                        variant={o.active ? 'outline' : 'primary'}
+                        size="sm"
+                      >
+                        <Power size={13} /> {o.active ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  </div>
+</GovernmentLayout>
+
+<style>
+  .gov-regions-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .two-col-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: var(--space-6);
+  }
+
+  .stack-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .btn-submit {
+    margin-top: var(--space-2);
+    width: 100%;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-main);
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .user-name {
+    font-weight: 600;
+  }
+
+  .user-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .region-tag {
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+  }
+
+  .date-cell {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .inline-form {
+    display: inline-block;
+  }
+
+  @media (max-width: 1024px) {
+    .two-col-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

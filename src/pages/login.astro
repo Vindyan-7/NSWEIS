@@ -36,9 +36,13 @@ if (Astro.request.method === 'POST') {
           .single();
 
         if (profile) {
-          return Astro.redirect(getDashboardForRole((profile as any).role));
+          if ((profile as any).active === false) {
+            errorMessage = 'Your account has been deactivated. Please contact your administrator.';
+          } else {
+            return Astro.redirect(getDashboardForRole((profile as any).role));
+          }
         } else {
-          return Astro.redirect('/student/dashboard');
+          return Astro.redirect('/no-access');
         }
       }
     }
@@ -48,22 +52,26 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<PublicLayout title="Login — NSWEIS">
+<PublicLayout title="Sign In — NSWEIS">
   <div class="login-container">
     <Card padding="lg" class="login-card glass-panel">
       <div class="login-header">
-        <h2 class="login-title">Sign In</h2>
-        <p class="login-sub">Access your NSWEIS portal role dashboard</p>
+        <div class="login-brand-icon">
+          <span class="brand-badge-text">NS</span>
+        </div>
+        <h1 class="login-title">Welcome back</h1>
+        <p class="login-sub">Sign in to your NSWEIS account to access your portal</p>
       </div>
 
-      {errorMessage && <Alert type="error" title="Login Failed">{errorMessage}</Alert>}
+      {errorMessage && <Alert type="error" title="Sign In Failed">{errorMessage}</Alert>}
 
-      <form method="POST" class="login-form">
+      <form method="POST" class="login-form" id="login-form">
         <Input
-          label="Email Address"
+          label="Official Email Address"
           type="email"
           name="email"
-          placeholder="user@nsweis.gov.in"
+          placeholder="your.name@institution.gov.in"
+          autocomplete="email"
           required
         />
         <Input
@@ -71,15 +79,35 @@ if (Astro.request.method === 'POST') {
           type="password"
           name="password"
           placeholder="••••••••"
+          autocomplete="current-password"
           required
         />
-        <Button type="submit" variant="primary" class="login-submit">
-          Sign In &rarr;
+        <Button type="submit" variant="primary" size="lg" class="login-submit" id="btn-login-submit">
+          <span class="btn-login-text">Sign In &rarr;</span>
         </Button>
       </form>
+
+      <div class="signup-footer text-center pt-4 border-t border-subtle">
+        <p class="text-sm text-muted">
+          New Student? <a href="/signup" class="font-semibold text-primary">Create Student Account &rarr;</a>
+        </p>
+      </div>
     </Card>
   </div>
 </PublicLayout>
+
+<script>
+  const form = document.getElementById('login-form');
+  const submitBtn = document.getElementById('btn-login-submit');
+  if (form && submitBtn) {
+    form.addEventListener('submit', () => {
+      submitBtn.classList.add('is-submitting');
+      submitBtn.setAttribute('disabled', 'true');
+      const textSpan = submitBtn.querySelector('.btn-login-text');
+      if (textSpan) textSpan.textContent = 'Signing in...';
+    });
+  }
+</script>
 
 <style>
   .login-container {
@@ -96,22 +124,47 @@ if (Astro.request.method === 'POST') {
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
+    background: #ffffff;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
   }
 
   .login-header {
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .login-brand-icon {
+    width: 3rem;
+    height: 3rem;
+    background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+    color: #ffffff;
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.125rem;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    margin-bottom: var(--space-1);
   }
 
   .login-title {
-    font-size: 1.75rem;
+    font-size: 1.625rem;
     font-weight: 700;
     color: var(--color-text-main);
+    letter-spacing: -0.02em;
   }
 
   .login-sub {
     font-size: 0.875rem;
     color: var(--color-text-muted);
-    margin-top: var(--space-1);
+    max-width: 320px;
+    line-height: 1.4;
   }
 
   .login-form {
@@ -122,6 +175,17 @@ if (Astro.request.method === 'POST') {
 
   .login-submit {
     width: 100%;
+    margin-top: var(--space-2);
+    min-height: 48px;
+    font-weight: 600;
+  }
+
+  .login-submit.is-submitting {
+    opacity: 0.8;
+    cursor: not-allowed;
+  }
+
+  .signup-footer {
     margin-top: var(--space-2);
   }
 </style>

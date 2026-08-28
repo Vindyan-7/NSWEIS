@@ -22,8 +22,11 @@ import {
 } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
-import { getLiveCollegeDashboardData } from '../../services/analytics';
+import { getLiveCollegeDashboardData, getCollegeStudentRoster, parseCollegeAcademicFilters } from '../../services/analytics';
 import { getInstitutionInterventions } from '../../services/interventions';
+import { getCollegeSupportRequests, updateCollegeSupportRequestStatus } from '../../services/privacy';
+
+import CollegeAcademicFilters from '../../components/analytics/CollegeAcademicFilters.astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -39,11 +42,44 @@ if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_a
   if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
 }
 
+// SERVER-AUTHORITATIVE INSTITUTION SCOPE (CRITICAL AUDIT ITEM A & B)
 const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
 
-// Load live server-authoritative institutional analytics & interventions
-const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId);
+// Handle Support Request Status Update Actions
+let supportNotice = '';
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
+    if (actionType === 'update_support_status') {
+      const reqId = formData.get('request_id')?.toString();
+      const newStatus = formData.get('status')?.toString() as any;
+      if (reqId && newStatus) {
+        await updateCollegeSupportRequestStatus(supabase, reqId, newStatus);
+        supportNotice = `Support request status updated to '${newStatus.replace('_', ' ')}'.`;
+      }
+    }
+  } catch (err: any) {
+    console.error('[COLLEGE DASHBOARD] Support action error:', err);
+  }
+}
+
+// Parse Academic Filters using shared helper (supports dept/department_id, year/year_level, section/section_code)
+const url = new URL(Astro.request.url);
+const filters = parseCollegeAcademicFilters(url.searchParams);
+const deptParam = filters.department_id || '';
+const yearParam = filters.year_level ? String(filters.year_level) : '';
+const sectionParam = filters.section_code || '';
+
+// Fetch departments for filter dropdown
+const { data: deptList } = await (supabase.from('departments') as any).select('id, name, code').order('name');
+const departments = deptList || [];
+
+// Load live server-authoritative institutional analytics, roster, support requests & interventions with filter scope
+const dashboardData = await getLiveCollegeDashboardData(supabase, institutionId, filters);
 const interventions = await getInstitutionInterventions(supabase, institutionId);
+const supportRequests = await getCollegeSupportRequests(supabase, institutionId);
+const studentRoster = await getCollegeStudentRoster(supabase, institutionId, filters);
 
 const { cycle, participation, analytics, action_intelligence, recommendation_distribution, task_activity } = dashboardData;
 
@@ -64,6 +100,18 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
   </PageHeader>
 
   <div class="college-dashboard-layout">
+    {/* Reusable Shared Academic Filter Component */}
+    <CollegeAcademicFilters
+      departments={departments}
+      selectedDepartment={deptParam}
+      selectedYear={yearParam}
+      selectedSection={sectionParam}
+      baseUrl="/college/dashboard"
+      totalEligible={participation.total_eligible_students}
+      completedCount={participation.completed_students}
+      isSuppressed={analytics.is_suppressed}
+    />
+
     {/* Active Cycle Context Banner */}
     <Card padding="md" class="active-cycle-banner">
       <div class="banner-content">
@@ -405,6 +453,129 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
           <p class="empty-state-text">No institutional interventions have been created yet for this campus.</p>
         </div>
       )}
+    </Card>
+
+    {/* Section 6b: Student Support Requests (Contact Counsellor Workflow) */}
+    <Card padding="lg" class="support-requests-card">
+      <div class="card-title-row">
+        <div>
+          <h3 class="card-section-title">Student Support Requests</h3>
+          <p class="section-subtext">Direct, confidential requests for campus counsellor contact submitted by students.</p>
+        </div>
+        <Badge variant={supportRequests.filter(r => r.status !== 'resolved').length > 0 ? "elevated" : "neutral"} size="sm">
+          {supportRequests.filter(r => r.status !== 'resolved').length} Pending Requests
+        </Badge>
+      </div>
+
+      {supportNotice && (
+        <div class="p-3 mb-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold">
+          ✓ {supportNotice}
+        </div>
+      )}
+
+      {supportRequests.length > 0 ? (
+        <div class="support-requests-list flex flex-col gap-3">
+          {supportRequests.map((req) => (
+            <div class="req-item p-4 bg-surface-subtle border border-subtle rounded-xl flex flex-col gap-2">
+              <div class="flex justify-between items-center flex-wrap gap-2">
+                <div>
+                  <span class="font-bold text-main">{req.student_name}</span> &bull;{' '}
+                  <span class="text-xs text-muted">Year {req.year_level} ({req.section_code})</span> &bull;{' '}
+                  <span class="text-xs text-muted">Requested: {new Date(req.requested_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <Badge variant={req.status === 'resolved' ? 'stable' : req.status === 'contact_planned' ? 'improving' : req.status === 'acknowledged' ? 'primary' : 'elevated'} size="sm">
+                  {req.status.replace('_', ' ')}
+                </Badge>
+              </div>
+              <p class="text-xs text-muted italic">"{req.notes || 'Student requested campus counsellor support contact.'}"</p>
+              <div class="pt-2 border-t border-subtle flex justify-between items-center text-xs text-muted flex-wrap gap-2">
+                <span class="text-xs font-medium text-emerald-700">🔒 Confidential Request &bull; Zero reflection text or answers attached</span>
+                <form method="POST" class="flex gap-2">
+                  <input type="hidden" name="action_type" value="update_support_status" />
+                  <input type="hidden" name="request_id" value={req.id} />
+                  {req.status === 'submitted' && (
+                    <button type="submit" name="status" value="acknowledged" class="px-3 py-1 bg-neutral-100 text-neutral-800 rounded font-semibold hover:bg-neutral-200">
+                      Acknowledge
+                    </button>
+                  )}
+                  {req.status !== 'resolved' && (
+                    <button type="submit" name="status" value="contact_planned" class="px-3 py-1 bg-primary-50 text-primary-700 border border-primary-200 rounded font-semibold hover:bg-primary-100">
+                      Plan Contact
+                    </button>
+                  )}
+                  {req.status !== 'resolved' && (
+                    <button type="submit" name="status" value="resolved" class="px-3 py-1 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700">
+                      Mark Resolved ✓
+                    </button>
+                  )}
+                </form>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="empty-support-box p-6 text-center bg-surface-subtle border border-subtle rounded-xl text-muted text-xs">
+          No student support requests currently require attention for your institution.
+        </div>
+      )}
+    </Card>
+
+    {/* Section 6c: Institutional Student Roster */}
+    <Card padding="lg" class="student-roster-card">
+      <div class="card-title-row mb-3">
+        <div>
+          <h3 class="card-section-title">Institutional Student Roster ({studentRoster.length})</h3>
+          <p class="section-subtext">Approved operational roster showing weekly reflection participation state. Excludes private reflection answers and individual wellness scores.</p>
+        </div>
+        <Badge variant="neutral" size="sm">
+          {deptParam || yearParam || sectionParam ? 'Filtered Cohort' : 'All Students'}
+        </Badge>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-subtle text-muted uppercase font-semibold bg-surface-subtle">
+              <th class="p-3">Student Name</th>
+              <th class="p-3">Department</th>
+              <th class="p-3">Year / Section</th>
+              <th class="p-3">Cycle Completion</th>
+              <th class="p-3">Support Request</th>
+            </tr>
+          </thead>
+          <tbody>
+            {studentRoster.map((st) => (
+              <tr class="border-b border-subtle hover:bg-surface-subtle">
+                <td class="p-3 font-semibold text-main">{st.full_name}</td>
+                <td class="p-3 text-muted">{st.department_name} ({st.department_code})</td>
+                <td class="p-3 text-muted">Year {st.year_level} - {st.section_code}</td>
+                <td class="p-3">
+                  <Badge variant={st.cycle_status === 'completed' ? 'stable' : st.cycle_status === 'in_progress' ? 'improving' : 'neutral'} size="sm">
+                    {st.cycle_status.replace('_', ' ')}
+                  </Badge>
+                </td>
+                <td class="p-3">
+                  {st.has_active_support_request ? (
+                    <Badge variant="elevated" size="sm">Requested Contact</Badge>
+                  ) : (
+                    <span class="text-muted">None</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Section 6d: Annual Completion & Credit Tracking Model */}
+    <Card padding="md" class="annual-tracking-card bg-amber-50/50 border border-amber-200 rounded-xl">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-700 font-bold text-sm">🗓️ Annual Completion Model:</span>
+        <span class="text-xs text-amber-900">
+          Annual completion tracking will populate as additional weekly cycles are completed. Weekly check-ins build towards 1 institutional academic/wellness credit per academic year.
+        </span>
+      </div>
     </Card>
 
     {/* Section 7: Closed-Loop Data Flow Component (Feature 6) */}

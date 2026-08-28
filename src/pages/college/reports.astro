@@ -1,0 +1,455 @@
+---
+import CollegeLayout from '../../layouts/CollegeLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
+import CollegeAcademicFilters from '../../components/analytics/CollegeAcademicFilters.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  parseCollegeAcademicFilters,
+  getCollegeReportAuditData,
+} from '../../services/analytics';
+import { FileText, ShieldCheck, Lock, Download, Printer, Layers, Calendar, Users } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'government_admin' || profile?.role === 'regional_officer') return Astro.redirect('/admin/dashboard');
+  return Astro.redirect('/no-access');
+}
+
+const institutionId = profile.institution_id || 'f75c1e77-dc3b-4f5d-b4eb-e7cd2bd45f5c';
+
+// Parse server-authoritative academic filters from URL search params
+const url = new URL(Astro.request.url);
+const filters = parseCollegeAcademicFilters(url.searchParams);
+
+// Fetch departments for the filter dropdown
+const { data: deptList } = await (supabase.from('departments') as any)
+  .select('id, name, code')
+  .eq('institution_id', institutionId)
+  .order('name');
+
+const departments = deptList || [];
+
+// Fetch server-authoritative institutional report audit data
+const reportData = await getCollegeReportAuditData(supabase, institutionId, filters);
+const { institution, cycle, participation, privacy, academic_breakdown, generated_at } = reportData;
+
+const dashboardBackUrl = url.search ? `/college/dashboard${url.search}` : '/college/dashboard';
+---
+
+<CollegeLayout title="Institutional Audit Report" activePath="/college/reports">
+  <PageHeader
+    title="Institutional Wellbeing & Participation Audit Report"
+    subtitle={`Official aggregate compliance and participation report for ${institution.name} (${institution.code})`}
+  >
+    <div class="header-actions">
+      <a href={dashboardBackUrl}>
+        <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+      </a>
+      <button class="btn-print" onclick="window.print()" title="Print or save as PDF">
+        <Printer size={15} aria-hidden="true" />
+        <span>Print Report</span>
+      </button>
+    </div>
+  </PageHeader>
+
+  <div class="college-report-layout">
+    {/* Reusable Shared Academic Filter Component */}
+    <CollegeAcademicFilters
+      departments={departments}
+      selectedDepartment={filters.department_id}
+      selectedYear={filters.year_level}
+      selectedSection={filters.section_code}
+      baseUrl="/college/reports"
+      totalEligible={participation.total_eligible_students}
+      completedCount={participation.completed_students}
+      isSuppressed={privacy.is_suppressed}
+    />
+
+    {/* Report Metadata & Privacy Banner */}
+    <Card padding="md" class="audit-meta-card">
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">Institution</span>
+          <strong class="meta-value">{institution.name} ({institution.code})</strong>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Active Cycle</span>
+          <strong class="meta-value">{cycle ? `${cycle.name} (Week ${cycle.week_number})` : 'No Active Cycle'}</strong>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Report Generated</span>
+          <strong class="meta-value">{new Date(generated_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Privacy Standard</span>
+          <strong class="meta-value text-success">DPDP Compliant (N &ge; {privacy.threshold})</strong>
+        </div>
+      </div>
+    </Card>
+
+    {/* Section 1: Executive Cohort Summary KPIs */}
+    <div class="metrics-grid">
+      <MetricCard
+        title="Eligible Cohort"
+        value={participation.total_eligible_students.toLocaleString()}
+        change="Enrolled Students in Filter Scope"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Completed Check-ins"
+        value={participation.completed_students.toLocaleString()}
+        change="Verified Submissions"
+        changeType={participation.completed_students > 0 ? "positive" : "neutral"}
+      />
+      <MetricCard
+        title="Participation Rate"
+        value={`${participation.participation_rate.toFixed(1)}%`}
+        change="Cohort Engagement Rate"
+        changeType={participation.participation_rate >= 50 ? "positive" : "neutral"}
+      />
+      <MetricCard
+        title="Differential Privacy"
+        value={privacy.is_suppressed ? "Active (<10)" : "Met (≥10)"}
+        change={privacy.is_suppressed ? "Score Values Suppressed" : "Aggregates Disclosed"}
+        changeType={privacy.is_suppressed ? "neutral" : "positive"}
+      />
+    </div>
+
+    {/* Privacy Protection Notice Banner */}
+    {privacy.is_suppressed ? (
+      <div class="privacy-alert-box suppressed">
+        <div class="privacy-alert-header">
+          <Lock size={18} class="text-amber" aria-hidden="true" />
+          <strong class="font-bold">Privacy Protection Active &bull; Aggregate Metrics Withheld</strong>
+        </div>
+        <p class="privacy-alert-body">
+          {privacy.notice} To protect student confidentiality under DPDP principles, aggregate wellbeing scores and domain breakdowns require at least {privacy.threshold} completed student reflections.
+        </p>
+      </div>
+    ) : (
+      <div class="privacy-alert-box unsuppressed">
+        <div class="privacy-alert-header">
+          <ShieldCheck size={18} class="text-success" aria-hidden="true" />
+          <strong class="font-bold">Anonymity Threshold Satisfied &bull; Verified Aggregate Scope</strong>
+        </div>
+        <p class="privacy-alert-body">
+          {privacy.notice}
+        </p>
+      </div>
+    )}
+
+    {/* Section 2: Academic Cohort Audit Breakdown Tables */}
+    <div class="audit-tables-grid">
+      {/* Department Breakdown */}
+      <Card padding="lg">
+        <div class="table-card-header">
+          <div class="flex items-center gap-2">
+            <Layers size={18} class="text-primary" aria-hidden="true" />
+            <h3 class="font-bold text-main text-base">Departmental Participation Breakdown</h3>
+          </div>
+          <span class="text-xs text-muted font-medium">{academic_breakdown.departments.length} Departments</span>
+        </div>
+
+        {academic_breakdown.departments.length === 0 ? (
+          <p class="text-muted text-sm py-4 text-center">No departments matching filter criteria.</p>
+        ) : (
+          <div class="table-responsive mt-3">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th class="text-center">Eligible</th>
+                  <th class="text-center">Completed</th>
+                  <th class="text-right">Participation Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {academic_breakdown.departments.map((dept) => (
+                  <tr>
+                    <td>
+                      <strong class="font-semibold text-main">{dept.name}</strong>
+                      <span class="dept-code-tag">({dept.code})</span>
+                    </td>
+                    <td class="text-center font-medium">{dept.eligible}</td>
+                    <td class="text-center font-semibold">{dept.completed}</td>
+                    <td class="text-right">
+                      <Badge variant={dept.participation_rate > 0 ? "stable" : "neutral"} size="sm">
+                        {dept.participation_rate.toFixed(1)}%
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Year Level & Section Breakdown */}
+      <Card padding="lg">
+        <div class="table-card-header">
+          <div class="flex items-center gap-2">
+            <Calendar size={18} class="text-primary" aria-hidden="true" />
+            <h3 class="font-bold text-main text-base">Academic Year & Section Breakdown</h3>
+          </div>
+          <span class="text-xs text-muted font-medium">{academic_breakdown.year_levels.length} Years &bull; {academic_breakdown.sections.length} Sections</span>
+        </div>
+
+        <div class="breakdown-two-col mt-3">
+          {/* Year Table */}
+          <div class="table-responsive">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>Year Level</th>
+                  <th class="text-center">Eligible</th>
+                  <th class="text-center">Completed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {academic_breakdown.year_levels.map((y) => (
+                  <tr>
+                    <td class="font-semibold text-main">{y.label}</td>
+                    <td class="text-center font-medium">{y.eligible}</td>
+                    <td class="text-center font-semibold">{y.completed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Section Table */}
+          <div class="table-responsive">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th class="text-center">Eligible</th>
+                  <th class="text-center">Completed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {academic_breakdown.sections.map((s) => (
+                  <tr>
+                    <td class="font-semibold text-main">Section {s.section_code}</td>
+                    <td class="text-center font-medium">{s.eligible}</td>
+                    <td class="text-center font-semibold">{s.completed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
+    </div>
+
+    {/* Section 3: Privacy & DPDP Compliance Footer */}
+    <PrivacyNotice variant="full" />
+  </div>
+</CollegeLayout>
+
+<style>
+  .college-report-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .btn-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-print:hover {
+    background-color: var(--color-bg-subtle);
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-700);
+  }
+
+  .audit-meta-card {
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .meta-value {
+    font-size: 0.9375rem;
+    color: var(--color-text-main);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .privacy-alert-box {
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .privacy-alert-box.suppressed {
+    background-color: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #92400e;
+  }
+
+  .privacy-alert-box.unsuppressed {
+    background-color: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #065f46;
+  }
+
+  .privacy-alert-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.9375rem;
+  }
+
+  .privacy-alert-body {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .audit-tables-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+  }
+
+  .table-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .dept-code-tag {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-left: 4px;
+  }
+
+  .breakdown-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  .audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .audit-table th {
+    padding: 8px 10px;
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--color-border-default);
+  }
+
+  .audit-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-main);
+  }
+
+  .audit-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  @media (max-width: 1024px) {
+    .audit-tables-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .breakdown-two-col {
+      grid-template-columns: 1fr;
+    }
+    .header-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  @media print {
+    .header-actions,
+    .college-academic-filters-card,
+    :global(nav),
+    :global(aside),
+    :global(header) {
+      display: none !important;
+    }
+    .college-report-layout {
+      gap: 12px;
+    }
+  }
+</style>

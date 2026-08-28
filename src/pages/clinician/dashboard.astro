@@ -1,0 +1,272 @@
+---
+import ClinicianLayout from '../../layouts/ClinicianLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Button from '../../components/ui/Button.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getClinicianQueueCounts,
+  getMyDraftQuestions,
+  getPendingReviewQuestions,
+  getActiveQuestions,
+} from '../../services/clinician';
+import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'clinician') {
+  return Astro.redirect('/no-access');
+}
+
+const url = new URL(Astro.request.url);
+const activeTab = url.searchParams.get('tab') || 'drafts';
+
+const counts = await getClinicianQueueCounts(supabase, user.id);
+
+let draftQuestions: Awaited<ReturnType<typeof getMyDraftQuestions>> = [];
+let reviewQuestions: Awaited<ReturnType<typeof getPendingReviewQuestions>> = [];
+let activeQuestions: Awaited<ReturnType<typeof getActiveQuestions>> = [];
+
+if (activeTab === 'drafts') {
+  draftQuestions = await getMyDraftQuestions(supabase, user.id);
+} else if (activeTab === 'review') {
+  reviewQuestions = await getPendingReviewQuestions(supabase, user.id);
+} else if (activeTab === 'active') {
+  activeQuestions = await getActiveQuestions(supabase);
+}
+
+const categoryLabel = (cat: string) => cat.replace(/_/g, ' ');
+
+// The sidebar's "Peer Review" link points at ?tab=review on this same
+// route (there's no separate page for it) — activePath only tracks a bare
+// pathname, so it needs to shift with the tab or that nav item never
+// highlights and every tab looks like "nothing happened" when clicked.
+const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinician/dashboard';
+---
+
+<ClinicianLayout title="Clinician Dashboard" activePath={layoutActivePath}>
+  <PageHeader title="Question Bank" subtitle="Author, review, and maintain the instrument.">
+    <a href="/clinician/questions/new">
+      <Button variant="primary" size="md">
+        <FilePlus2 size={16} aria-hidden="true" /> Author a Question
+      </Button>
+    </a>
+  </PageHeader>
+
+  <div class="metrics-grid">
+    <MetricCard title="My Drafts" value={counts.myDrafts} subtitle="Authored by you, not yet reviewed" />
+    <MetricCard title="Awaiting My Review" value={counts.awaitingMyReview} subtitle="Authored by other clinicians" />
+    <MetricCard title="Open Flags" value={counts.flagged} subtitle="Raised by college officers" />
+    <MetricCard title="Active in Library" value={counts.active} subtitle="Live, assignable to students" />
+  </div>
+
+  <div class="tab-bar">
+    <a href="?tab=drafts" class={`tab-btn ${activeTab === 'drafts' ? 'active' : ''}`}>My Drafts</a>
+    <a href="?tab=review" class={`tab-btn ${activeTab === 'review' ? 'active' : ''}`}>Awaiting My Review</a>
+    <a href="/clinician/flags" class="tab-btn">
+      Flags {counts.flagged > 0 && <span class="tab-count">{counts.flagged}</span>}
+    </a>
+    <a href="?tab=active" class={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}>Active Library</a>
+  </div>
+
+  {activeTab === 'drafts' && (
+    <Card padding="lg">
+      {draftQuestions.length === 0 ? (
+        <EmptyState title="No drafts in progress" description="Author a question to start it through the review chain." icon={FilePlus2} />
+      ) : (
+        <div class="q-list">
+          {draftQuestions.map((q) => (
+            <div class="q-row">
+              <div class="q-main">
+                <div class="q-tags">
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                  {q.clinical_reviewed_at ? (
+                    <Badge variant="watch" size="sm">Reviewed — awaiting activation</Badge>
+                  ) : (
+                    <Badge variant="neutral" size="sm">Draft — awaiting peer review</Badge>
+                  )}
+                </div>
+                <p class="q-text">{q.text}</p>
+                {q.review_notes && (
+                  <p class="q-notes">
+                    <strong>Reviewer feedback:</strong> {q.review_notes}
+                  </p>
+                )}
+              </div>
+              <a href={`/clinician/review/${q.id}`}>
+                <Button variant="outline" size="sm">View <ArrowRight size={14} aria-hidden="true" /></Button>
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )}
+
+  {activeTab === 'review' && (
+    <Card padding="lg">
+      {reviewQuestions.length === 0 ? (
+        <EmptyState title="Nothing waiting on you" description="No other clinician has a draft pending review right now." icon={ClipboardCheck} />
+      ) : (
+        <div class="q-list">
+          {reviewQuestions.map((q) => (
+            <div class="q-row">
+              <div class="q-main">
+                <div class="q-tags">
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                  <span class="q-author">by {q.author_name || 'another clinician'}</span>
+                </div>
+                <p class="q-text">{q.text}</p>
+              </div>
+              <a href={`/clinician/review/${q.id}`}>
+                <Button variant="primary" size="sm">Review <ArrowRight size={14} aria-hidden="true" /></Button>
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )}
+
+  {activeTab === 'active' && (
+    <Card padding="lg">
+      {activeQuestions.length === 0 ? (
+        <EmptyState title="Nothing active yet" description="Activated questions will appear here once the regional tier signs off." icon={CheckCircle2} />
+      ) : (
+        <div class="q-list">
+          {activeQuestions.map((q) => (
+            <div class="q-row">
+              <div class="q-main">
+                <div class="q-tags">
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                  <Badge variant="stable" size="sm">Active</Badge>
+                </div>
+                <p class="q-text">{q.text}</p>
+                <span class="q-meta">Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} · activated by {q.activator_name || '—'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )}
+</ClinicianLayout>
+
+<style>
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .tab-bar {
+    display: flex;
+    gap: var(--space-2);
+    border-bottom: 1px solid var(--color-border-subtle);
+    margin-bottom: var(--space-5);
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .tab-btn.active {
+    color: var(--color-primary-700);
+    border-bottom-color: var(--color-primary-600);
+  }
+
+  .tab-count {
+    background: var(--color-band-elevated-bg);
+    color: var(--color-band-elevated);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    padding: 0.0625rem 0.5rem;
+  }
+
+  .q-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .q-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .q-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .q-tags {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .q-author {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .q-text {
+    font-size: 0.9375rem;
+    color: var(--color-text-main);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .q-notes {
+    margin-top: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--color-band-attention);
+    background: var(--color-band-attention-bg);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .q-meta {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .q-row {
+      flex-direction: column;
+    }
+  }
+</style>

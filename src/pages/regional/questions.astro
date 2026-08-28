@@ -1,0 +1,222 @@
+---
+import RegionalLayout from '../../layouts/RegionalLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Alert from '../../components/ui/Alert.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  getQuestionsAwaitingActivation,
+  activateQuestion,
+  requestQuestionChange,
+  getActiveQuestions,
+} from '../../services/clinician';
+import { CheckCircle2 } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'regional_officer' && profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  return Astro.redirect('/no-access');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const actionType = formData.get('action_type')?.toString();
+  const questionId = formData.get('question_id')?.toString();
+
+  if (questionId) {
+    if (actionType === 'activate') {
+      const res = await activateQuestion(supabase, questionId, user.id);
+      if (res.success) {
+        message = 'Question activated successfully for student weekly cycles!';
+      } else {
+        message = res.error || 'Could not activate question.';
+        isError = true;
+      }
+    } else if (actionType === 'request_revision') {
+      const notes = formData.get('review_notes')?.toString().trim() || '';
+      if (!notes) {
+        message = 'Please provide feedback explaining what needs to be revised.';
+        isError = true;
+      } else {
+        const res = await requestQuestionChange(supabase, questionId, notes);
+        if (res.success) {
+          message = 'Feedback sent to clinicians for question revision.';
+        } else {
+          message = res.error || 'Could not send feedback.';
+          isError = true;
+        }
+      }
+    }
+  }
+}
+
+const awaitingActivation = await getQuestionsAwaitingActivation(supabase);
+const activeQuestions = await getActiveQuestions(supabase);
+---
+
+<RegionalLayout title="Question Pool Review — Regional Officer" activePath="/regional/questions">
+  <PageHeader
+    title="Regional Question Pool Governance"
+    subtitle="Review clinician peer-approved questions, communicate feedback, and activate approved pools for student weekly check-ins."
+  >
+    <a href="/regional/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Regional Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  {message && (
+    <Alert type={isError ? "error" : "success"} class="mb-6">
+      {message}
+    </Alert>
+  )}
+
+  <div class="regional-questions-stack">
+    {/* Section 1: Questions Awaiting Regional Activation */}
+    <Card padding="lg">
+      <div class="card-header-row mb-4">
+        <div>
+          <h3 class="font-bold text-lg text-main">Clinician Peer-Approved Queue</h3>
+          <p class="text-sm text-muted">
+            These questions have completed clinician peer review and are awaiting your regional governance review and activation.
+          </p>
+        </div>
+        <Badge variant={awaitingActivation.length > 0 ? "elevated" : "neutral"} size="sm">
+          {awaitingActivation.length} Awaiting Activation
+        </Badge>
+      </div>
+
+      {awaitingActivation.length === 0 ? (
+        <EmptyState
+          title="No questions in review queue"
+          description="All reviewed questions have been activated for active student reflection cycles."
+          icon={CheckCircle2}
+        />
+      ) : (
+        <div class="questions-review-list">
+          {awaitingActivation.map((q) => (
+            <div class="review-card p-5 bg-surface-subtle border border-subtle rounded-xl mb-4">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <span class="font-bold text-main">{q.question_code}</span> &bull;{' '}
+                  <span class="text-sm text-muted capitalize">{q.category.replace('_', ' ')}</span> &bull;{' '}
+                  <span class="text-xs text-primary font-semibold">Week {q.week_number}</span>
+                </div>
+                <Badge variant="primary" size="sm">Peer Approved</Badge>
+              </div>
+
+              <p class="text-base font-semibold text-main mb-3">{q.text}</p>
+
+              {q.options && q.options.length > 0 && (
+                <div class="options-preview grid grid-cols-2 gap-2 mb-4">
+                  {q.options.map((opt: any) => (
+                    <div class="opt-pill p-2 bg-surface rounded border border-subtle text-xs flex justify-between">
+                      <span>{opt.label}</span>
+                      <span class="font-bold text-muted">Score: {opt.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div class="meta-authors text-xs text-muted mb-4">
+                <span>Authored by: <strong>{q.author_name || 'Clinician A'}</strong></span> &bull;{' '}
+                <span>Peer Reviewed by: <strong>{q.reviewer_name || 'Clinician B'}</strong></span>
+                {q.review_notes && (
+                  <div class="notes-box p-2 bg-amber-50 text-amber-900 border border-amber-200 rounded mt-2">
+                    <strong>Previous Review Notes:</strong> {q.review_notes}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Form */}
+              <div class="action-form-box pt-3 border-t border-subtle">
+                <form method="POST" class="flex flex-col gap-3">
+                  <input type="hidden" name="question_id" value={q.id} />
+                  
+                  <div class="flex gap-2">
+                    <input
+                      type="text"
+                      name="review_notes"
+                      placeholder="Optional revision notes or comment for clinicians..."
+                      class="flex-1 px-3 py-2 text-sm border border-subtle rounded-lg"
+                    />
+                    <button
+                      type="submit"
+                      name="action_type"
+                      value="request_revision"
+                      class="px-4 py-2 bg-neutral-100 text-neutral-800 text-sm font-semibold rounded-lg hover:bg-neutral-200"
+                    >
+                      Request Revision
+                    </button>
+                    <button
+                      type="submit"
+                      name="action_type"
+                      value="activate"
+                      class="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark"
+                    >
+                      Approve & Activate &rarr;
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
+    {/* Section 2: Currently Active Questions */}
+    <Card padding="lg">
+      <div class="card-header-row mb-4">
+        <div>
+          <h3 class="font-bold text-lg text-main">Active Student Questions ({activeQuestions.length})</h3>
+          <p class="text-sm text-muted">Questions currently available for adaptive weekly student reflections in your region.</p>
+        </div>
+      </div>
+
+      <div class="active-list">
+        {activeQuestions.map((q) => (
+          <div class="active-item p-3 bg-surface-subtle border border-subtle rounded-lg mb-2 flex justify-between items-center">
+            <div>
+              <span class="font-bold text-sm text-main">{q.question_code}</span> &bull;{' '}
+              <span class="text-xs text-muted capitalize">{q.category.replace('_', ' ')}</span> &bull;{' '}
+              <span class="text-xs font-semibold">{q.text}</span>
+            </div>
+            <Badge variant="stable" size="sm">Active</Badge>
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+</RegionalLayout>
+
+<style>
+  .regional-questions-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .options-preview {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+</style>

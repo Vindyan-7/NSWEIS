@@ -1,0 +1,121 @@
+---
+import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Alert from '../../components/ui/Alert.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getQuestionsAwaitingActivation, activateQuestion } from '../../services/clinician';
+import { ClipboardCheck } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+  if (profile?.role === 'clinician') return Astro.redirect('/clinician/dashboard');
+}
+
+let message = '';
+let isError = false;
+
+// Activation is a government_admin action specifically — the RLS policy
+// (12_security_hardening.sql) doesn't grant it to super_admin, matching
+// AUDIT.md M4 (super_admin is deliberately not a wildcard here).
+const canActivate = profile?.role === 'government_admin';
+
+if (Astro.request.method === 'POST' && canActivate) {
+  const formData = await Astro.request.formData();
+  const questionId = formData.get('question_id')?.toString();
+  if (questionId) {
+    const result = await activateQuestion(supabase, questionId, user.id);
+    if (!result.success) {
+      message = result.error || 'Could not activate this question.';
+      isError = true;
+    }
+  }
+}
+
+const pending = await getQuestionsAwaitingActivation(supabase);
+---
+
+<GovernmentLayout title="Question Activation" activePath="/admin/questions">
+  <PageHeader title="Reviewed Questions Awaiting Activation" subtitle="Peer-reviewed by a clinician. Nothing reaches a student until you activate it." />
+
+  {message && <Alert type="error" title="Could not activate">{message}</Alert>}
+  {!canActivate && (
+    <Alert type="info" title="View only">
+      Activation is a government_admin action. You're viewing this as {profile?.role}.
+    </Alert>
+  )}
+
+  {pending.length === 0 ? (
+    <EmptyState title="Nothing waiting on you" description="Every clinically reviewed question has already been activated." icon={ClipboardCheck} />
+  ) : (
+    <div class="q-list">
+      {pending.map((q) => (
+        <Card padding="lg">
+          <div class="q-tags">
+            <Badge variant="neutral" size="sm">{q.category.replace(/_/g, ' ')}</Badge>
+            {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+            <Badge variant="watch" size="sm">Reviewed, not yet active</Badge>
+          </div>
+          <p class="q-text">{q.text}</p>
+          <span class="q-meta">
+            Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} on {q.clinical_reviewed_at ? new Date(q.clinical_reviewed_at).toLocaleDateString() : '—'}
+          </span>
+
+          {canActivate && (
+            <form method="POST" class="activate-form">
+              <input type="hidden" name="question_id" value={q.id} />
+              <Button type="submit" variant="primary" size="sm">Activate</Button>
+            </form>
+          )}
+        </Card>
+      ))}
+    </div>
+  )}
+</GovernmentLayout>
+
+<style>
+  .q-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .q-tags {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .q-text {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .q-meta {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .activate-form {
+    display: flex;
+  }
+</style>

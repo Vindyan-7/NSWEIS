@@ -1,0 +1,79 @@
+---
+import Header from '../components/navigation/Header.astro';
+import Sidebar from '../components/navigation/Sidebar.astro';
+import MobileNav from '../components/navigation/MobileNav.astro';
+import type { UserRole } from '../types/domain';
+import '../styles/globals.css';
+
+interface Props {
+  title: string;
+  activePath?: string;
+}
+
+const { title, activePath = '/regional/dashboard' } = Astro.props;
+
+const profile = Astro.locals.profile;
+
+const navItems = [
+  { label: 'Overview', href: '/regional/dashboard', icon: 'LayoutDashboard', active: activePath === '/regional/dashboard' },
+  { label: 'Question Pools', href: '/regional/questions', icon: 'ClipboardCheck', active: activePath === '/regional/questions' },
+  { label: 'Clinical Team', href: '/regional/clinicians', icon: 'Stethoscope', active: activePath === '/regional/clinicians' },
+  { label: 'College Officers', href: '/regional/colleges', icon: 'Building', active: activePath === '/regional/colleges' },
+  { label: 'Regional Insights', href: '/admin/insights', icon: 'TrendingUp', active: activePath === '/admin/insights' },
+];
+
+const mobileNavItems = [
+  { label: 'Overview', href: '/regional/dashboard', icon: 'LayoutDashboard', active: activePath === '/regional/dashboard' },
+  { label: 'Question Pools', href: '/regional/questions', icon: 'ClipboardCheck', active: activePath === '/regional/questions' },
+  { label: 'Clinicians', href: '/regional/clinicians', icon: 'Stethoscope', active: activePath === '/regional/clinicians' },
+  { label: 'Colleges', href: '/regional/colleges', icon: 'Building', active: activePath === '/regional/colleges' },
+  { label: 'Insights', href: '/admin/insights', icon: 'TrendingUp', active: activePath === '/admin/insights' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — Regional Governance | NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar items={navItems} roleTitle="Regional Officer" />
+      <div class="app-main-area">
+        <Header userName={profile?.full_name || 'Regional Officer'} userRole="Regional Officer" avatarUrl={profile?.avatar_url} />
+        <main class="app-content container">
+          <slot />
+        </main>
+      </div>
+      <MobileNav items={mobileNavItems} />
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .app-content {
+    flex: 1;
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-16);
+  }
+</style>

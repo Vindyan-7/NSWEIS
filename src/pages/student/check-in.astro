@@ -21,8 +21,16 @@ import {
   getStudentQuestionAssignments,
 } from '../../services/adaptive-question-selection';
 import { generateRecommendationsForAssessment } from '../../services/recommendations';
+import {
+  CRISIS_BAND,
+  recordCrisisTrigger,
+  getCrisisEscalation,
+  acknowledgeCrisisEscalation,
+  requestCrisisContact,
+  getInstitutionCounsellorContact,
+} from '../../services/crisis';
 import type { Question } from '../../types/domain';
-import { Clock3, CheckCircle2, ShieldCheck, FileText, Timer } from '@lucide/astro';
+import { Clock3, CheckCircle2, ShieldCheck, FileText, Timer, PhoneCall, HeartHandshake } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
@@ -90,38 +98,17 @@ if (Astro.request.method === 'POST' && activeCycle && user) {
         });
       }
 
+      // SECURITY (AUDIT.md C1b): this used to auto-provision a missing
+      // profile with a role inferred from a substring match on the user's
+      // own email address (the same escalation closed in lib/auth/session.ts
+      // — see SESSION_HANDOFF.md). Profiles are provisioned by the hierarchy,
+      // never guessed from here. In practice middleware.ts already redirects
+      // a null-profile user to /no-access before this page renders, so this
+      // is a defence-in-depth bail-out, not the primary gate.
       if (!profileCheck) {
-        console.log(`[CHECKIN START] auto-provisioning missing profile for user: ${user.id}`);
-        const email = user.email || '';
-        const inferredRole = email.includes('super')
-          ? 'super_admin'
-          : email.includes('admin')
-          ? 'government_admin'
-          : email.includes('college')
-          ? 'college_officer'
-          : 'student';
-
-        const { error: profInsertErr } = await (supabase.from('profiles') as any).upsert({
-          id: user.id,
-          full_name: (user as any).user_metadata?.full_name || email.split('@')[0] || 'Student',
-          role: inferredRole,
-          institution_id: '11111111-1111-1111-1111-111111111111',
-          active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-        if (profInsertErr) {
-          console.error('[CHECKIN START] profile auto-provision error:', {
-            code: profInsertErr.code,
-            message: profInsertErr.message,
-            details: profInsertErr.details,
-            hint: profInsertErr.hint,
-          });
-        }
-      }
-
-      if (!assessment) {
+        console.error(`[CHECKIN START] no profile row for user ${user.id}; refusing to start an assessment`);
+        errorMessage = 'Your account isn\'t fully set up yet. Please contact your college to get started.';
+      } else if (!assessment) {
         console.log(`[CHECKIN START] assessment creation initiating for user: ${user.id}, cycle: ${activeCycle.id}`);
         const { data: newAssessment, error: createError } = await (supabase.from('assessments') as any)
           .insert({
@@ -159,6 +146,15 @@ if (Astro.request.method === 'POST' && activeCycle && user) {
             console.log(`[CHECKIN START] assignment generation completed: ${genRes.assignments.length} assignments generated`);
           }
         }
+      }
+    } else if (assessment && (actionType === 'crisis_ack' || actionType === 'crisis_connect')) {
+      // C. Crisis interstitial actions — only meaningful on a completed,
+      // acute-band assessment. Handled before the completed-redirect below
+      // so the interstitial's own buttons never bounce the student away.
+      if (actionType === 'crisis_ack') {
+        await acknowledgeCrisisEscalation(supabase, assessment.id, user.id);
+      } else {
+        await requestCrisisContact(supabase, assessment.id, user.id);
       }
     } else if (assessment) {
       // B. Answer Submission / Completion Action
@@ -262,7 +258,14 @@ if (Astro.request.method === 'POST' && activeCycle && user) {
             // Log safely without rolling back assessment completion
           }
 
+          // Crisis safety path (BUILD_PLAN Phase 5). Best-effort — never
+          // blocks the student from seeing their results either way.
+          if (submitResult.overallBand === CRISIS_BAND && profile?.institution_id) {
+            await recordCrisisTrigger(supabase, assessment.id, user.id, profile.institution_id, submitResult.overallBand);
+          }
+
           assessment.status = 'completed';
+          assessment.overall_band = submitResult.overallBand ?? null;
         } else {
           errorMessage = 'Your reflection could not be submitted right now. Please review your responses and try again.';
         }
@@ -307,6 +310,22 @@ if (activeCycle && assessment && assessment.status !== 'completed') {
   }
 }
 
+// 5b. Crisis interstitial state (BUILD_PLAN Phase 5). Re-checked on every
+// render — including a plain reload — so it cannot be bypassed by refreshing
+// past it. It only ever shows for a completed, acute-band assessment, and
+// only until the student themselves acknowledges it.
+let crisisEscalation: Awaited<ReturnType<typeof getCrisisEscalation>> = null;
+let counsellorContact: Awaited<ReturnType<typeof getInstitutionCounsellorContact>> = { name: null, phone: null };
+let showCrisisInterstitial = false;
+
+if (assessment && assessment.status === 'completed' && assessment.overall_band === CRISIS_BAND) {
+  crisisEscalation = await getCrisisEscalation(supabase, assessment.id);
+  showCrisisInterstitial = !crisisEscalation?.acknowledged_at;
+  if (showCrisisInterstitial) {
+    counsellorContact = await getInstitutionCounsellorContact(supabase, profile?.institution_id);
+  }
+}
+
 // 6. Calculate Session Duration & Remaining Time
 const sessionDurationMins = activeCycle?.session_duration_minutes || 10;
 const REQUIRED_SESSION_SECONDS = sessionDurationMins * 60;
@@ -338,6 +357,66 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
           <p>There are no active weekly check-in cycles open currently. Please check back soon.</p>
         </div>
       </Card>
+    ) : showCrisisInterstitial ? (
+      <div class="crisis-overlay" role="alertdialog" aria-labelledby="crisis-title" aria-describedby="crisis-desc">
+        <div class="crisis-panel">
+          <div class="crisis-icon"><HeartHandshake size={32} aria-hidden="true" /></div>
+          <h2 id="crisis-title">Before you go — some real support, right now</h2>
+          <p id="crisis-desc" class="crisis-desc">
+            Some of what you shared suggests things have been genuinely hard lately. NSWEIS
+            isn't a crisis service itself, but these are real people who are trained for
+            exactly this, available right now, at no cost to you.
+          </p>
+
+          <div class="crisis-contacts">
+            <a class="crisis-contact-card" href="tel:14416">
+              <PhoneCall size={22} aria-hidden="true" />
+              <div class="crisis-contact-text">
+                <span class="crisis-contact-name">Tele-MANAS</span>
+                <span class="crisis-contact-detail">24/7, free, confidential &mdash; call 14416</span>
+              </div>
+            </a>
+
+            {counsellorContact.phone ? (
+              <a class="crisis-contact-card" href={`tel:${counsellorContact.phone}`}>
+                <HeartHandshake size={22} aria-hidden="true" />
+                <div class="crisis-contact-text">
+                  <span class="crisis-contact-name">{counsellorContact.name || 'Your campus counsellor'}</span>
+                  <span class="crisis-contact-detail">Direct line &mdash; call {counsellorContact.phone}</span>
+                </div>
+              </a>
+            ) : (
+              <div class="crisis-contact-card crisis-contact-static">
+                <HeartHandshake size={22} aria-hidden="true" />
+                <div class="crisis-contact-text">
+                  <span class="crisis-contact-name">Your campus counsellor</span>
+                  <span class="crisis-contact-detail">Use the button below and they'll reach out to you directly.</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form method="POST" class="crisis-connect-form">
+            <input type="hidden" name="action_type" value="crisis_connect" />
+            {crisisEscalation?.requested_contact ? (
+              <p class="crisis-connect-confirmed">
+                <CheckCircle2 size={16} aria-hidden="true" /> Noted — your campus counsellor has been notified and
+                will reach out to you directly. Nothing else about your reflection was shared.
+              </p>
+            ) : (
+              <Button type="submit" variant="primary" size="lg">Connect me to my campus counsellor</Button>
+            )}
+            <p class="crisis-consent-note">
+              This is entirely your choice. Nobody is notified unless you press this button.
+            </p>
+          </form>
+
+          <form method="POST" class="crisis-continue-form">
+            <input type="hidden" name="action_type" value="crisis_ack" />
+            <Button type="submit" variant="ghost" size="sm">Continue to my results &rarr;</Button>
+          </form>
+        </div>
+      </div>
     ) : assessment?.status === 'completed' ? (
       <Card padding="lg" class="completed-session-card">
         <div class="completed-session-box">
@@ -928,5 +1007,126 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
       gap: var(--space-4);
       width: 100%;
     }
+  }
+
+  /* Crisis interstitial — deliberately fixed/full-screen so it renders
+     ahead of everything else on the page regardless of DOM position, and
+     carries no close/X control. The only ways out are its own two forms. */
+  .crisis-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: var(--space-6, 1.5rem);
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(2px);
+    overflow-y: auto;
+  }
+
+  .crisis-panel {
+    width: 100%;
+    max-width: 30rem;
+    background: var(--color-bg-card, #ffffff);
+    border-radius: var(--radius-lg, 1rem);
+    padding: var(--space-8, 2rem) var(--space-6, 1.5rem);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+    text-align: center;
+  }
+
+  .crisis-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    margin-bottom: var(--space-4, 1rem);
+  }
+
+  .crisis-panel h2 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-3, 0.75rem);
+  }
+
+  .crisis-desc {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-6, 1.5rem);
+  }
+
+  .crisis-contacts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-6, 1.5rem);
+    text-align: left;
+  }
+
+  .crisis-contact-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-4, 1rem);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    color: var(--color-text-main);
+    text-decoration: none;
+    transition: border-color var(--transition-fast);
+  }
+
+  a.crisis-contact-card:hover {
+    border-color: var(--color-primary-500);
+    background-color: var(--color-primary-50);
+  }
+
+  .crisis-contact-static {
+    cursor: default;
+  }
+
+  .crisis-contact-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .crisis-contact-name {
+    font-weight: 700;
+    font-size: 0.9375rem;
+  }
+
+  .crisis-contact-detail {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .crisis-connect-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    margin-bottom: var(--space-4, 1rem);
+  }
+
+  .crisis-connect-form :global(button) {
+    width: 100%;
+  }
+
+  .crisis-connect-confirmed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #047857;
+  }
+
+  .crisis-consent-note {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
   }
 </style>

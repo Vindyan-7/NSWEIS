@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import type { Question, WellnessCategory, StudentQuestionAssignment, WeeklyCycle } from '../types/domain';
 import { getActiveWeeklyCycle, getWeeklyCycleById } from './weekly-cycles';
+import { createSupabaseAdminClient } from '../lib/supabase/server';
+import { getGovernedWeeklyPoolQuestions } from './clinician';
+import { getStudentConsent } from './privacy';
+import { INSTITUTION_REGION_MAP } from './provisioning';
 
 export interface CategorySignal {
   category: WellnessCategory;
@@ -299,7 +303,31 @@ export async function generateStudentQuestionAssignment(
   error?: string;
 }> {
   try {
-    // 1. Idempotency Check: check if assignments already exist for (studentId, cycleId)
+    // 1. Student Eligibility & Role Security Check
+    const { data: studentProf } = await (supabase.from('profiles') as any)
+      .select('id, role, active, institution_id, department_id, region_id')
+      .eq('id', studentId)
+      .single();
+
+    if (studentProf) {
+      if (studentProf.role !== 'student' && studentProf.role !== 'super_admin') {
+        return { success: false, assignments: [], error: 'Unauthorized: User is not an active student.' };
+      }
+      if (studentProf.active === false) {
+        return { success: false, assignments: [], error: 'Student account is inactive.' };
+      }
+      if (!studentProf.institution_id) {
+        return { success: false, assignments: [], error: 'Student has no assigned college.' };
+      }
+    }
+
+    // 2. Student Privacy Consent Verification
+    const consent = await getStudentConsent(supabase, studentId);
+    if (consent.consent_status !== 'active') {
+      return { success: false, assignments: [], error: 'Active privacy consent is required before receiving weekly assessments.' };
+    }
+
+    // 3. Idempotency Check: check if assignments already exist for (studentId, cycleId)
     const { data: existingAssignments } = await (supabase.from('student_question_assignments') as any)
       .select('*')
       .eq('student_id', studentId)
@@ -314,13 +342,32 @@ export async function generateStudentQuestionAssignment(
       };
     }
 
-    // 2. Fetch Active Weekly Cycle Configuration
+    // 4. Fetch Active Weekly Cycle Configuration
     const cycle: WeeklyCycle | null = await getWeeklyCycleById(supabase, cycleId) || await getActiveWeeklyCycle(supabase);
     if (!cycle) {
       return { success: false, assignments: [], error: 'Active weekly cycle configuration not found.' };
     }
+    if (cycle.status !== 'active') {
+      return { success: false, assignments: [], error: 'Weekly reflection cycle is not currently active.' };
+    }
 
-    // 3. Fetch Student's Previous Assessment Responses & Signals
+    // 5. Resolve Student Regional Governance Scope
+    const studentRegion =
+      studentProf?.region_id ||
+      (studentProf?.institution_id ? INSTITUTION_REGION_MAP.get(studentProf.institution_id) : null) ||
+      'reg-demo-north-01';
+
+    // 6. Fetch Governed Weekly Question Pool (Enforces: Active flag alone does NOT grant delivery!)
+    const poolQuestions = await getGovernedWeeklyPoolQuestions(supabase, cycle.id, studentRegion);
+    if (!poolQuestions || poolQuestions.length === 0) {
+      return {
+        success: false,
+        assignments: [],
+        error: 'No approved questions available in the active weekly question pool for this region.',
+      };
+    }
+
+    // 7. Fetch Student's Previous Assessment Responses & Signals
     const { data: previousAssessments } = await (supabase.from('assessments') as any)
       .select('id, completed_at, cycle:weekly_cycles(week_number)')
       .eq('student_id', studentId)
@@ -332,9 +379,11 @@ export async function generateStudentQuestionAssignment(
       latestAssessmentId = previousAssessments[0].id;
     }
 
+    const optionsAdmin = createSupabaseAdminClient();
+
     const rawResponses: Array<{ category: WellnessCategory; signalValue?: number | null }> = [];
     if (latestAssessmentId) {
-      const { data: respData } = await (supabase.from('assessment_responses') as any)
+      const { data: respData } = await (optionsAdmin.from('assessment_responses') as any)
         .select('question:questions(category), option:question_options(signal_value, score)')
         .eq('assessment_id', latestAssessmentId);
 
@@ -352,7 +401,7 @@ export async function generateStudentQuestionAssignment(
 
     const categorySignals = calculateCategorySignals(rawResponses);
 
-    // 4. Fetch Student's Generated Task States
+    // 8. Fetch Student's Generated Task States
     const { data: taskData } = await (supabase.from('student_tasks') as any)
       .select('category, status')
       .eq('student_id', studentId);
@@ -364,7 +413,7 @@ export async function generateStudentQuestionAssignment(
       taskStates,
     };
 
-    // 5. Fetch Previous Student Question Assignment History
+    // 9. Fetch Previous Student Question Assignment History
     const { data: historyData } = await (supabase.from('student_question_assignments') as any)
       .select('question_id, cycle:weekly_cycles(week_number)')
       .eq('student_id', studentId);
@@ -379,13 +428,8 @@ export async function generateStudentQuestionAssignment(
       }
     }
 
-    // 6. Fetch Master Question Library & Selection Rules
-    const { data: allQuestionsData } = await (supabase.from('questions') as any)
-      .select('*, options:question_options(*)')
-      .eq('active', true)
-      .order('order_index', { ascending: true });
-
-    const allQuestions = (allQuestionsData || []) as Question[];
+    // 10. Use strictly Governed Pool Questions (Excludes any questions outside the active weekly pool)
+    const allQuestions = poolQuestions;
 
     const { data: selectionRulesData } = await (supabase.from('question_selection_rules') as any)
       .select('*')
@@ -394,7 +438,7 @@ export async function generateStudentQuestionAssignment(
 
     const selectionRules = (selectionRulesData || []) as any[];
 
-    // 7. Execute Adaptive & Common Question Selection
+    // 11. Execute Adaptive & Common Question Selection
     const assignedQuestionIds = new Set<string>();
 
     const adaptiveCount = cycle.adaptive_questions_enabled ? cycle.adaptive_questions : 0;
@@ -520,7 +564,12 @@ export async function getStudentQuestionAssignments(
   studentId: string,
   cycleId: string
 ): Promise<Array<StudentQuestionAssignment & { question: Question }>> {
-  const { data, error } = await (supabase.from('student_question_assignments') as any)
+  // AUDIT.md H2: the nested options:question_options(*) embed needs the
+  // admin client (see generateStudentQuestionAssignment above for why).
+  // Safe here too: studentId/cycleId are explicit WHERE params supplied by
+  // the caller from the authenticated session, never client-controlled, so
+  // this doesn't relax the per-student scoping — it's just not done via RLS.
+  const { data, error } = await (createSupabaseAdminClient().from('student_question_assignments') as any)
     .select('*, question:questions(*, options:question_options(*))')
     .eq('student_id', studentId)
     .eq('cycle_id', cycleId)

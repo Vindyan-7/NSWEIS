@@ -1,0 +1,750 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import Card from '../components/ui/Card.astro';
+import Button from '../components/ui/Button.astro';
+import Input from '../components/ui/Input.astro';
+import { createSupabaseServerClient, createSupabaseAdminClient } from '../lib/supabase/server';
+import { updateStudentConsent } from '../services/privacy';
+import {
+  getInstitutionAcademicStructure,
+  validateStudentAcademicPlacement,
+} from '../services/provisioning';
+
+let errorMessage = '';
+let successMessage = '';
+let formValues = {
+  email: '',
+  full_name: '',
+  student_roll_no: '',
+  institution_id: '',
+  department_id: '',
+  year_level: '',
+  section_code: '',
+};
+
+const supabase = createSupabaseServerClient(Astro);
+const adminClient = createSupabaseAdminClient();
+
+// 1. Fetch active institutions (Source of Truth)
+const { data: institutionsData } = await adminClient
+  .from('institutions')
+  .select('id, name, code, active')
+  .eq('active', true)
+  .order('name');
+
+const validInstitutions = institutionsData || [];
+
+const institutionOptions = [
+  { value: '', label: '-- Select Your College / Institution --' },
+  ...validInstitutions.map((inst: any) => ({
+    value: inst.id,
+    label: `${inst.name} (${inst.code})`,
+  })),
+];
+
+// Pre-load academic structure if an institution was submitted
+let initialStructure = {
+  departments: [] as any[],
+  years: [] as any[],
+  sections: [] as any[],
+};
+
+if (formValues.institution_id) {
+  initialStructure = await getInstitutionAcademicStructure(supabase, formValues.institution_id);
+} else if (validInstitutions.length > 0 && validInstitutions[0]) {
+  initialStructure = await getInstitutionAcademicStructure(supabase, (validInstitutions[0] as any).id);
+}
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const email = formData.get('email')?.toString().trim().toLowerCase() || '';
+    const password = formData.get('password')?.toString() || '';
+    const confirmPassword = formData.get('confirm_password')?.toString() || '';
+    const fullName = formData.get('full_name')?.toString().trim() || '';
+    const studentRollNo = formData.get('student_roll_no')?.toString().trim() || '';
+    const institutionId = formData.get('institution_id')?.toString()?.trim() || '';
+    const departmentId = formData.get('department_id')?.toString()?.trim() || '';
+    const yearLevelRaw = formData.get('year_level')?.toString() || '';
+    const sectionCode = formData.get('section_code')?.toString()?.trim().toUpperCase() || '';
+    const privacyConsent = formData.get('privacy_consent')?.toString();
+
+    formValues = {
+      email,
+      full_name: fullName,
+      student_roll_no: studentRollNo,
+      institution_id: institutionId,
+      department_id: departmentId,
+      year_level: yearLevelRaw,
+      section_code: sectionCode,
+    };
+
+    if (institutionId) {
+      initialStructure = await getInstitutionAcademicStructure(supabase, institutionId);
+    }
+
+    // CRITICAL ROLE RULE: Ignore any client-submitted role value and hardcode to 'student'
+    const HARDCODED_STUDENT_ROLE = 'student';
+
+    // 1. Server-side Input Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : NaN;
+
+    if (!email || !password || !confirmPassword || !fullName || !institutionId || !departmentId || !yearLevelRaw || !sectionCode) {
+      errorMessage = 'Please fill out all required fields marked with an asterisk (*).';
+    } else if (!emailRegex.test(email)) {
+      errorMessage = 'Please enter a valid email address.';
+    } else if (password !== confirmPassword) {
+      errorMessage = 'Passwords do not match. Please re-enter your password.';
+    } else if (password.length < 6) {
+      errorMessage = 'Password must be at least 6 characters long.';
+    } else if (!privacyConsent || privacyConsent !== 'accepted') {
+      errorMessage = 'You must review and explicitly accept the Privacy Policy to create a student account.';
+    } else {
+      // 2. Server-Authoritative Academic Placement Validation (Enforces configured hierarchy)
+      const placementCheck = await validateStudentAcademicPlacement(supabase, {
+        institutionId,
+        departmentId,
+        yearLevel,
+        sectionCode,
+      });
+
+      if (!placementCheck.valid) {
+        errorMessage = placementCheck.error || 'Invalid academic structure selection for this college.';
+      } else {
+        // 3. Create Auth User in Supabase Auth
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: HARDCODED_STUDENT_ROLE,
+            },
+          },
+        });
+
+        const userObj = signUpData?.user;
+        const isDuplicateUser =
+          signUpError?.message?.toLowerCase().includes('already registered') ||
+          signUpError?.message?.toLowerCase().includes('already exists') ||
+          (userObj && userObj.identities && userObj.identities.length === 0);
+
+        if (signUpError || !userObj || isDuplicateUser) {
+          if (isDuplicateUser) {
+            errorMessage = 'An account with this email address already exists. Please sign in or use a different email address.';
+          } else {
+            errorMessage = signUpError?.message || 'Could not create authentication account. Please check details and try again.';
+          }
+        } else {
+          const userId = userObj.id;
+
+          // 4. Create/Upsert Student Profile in public.profiles via Admin Client
+          const profilePayload: any = {
+            id: userId,
+            full_name: fullName,
+            role: HARDCODED_STUDENT_ROLE, // Hardcoded student role ONLY
+            institution_id: institutionId,
+            department_id: departmentId,
+            student_roll_no: studentRollNo || null,
+            year_level: yearLevel,
+            section_code: sectionCode,
+            active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          const { error: profileError } = await (adminClient.from('profiles') as any).upsert(
+            profilePayload,
+            { onConflict: 'id' }
+          );
+
+          if (profileError) {
+            console.error('[SIGNUP] Profile creation error:', profileError);
+            // Rollback Auth user to prevent orphaned account lockout
+            try {
+              await adminClient.auth.admin.deleteUser(userId);
+            } catch (delErr) {
+              console.error('[SIGNUP] Auth rollback error:', delErr);
+            }
+            errorMessage = 'Registration profile could not be saved. Please contact support or try again.';
+          } else {
+            // 5. Persist DPDP Privacy Consent Server-Side with Policy Version & Timestamp
+            await updateStudentConsent(supabase, userId, 'active');
+
+            // 6. Sign in automatically or direct to login/dashboard
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+
+            if (!signInError) {
+              return Astro.redirect('/student/dashboard');
+            } else {
+              successMessage = 'Student account created successfully! Please sign in with your email and password.';
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[SIGNUP] System error during registration:', err);
+    errorMessage = err.message || 'An unexpected server error occurred during registration.';
+  }
+}
+---
+
+<PublicLayout title="Student Registration — NSWEIS">
+  <div class="signup-page-wrapper">
+    <div class="signup-card-container">
+      <div class="signup-header text-center">
+        <span class="brand-badge">NSWEIS STUDENT REGISTRATION</span>
+        <h1 class="signup-title">Create Your Student Account</h1>
+        <p class="signup-subtitle">
+          Join your institution's confidential weekly reflection and student support system.
+        </p>
+      </div>
+
+      {errorMessage && (
+        <div class="alert alert-danger" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div class="alert alert-success" role="alert">
+          {successMessage}
+          <div class="mt-3">
+            <a href="/login"><Button variant="primary" size="sm">Go to Login &rarr;</Button></a>
+          </div>
+        </div>
+      )}
+
+      {!successMessage && (
+        <Card padding="lg" class="signup-form-card">
+          <form method="POST" class="signup-form" id="student-signup-form">
+            {/* Step 1 & 2: Campus & Academic Alignment */}
+            <div class="form-section">
+              <h3 class="section-heading">1. Campus & Academic Program</h3>
+              <p class="section-help-text">
+                Select your college to load its configured academic departments, years, and sections.
+              </p>
+
+              <div class="form-field-full mt-3">
+                <label for="institution_select" class="form-label font-semibold text-sm">
+                  College / Institution <span class="text-danger">*</span>
+                </label>
+                <select
+                  id="institution_select"
+                  name="institution_id"
+                  class="custom-select"
+                  required
+                >
+                  {institutionOptions.map((opt) => (
+                    <option value={opt.value} selected={formValues.institution_id === opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div id="structure-loading-indicator" class="loading-bar hidden">
+                <span class="spinner-sm"></span> Loading college academic structure...
+              </div>
+
+              <div id="structure-empty-alert" class="empty-structure-alert hidden">
+                <p id="structure-empty-message">Academic structure is not yet available for this college. Please contact your college administration.</p>
+              </div>
+
+              <div class="form-grid mt-3" id="academic-fields-container">
+                <div class="form-field">
+                  <label for="department_select" class="form-label font-semibold text-sm">
+                    Department / Branch <span class="text-danger">*</span>
+                  </label>
+                  <select
+                    id="department_select"
+                    name="department_id"
+                    class="custom-select"
+                    required
+                  >
+                    <option value="">-- Select Department --</option>
+                    {initialStructure.departments.map((d) => (
+                      <option value={d.id} selected={formValues.department_id === d.id}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <label for="year_select" class="form-label font-semibold text-sm">
+                    Academic Year <span class="text-danger">*</span>
+                  </label>
+                  <select
+                    id="year_select"
+                    name="year_level"
+                    class="custom-select"
+                    required
+                  >
+                    <option value="">-- Select Year --</option>
+                    {initialStructure.years.map((y) => (
+                      <option value={y.year_level} selected={formValues.year_level === String(y.year_level)}>
+                        {y.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-grid mt-3">
+                <div class="form-field">
+                  <label for="section_select" class="form-label font-semibold text-sm">
+                    Section Code <span class="text-danger">*</span>
+                  </label>
+                  <select
+                    id="section_select"
+                    name="section_code"
+                    class="custom-select"
+                    required
+                  >
+                    <option value="">-- Select Section --</option>
+                    {initialStructure.sections.map((s) => (
+                      <option value={s.section_code} selected={formValues.section_code === s.section_code}>
+                        Section {s.section_code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <Input
+                    label="Student Roll No / University ID"
+                    name="student_roll_no"
+                    type="text"
+                    value={formValues.student_roll_no}
+                    placeholder="e.g. 2024CSE042"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Account Credentials */}
+            <div class="form-section mt-6">
+              <h3 class="section-heading">2. Personal & Login Details</h3>
+              <div class="form-grid mt-3">
+                <Input
+                  label="Full Name *"
+                  name="full_name"
+                  type="text"
+                  value={formValues.full_name}
+                  placeholder="e.g. Rahul Sharma"
+                  required
+                />
+                <Input
+                  label="Official Email Address *"
+                  name="email"
+                  type="email"
+                  value={formValues.email}
+                  placeholder="rahul.sharma@college.edu.in"
+                  required
+                />
+              </div>
+
+              <div class="form-grid mt-3">
+                <Input
+                  label="Password (min 6 chars) *"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                />
+                <Input
+                  label="Confirm Password *"
+                  name="confirm_password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Step 4: Privacy & DPDP Consent */}
+            <div class="form-section privacy-section mt-6">
+              <h3 class="section-heading">3. Privacy Policy & DPDP Consent</h3>
+              <div class="privacy-box">
+                <h4 class="font-semibold text-primary">Your Reflection Privacy Guarantee</h4>
+                <p class="privacy-desc text-sm text-muted mt-1">
+                  NSWEIS guarantees strict data isolation. Your individual reflection answers and wellbeing ratings are completely confidential to your student account and never visible to college officers, professors, or administrators.
+                </p>
+                <div class="privacy-link-row mt-2">
+                  <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="policy-link font-semibold text-primary">
+                    &rarr; Review NSWEIS Privacy Policy & DPDP Data Governance
+                  </a>
+                </div>
+              </div>
+
+              <div class="consent-checkbox-row mt-3">
+                <label class="consent-label">
+                  <input type="checkbox" name="privacy_consent" value="accepted" required class="consent-checkbox" />
+                  <span class="consent-text text-sm">
+                    I have reviewed the <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="underline font-medium">NSWEIS Privacy Policy</a> and explicitly consent to the processing of my reflection responses for confidential wellbeing support.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-actions mt-6">
+              <Button type="submit" variant="primary" size="lg" class="w-full" id="btn-submit-signup">
+                Create Student Account
+              </Button>
+            </div>
+          </form>
+
+          <div class="login-footer-link text-center mt-6">
+            <span class="text-sm text-muted">Already have an account?</span>{' '}
+            <a href="/login" class="font-semibold text-primary">Sign In here &rarr;</a>
+          </div>
+        </Card>
+      )}
+    </div>
+  </div>
+</PublicLayout>
+
+<script>
+  // Client-side dynamic academic structure cascading dropdowns
+  const instSelect = document.getElementById('institution_select') as HTMLSelectElement | null;
+  const deptSelect = document.getElementById('department_select') as HTMLSelectElement | null;
+  const yearSelect = document.getElementById('year_select') as HTMLSelectElement | null;
+  const secSelect = document.getElementById('section_select') as HTMLSelectElement | null;
+  const loadingIndicator = document.getElementById('structure-loading-indicator');
+  const emptyAlert = document.getElementById('structure-empty-alert');
+  const emptyMessage = document.getElementById('structure-empty-message');
+  const btnSubmit = document.getElementById('btn-submit-signup') as HTMLButtonElement | null;
+
+  let currentSections: any[] = [];
+
+  function filterSections() {
+    if (!secSelect) return;
+    const selectedDeptId = deptSelect?.value || '';
+    const selectedYear = yearSelect?.value ? Number(yearSelect.value) : null;
+
+    secSelect.innerHTML = '<option value="">-- Select Section --</option>';
+
+    const matchingSections = currentSections.filter((s: any) => {
+      if (s.department_id && selectedDeptId && s.department_id !== selectedDeptId) return false;
+      if (s.year_level && selectedYear && s.year_level !== selectedYear) return false;
+      return true;
+    });
+
+    if (matchingSections.length > 0) {
+      matchingSections.forEach((s: any) => {
+        const opt = document.createElement('option');
+        opt.value = s.section_code;
+        opt.textContent = `Section ${s.section_code}`;
+        secSelect.appendChild(opt);
+      });
+      secSelect.disabled = false;
+      if (btnSubmit) btnSubmit.disabled = false;
+    } else if (currentSections.length > 0) {
+      // Fallback to all institution sections if not strictly partitioned
+      currentSections.forEach((s: any) => {
+        const opt = document.createElement('option');
+        opt.value = s.section_code;
+        opt.textContent = `Section ${s.section_code}`;
+        secSelect.appendChild(opt);
+      });
+      secSelect.disabled = false;
+      if (btnSubmit) btnSubmit.disabled = false;
+    } else {
+      secSelect.disabled = true;
+    }
+  }
+
+  if (instSelect) {
+    instSelect.addEventListener('change', async (e) => {
+      const instId = (e.target as HTMLSelectElement).value;
+
+      // Reset downstream selections
+      if (deptSelect) {
+        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
+        deptSelect.value = '';
+      }
+      if (yearSelect) {
+        yearSelect.innerHTML = '<option value="">-- Select Year --</option>';
+        yearSelect.value = '';
+      }
+      if (secSelect) {
+        secSelect.innerHTML = '<option value="">-- Select Section --</option>';
+        secSelect.value = '';
+        secSelect.disabled = true;
+      }
+      currentSections = [];
+
+      if (!instId) {
+        if (emptyAlert) emptyAlert.classList.add('hidden');
+        if (btnSubmit) btnSubmit.disabled = false;
+        return;
+      }
+
+      try {
+        if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+        if (emptyAlert) emptyAlert.classList.add('hidden');
+
+        const res = await fetch(`/api/academic-structure?institution_id=${encodeURIComponent(instId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentSections = data.sections || [];
+
+          // 1. Populate Departments
+          if (deptSelect) {
+            deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
+            if (data.departments && data.departments.length > 0) {
+              data.departments.forEach((d: any) => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `${d.name} (${d.code})`;
+                deptSelect.appendChild(opt);
+              });
+              deptSelect.disabled = false;
+            } else {
+              deptSelect.disabled = true;
+            }
+          }
+
+          // 2. Populate Years
+          if (yearSelect) {
+            yearSelect.innerHTML = '<option value="">-- Select Year --</option>';
+            if (data.years && data.years.length > 0) {
+              data.years.forEach((y: any) => {
+                const opt = document.createElement('option');
+                opt.value = String(y.year_level);
+                opt.textContent = y.label;
+                yearSelect.appendChild(opt);
+              });
+              yearSelect.disabled = false;
+            } else {
+              yearSelect.disabled = true;
+            }
+          }
+
+          // Check Empty State
+          if (!data.departments || data.departments.length === 0) {
+            if (emptyAlert && emptyMessage) {
+              emptyMessage.textContent = 'Academic programs (Departments/Branches) are not yet configured for this college. Please contact your college administration.';
+              emptyAlert.classList.remove('hidden');
+            }
+            if (btnSubmit) btnSubmit.disabled = true;
+          } else if (!data.years || data.years.length === 0) {
+            if (emptyAlert && emptyMessage) {
+              emptyMessage.textContent = 'Academic years are not yet configured for this college. Please contact your college administration.';
+              emptyAlert.classList.remove('hidden');
+            }
+            if (btnSubmit) btnSubmit.disabled = true;
+          } else if (!data.sections || data.sections.length === 0) {
+            if (emptyAlert && emptyMessage) {
+              emptyMessage.textContent = 'Academic sections are not yet configured for this college. Please contact your college administration.';
+              emptyAlert.classList.remove('hidden');
+            }
+            if (btnSubmit) btnSubmit.disabled = true;
+          } else {
+            if (emptyAlert) emptyAlert.classList.add('hidden');
+            if (btnSubmit) btnSubmit.disabled = false;
+            filterSections();
+          }
+        } else {
+          if (emptyAlert && emptyMessage) {
+            emptyMessage.textContent = 'Could not load academic programs for this college. Please try again.';
+            emptyAlert.classList.remove('hidden');
+          }
+          if (btnSubmit) btnSubmit.disabled = true;
+        }
+      } catch (err) {
+        console.error('Failed to load academic structure:', err);
+      } finally {
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+      }
+    });
+  }
+
+  if (deptSelect) {
+    deptSelect.addEventListener('change', () => {
+      filterSections();
+    });
+  }
+
+  if (yearSelect) {
+    yearSelect.addEventListener('change', () => {
+      filterSections();
+    });
+  }
+</script>
+
+<style>
+  .signup-page-wrapper {
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .signup-card-container {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .brand-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-primary-600);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    margin-bottom: var(--space-2);
+  }
+
+  .signup-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    letter-spacing: -0.02em;
+  }
+
+  .signup-subtitle {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+    margin-bottom: var(--space-6);
+  }
+
+  .signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .section-heading {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: var(--space-2);
+  }
+
+  .section-help-text {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-1);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+  }
+
+  .custom-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color var(--transition-fast);
+  }
+
+  .custom-select:focus {
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+
+  .custom-select:disabled {
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
+  .loading-bar {
+    font-size: 0.8125rem;
+    color: var(--color-primary-600);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .empty-structure-alert {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: var(--radius-md);
+    color: #b45309;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  .privacy-box {
+    background-color: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .consent-checkbox-row {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .consent-checkbox {
+    margin-top: 3px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary-600);
+  }
+
+  .consent-text {
+    color: var(--color-text-main);
+    line-height: 1.4;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .alert {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .alert-danger {
+    background-color: #fef2f2;
+    border: 1px solid #f87171;
+    color: #991b1b;
+  }
+
+  .alert-success {
+    background-color: #f0fdf4;
+    border: 1px solid #4ade80;
+    color: #166534;
+  }
+
+  @media (max-width: 640px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

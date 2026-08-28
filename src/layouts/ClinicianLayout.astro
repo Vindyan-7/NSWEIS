@@ -1,0 +1,83 @@
+---
+import '../styles/globals.css';
+import Header from '../components/navigation/Header.astro';
+import Sidebar from '../components/navigation/Sidebar.astro';
+import MobileNav from '../components/navigation/MobileNav.astro';
+import { LayoutDashboard, FilePlus2, ClipboardCheck, Flag } from '@lucide/astro';
+
+interface Props {
+  title: string;
+  activePath?: string;
+}
+
+const { title, activePath = '/clinician/dashboard' } = Astro.props;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+const clinicianNav = [
+  { label: 'Dashboard', href: '/clinician/dashboard', icon: LayoutDashboard, active: activePath === '/clinician/dashboard' },
+  { label: 'Author Question', href: '/clinician/questions/new', icon: FilePlus2, active: activePath === '/clinician/questions/new' },
+  { label: 'Peer Review', href: '/clinician/dashboard?tab=review', icon: ClipboardCheck, active: activePath === '/clinician/review' },
+  { label: 'Flags', href: '/clinician/flags', icon: Flag, active: activePath === '/clinician/flags' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — Clinician Portal | NSWEIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar items={clinicianNav} roleTitle="Clinician" />
+      <div class="app-main-area">
+        <Header userName={profile?.full_name || user?.email || 'Clinician'} userRole="Clinician" />
+        <main class="app-content container">
+          <div class="scope-banner">
+            You see the instrument only — no student data, cohort counts, or campus names appear anywhere in this portal.
+          </div>
+          <slot />
+        </main>
+      </div>
+      <MobileNav items={clinicianNav} />
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .app-content {
+    flex: 1;
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-16);
+  }
+
+  .scope-banner {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-100);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+</style>

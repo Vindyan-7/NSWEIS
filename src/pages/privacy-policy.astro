@@ -1,0 +1,354 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import PageHeader from '../components/navigation/PageHeader.astro';
+import Card from '../components/ui/Card.astro';
+import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+import Button from '../components/ui/Button.astro';
+import Badge from '../components/ui/Badge.astro';
+import { ArrowLeft, ShieldCheck, FileText, Lock } from '@lucide/astro';
+---
+
+<PublicLayout title="NSWEIS Privacy Policy & Governance Framework">
+  <div class="container policy-page-wrapper">
+    <div class="policy-nav-bar">
+      <a href="/signup" class="back-link">
+        <ArrowLeft size={16} aria-hidden="true" /> Return to Student Registration
+      </a>
+      <a href="/login" class="back-link muted">
+        Sign In &rarr;
+      </a>
+    </div>
+
+    <PageHeader
+      title="NSWEIS Privacy Policy & Data Governance"
+      subtitle="Designed around the privacy principles of the Digital Personal Data Protection Act, 2023 and applicable rules."
+    />
+
+    <div class="policy-meta-pill-bar">
+      <div class="meta-pill">
+        <FileText size={14} class="text-primary" aria-hidden="true" />
+        <span>Policy Version: <strong>v1.0.0</strong></span>
+      </div>
+      <div class="meta-pill">
+        <ShieldCheck size={14} class="text-success" aria-hidden="true" />
+        <span>Effective Date: <strong>August 2026</strong></span>
+      </div>
+      <div class="meta-pill">
+        <Lock size={14} class="text-primary" aria-hidden="true" />
+        <span>Standard: <strong>DPDP Act 2023 Compliant</strong></span>
+      </div>
+    </div>
+
+    <div class="policy-content-stack">
+      <PrivacyNotice variant="full" />
+
+      <Card padding="lg" class="policy-doc-card">
+        <div class="policy-section">
+          <h2>1. What NSWEIS Is</h2>
+          <p>
+            The National Student Wellbeing Early-Awareness & Institutional Support (NSWEIS) platform is a non-clinical, privacy-preserving digital framework designed for higher education institutions. NSWEIS enables students to perform confidential weekly self-reflections, receive personal supportive guidance, and convert anonymized participation into aggregate campus wellbeing insights.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>2. What Information Is Collected</h2>
+          <p>NSWEIS collects only the minimal data required for account authentication, academic alignment, and self-reflection support:</p>
+          <ul>
+            <li><strong>Account Metadata:</strong> Email address, hashed authentication credentials, full name.</li>
+            <li><strong>Academic Alignment:</strong> Institution/College, Department/Branch, Year Level, and Section Code.</li>
+            <li><strong>Weekly Reflections:</strong> Responses to non-clinical check-in options and optional personal reflection prose.</li>
+            <li><strong>Supportive Preferences:</strong> Selected focus areas, completed student tasks, and incentive credits.</li>
+          </ul>
+        </div>
+
+        <div class="policy-section">
+          <h2>3. Why Information Is Collected</h2>
+          <p>Information is processed strictly for legitimate educational wellbeing purposes:</p>
+          <ul>
+            <li>To enable confidential student self-reflection and personal progress tracking over time.</li>
+            <li>To generate personalized, non-clinical supportive next steps and task suggestions.</li>
+            <li>To compute anonymized aggregate indicators that help colleges organize campus-wide wellbeing activities.</li>
+            <li>To provide regional and state administrators with high-level participation trends across institutions.</li>
+          </ul>
+        </div>
+
+        <div class="policy-section">
+          <h2>4. How Weekly Reflections Work</h2>
+          <p>
+            Each week during an active cycle, students complete a brief (~10 minute) reflection session containing common base questions and signal-driven adaptive questions. Responses are evaluated server-side to calculate category indicators (0.0 to 10.0) across wellness domains (e.g., Academic Support, Sleep & Rest, Emotional Support, Physical Wellbeing).
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>5. What Remains Private</h2>
+          <p>
+            <strong>Your private reflection data belongs to you.</strong> Individual check-in answers, raw text entries, and personal indicator scores are bound to your student account via database Row Level Security (RLS). They are strictly inaccessible to college officers, regional officers, government administrators, clinicians, or third parties.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>6. What College Officers Can See</h2>
+          <p>
+            College Officers access anonymized campus-level metrics only. They can view total student participation rates, campus-wide category indicator averages (when the 10-student anonymity threshold is met), and aggregate focus distribution areas to organize campus programmes (e.g., Sleep Health Workshops). <strong>College Officers cannot see individual student check-in responses or individual scores.</strong>
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>7. What Regional Officers Can See</h2>
+          <p>
+            Regional Officers oversee implementation across assigned colleges in their region. They view regional participation rates, aggregate institutional status distribution, and review clinician-authored question pools. They cannot view individual student reflections or sub-threshold individual institution data.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>8. What Government Administrators Can See</h2>
+          <p>
+            State and national Government Administrators access high-level multi-institution participation benchmarking and overall state-wide engagement trends. Government dashboards display non-evaluative participation tiers and contain zero student-identifying data.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>9. What Clinicians Can See</h2>
+          <p>
+            Authorized Clinicians and Counsellors author question pools, craft supportive recommendation content, and perform peer reviews of question quality. <strong>Clinicians operate in a zero-PII workspace: they have no access to student profiles, check-in answers, or student identities.</strong>
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>10. What Students Can See</h2>
+          <p>
+            Students have complete visibility over their own portal data: personal reflection history, current wellness domain indicators, active supportive tasks, earned credit balances, active privacy consents, and data processing audit logs.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>11. Aggregate Analytics & Privacy Thresholds</h2>
+          <p>
+            NSWEIS enforces a strict <strong>Privacy Threshold ($\ge 10$ completed reflections)</strong>. Whenever an institution, department, branch, year level, or section group has fewer than 10 completed student reflections for a cycle, detailed category indicators are withheld and displayed as <em>"Privacy Protected"</em> to prevent small-group re-identification.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>12. Consent</h2>
+          <p>
+            Student participation is voluntary. Explicit consent is recorded at self-registration and persisted server-side with policy versioning. Processing occurs only for the registered educational wellbeing purposes.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>13. Withdrawal of Consent</h2>
+          <p>
+            Students may withdraw consent at any time via the Student Privacy Center (<code>/student/privacy</code>). Withdrawing consent immediately halts further reflection processing and disables weekly check-in assignments.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>14. Privacy Requests</h2>
+          <p>
+            Students have the right to request access to their data, request correction of profile information, request consent withdrawal, or file a privacy grievance through the Privacy Request interface.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>15. Data Retention</h2>
+          <p>
+            Identifiable student profile data is retained for the duration of active enrollment. Reflection data is maintained for student self-reflection tracking. Anonymized aggregate indicators are retained for long-term educational wellbeing policy evaluation.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>16. Security</h2>
+          <p>
+            NSWEIS employs multi-layered technical security: TLS transport encryption, PostgreSQL Row Level Security (RLS), isolated server-side service keys, strict default-deny route authorization, and continuous audit logging.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>17. Human Support & Contact Process</h2>
+          <p>
+            Students experiencing distress or wanting to speak with a human counsellor can access direct confidential referral cards for Tele-MANAS (14416) or voluntarily initiate a college counsellor contact request. Initiating a counsellor request notifies the College Officer for human support coordination without sharing raw check-in text by default.
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>18. Non-Clinical Disclaimer</h2>
+          <p class="disclaimer-text">
+            <strong>IMPORTANT:</strong> NSWEIS is a non-clinical early-awareness and self-reflection platform. It does not provide medical diagnoses, psychiatric risk scores, or clinical medical treatment. Students requiring urgent medical or mental health care are encouraged to contact emergency services, campus healthcare units, or the Tele-MANAS toll-free helpline (14416).
+          </p>
+        </div>
+
+        <div class="policy-section">
+          <h2>19. Grievance & Contact Information</h2>
+          <p>
+            For privacy inquiries, data access requests, or privacy grievances, students may contact their Institutional Privacy Officer or the NSWEIS Data Protection Office via the Student Privacy Portal.
+          </p>
+        </div>
+
+        <div class="policy-footer-actions">
+          <a href="/signup">
+            <Button variant="primary" size="md">
+              <ArrowLeft size={16} aria-hidden="true" /> Return to Student Registration
+            </Button>
+          </a>
+          <a href="/login">
+            <Button variant="outline" size="md">
+              Sign In to Your Account &rarr;
+            </Button>
+          </a>
+        </div>
+      </Card>
+    </div>
+  </div>
+</PublicLayout>
+
+<style>
+  .policy-page-wrapper {
+    padding: var(--space-6) 0 var(--space-16);
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .policy-nav-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-600);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .back-link:hover {
+    color: var(--color-primary-700);
+  }
+
+  .back-link.muted {
+    color: var(--color-text-muted);
+  }
+
+  .policy-meta-pill-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+
+  .meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-sm);
+    color: var(--color-text-muted);
+  }
+
+  .meta-pill strong {
+    color: var(--color-text-main);
+  }
+
+  .policy-content-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .policy-doc-card {
+    line-height: 1.6;
+    background: #ffffff;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-md);
+  }
+
+  .policy-section {
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+
+    &:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+  }
+
+  .policy-section h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-2);
+  }
+
+  .policy-section p {
+    font-size: 0.9375rem;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-3);
+    line-height: 1.65;
+  }
+
+  .policy-section ul {
+    padding-left: var(--space-5);
+    margin-bottom: var(--space-3);
+  }
+
+  .policy-section li {
+    font-size: 0.875rem;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+    line-height: 1.55;
+  }
+
+  .disclaimer-text {
+    padding: var(--space-4);
+    background-color: var(--color-bg-subtle);
+    border-left: 4px solid var(--color-primary-600);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .policy-footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  @media (max-width: 640px) {
+    .policy-meta-pill-bar {
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .meta-pill {
+      width: 100%;
+    }
+
+    .policy-footer-actions {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .policy-footer-actions a,
+    .policy-footer-actions button {
+      width: 100%;
+    }
+  }
+</style>

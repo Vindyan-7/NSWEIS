@@ -1,0 +1,346 @@
+---
+import RegionalLayout from '../../layouts/RegionalLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { Building2, Plus, UserCheck, Shield, Power } from '@lucide/astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import {
+  provisionStaffAccount,
+  getManagedStaffAccounts,
+  getInstitutionsForRegionalOfficer,
+  toggleStaffAccountStatus,
+} from '../../services/provisioning';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'regional_officer' && profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  return Astro.redirect('/no-access');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const actionType = formData.get('action_type')?.toString();
+
+    if (actionType === 'toggle_status') {
+      const targetUserId = formData.get('target_user_id')?.toString() || '';
+      const newStatus = formData.get('new_status')?.toString() === 'true';
+
+      const res = await toggleStaffAccountStatus(supabase, user.id, targetUserId, newStatus);
+      if (!res.success) {
+        message = res.error || 'Failed to update account status.';
+        isError = true;
+      } else {
+        message = `College Officer status updated to ${newStatus ? 'Active' : 'Deactivated'}.`;
+      }
+    } else {
+      const fullName = formData.get('full_name')?.toString().trim() || '';
+      const email = formData.get('email')?.toString().trim() || '';
+      const password = formData.get('password')?.toString() || '';
+      const confirmPassword = formData.get('confirm_password')?.toString() || '';
+      const institutionId = formData.get('institution_id')?.toString() || '';
+
+      const res = await provisionStaffAccount(supabase, user.id, {
+        fullName,
+        email,
+        password,
+        confirmPassword,
+        targetRole: 'college_officer',
+        institutionId,
+      });
+
+      if (!res.success) {
+        message = res.error || 'Failed to provision College Officer.';
+        isError = true;
+      } else {
+        message = `College Officer account for '${fullName}' (${email}) provisioned successfully.`;
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
+  }
+}
+
+const allStaff = await getManagedStaffAccounts(supabase, user.id);
+const collegeOfficers = allStaff.filter((s) => s.role === 'college_officer');
+
+// Fetch institutions strictly assigned to this Regional Officer's region
+const regionalInstitutions = await getInstitutionsForRegionalOfficer(supabase, user.id);
+const institutionOptions = regionalInstitutions.map((i) => ({
+  value: i.id,
+  label: `${i.name} (${i.code})`,
+}));
+---
+
+<RegionalLayout title="College Officers & Regional Campuses" activePath="/regional/colleges">
+  <PageHeader
+    title="College Officer Provisioning & Regional Campuses"
+    subtitle="Provision institutional wellness officers for colleges and universities strictly within your regional jurisdiction"
+  >
+    <a href="/regional/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
+    </a>
+  </PageHeader>
+
+  <div class="regional-colleges-layout">
+    {message && (
+      <Alert type={isError ? 'error' : 'success'} title={isError ? 'Notice' : 'Success'}>
+        {message}
+      </Alert>
+    )}
+
+    <div class="grid-layout">
+      {/* 1. Create College Officer Form */}
+      <Card padding="lg">
+        <div class="card-header-row">
+          <Building2 size={20} class="text-primary" />
+          <h3 class="card-title">Provision College Wellness Officer</h3>
+        </div>
+        <p class="section-subtext">
+          Create credentials for a College Officer. The officer configures the college's academic structure and reviews anonymous institutional insights.
+        </p>
+
+        <form method="POST" class="form-stack">
+          <Input
+            label="Officer Full Name"
+            name="full_name"
+            placeholder="Prof. Ramesh Verma"
+            required
+          />
+
+          <Input
+            label="Official Email Address"
+            type="email"
+            name="email"
+            placeholder="officer.nita@nsweis.gov.in"
+            required
+          />
+
+          <Select
+            label="Assigned College (Your Regional Scope)"
+            name="institution_id"
+            options={institutionOptions}
+            required
+          />
+
+          <div class="form-row-2">
+            <Input
+              label="Password (min 8 chars)"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              name="confirm_password"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <Button type="submit" variant="primary" class="btn-submit">
+            <Plus size={15} /> Provision College Officer
+          </Button>
+        </form>
+      </Card>
+
+      {/* 2. College Officers Directory */}
+      <Card padding="lg">
+        <div class="card-header-row">
+          <UserCheck size={20} class="text-primary" />
+          <h3 class="card-title">Regional College Officers ({collegeOfficers.length})</h3>
+        </div>
+        <p class="section-subtext">
+          Campus officers managing institutional academic structures and student support in your region.
+        </p>
+
+        {collegeOfficers.length === 0 ? (
+          <EmptyState
+            title="No College Officers Provisioned"
+            description="Use the form on the left to provision college officers for regional campuses."
+          />
+        ) : (
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Officer</th>
+                  <th>Assigned College</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collegeOfficers.map((o) => (
+                  <tr>
+                    <td>
+                      <div class="user-info">
+                        <strong>{o.full_name}</strong>
+                        <span class="user-sub">{o.id.slice(0, 8)}...</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="inst-tag">{o.institution_name || 'Assigned College'}</span>
+                    </td>
+                    <td>
+                      <Badge variant={o.active ? 'stable' : 'neutral'} size="sm">
+                        {o.active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    <td class="date-cell">
+                      {new Date(o.created_at).toLocaleDateString()}
+                    </td>
+                    <td>
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action_type" value="toggle_status" />
+                        <input type="hidden" name="target_user_id" value={o.id} />
+                        <input type="hidden" name="new_status" value={o.active ? 'false' : 'true'} />
+                        <Button
+                          type="submit"
+                          variant={o.active ? 'outline' : 'primary'}
+                          size="sm"
+                        >
+                          <Power size={13} /> {o.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  </div>
+</RegionalLayout>
+
+<style>
+  .regional-colleges-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: var(--space-6);
+  }
+
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-subtext {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .btn-submit {
+    margin-top: var(--space-2);
+    width: 100%;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-main);
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .user-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .inst-tag {
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+  }
+
+  .date-cell {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .inline-form {
+    display: inline-block;
+  }
+
+  @media (max-width: 1024px) {
+    .grid-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

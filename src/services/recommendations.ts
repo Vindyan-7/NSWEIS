@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import type { Recommendation, WellnessCategory, StudentTask } from '../types/domain';
+import { createSupabaseAdminClient } from '../lib/supabase/server';
 
 export interface RecommendationRule {
   id: string;
@@ -273,7 +274,10 @@ export async function generateRecommendationsForAssessment(
     }
 
     // 4. Fallback for pending DB migration: Evaluate server-side in Astro SSR using FALLBACK_RULES
-    const { data: responsesData } = await (supabase.from('assessment_responses') as any)
+    // AUDIT.md H2: question_options is readable only by clinician/super_admin
+    // now, so this embed needs the admin client — assessmentId is already
+    // scoped to this student by the caller, not by RLS on this query.
+    const { data: responsesData } = await (createSupabaseAdminClient().from('assessment_responses') as any)
       .select('question_id, selected_option_id, question:questions(category), option:question_options(score, signal_value)')
       .eq('assessment_id', assessmentId);
 

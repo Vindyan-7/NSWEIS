@@ -25,9 +25,10 @@ if (!user) {
 
 const profile = await getProfile(supabase, user.id);
 
-if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin' && profile.role !== 'regional_officer')) {
   if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
   if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+  return Astro.redirect('/no-access');
 }
 
 const metrics = await getGovernmentParticipationMetrics(supabase, user.id);

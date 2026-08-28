@@ -6,8 +6,24 @@ import Avatar from '../../components/ui/Avatar.astro';
 import Badge from '../../components/ui/Badge.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
+const supabase = createSupabaseServerClient(Astro);
+
+let institutionName = 'College / Institution';
+let departmentName = 'Department / Branch';
+
+if (profile?.institution_id) {
+  const { data: inst } = await (supabase.from('institutions') as any).select('name, code').eq('id', profile.institution_id).single();
+  if (inst) institutionName = `${inst.name} (${inst.code})`;
+}
+
+if (profile?.department_id) {
+  const { data: dept } = await (supabase.from('departments') as any).select('name, code').eq('id', profile.department_id).single();
+  if (dept) departmentName = `${dept.name} (${dept.code})`;
+}
 ---
 
 <StudentLayout title="Student Profile" activePath="/student/profile">
@@ -33,16 +49,16 @@ const profile = Astro.locals.profile;
           <span class="detail-val">{profile?.student_roll_no || 'STU-2026-0842'}</span>
         </div>
         <div class="detail-item">
-          <span class="detail-label">Year Level</span>
-          <span class="detail-val">Year {profile?.year_level || 2}</span>
+          <span class="detail-label">Year Level & Section</span>
+          <span class="detail-val">Year {profile?.year_level || 1} · Section {profile?.section_code || 'A'}</span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Department</span>
-          <span class="detail-val">Computer Science & Engineering</span>
+          <span class="detail-val">{departmentName}</span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Institution</span>
-          <span class="detail-val">National Institute of Technology, Apex</span>
+          <span class="detail-val">{institutionName}</span>
         </div>
       </div>
     </Card>

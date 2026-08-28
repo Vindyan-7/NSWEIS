@@ -3,7 +3,7 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
-import { LayoutDashboard, Building2, UserCog, CalendarDays } from '@lucide/astro';
+import { LayoutDashboard, Building2, UserCog, CalendarDays, Library } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -14,11 +14,18 @@ const { title, activePath = '/superadmin/dashboard' } = Astro.props;
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 
+// "Cycles" and "Question Library" both live on the same /superadmin/questions
+// workspace, distinguished by ?tab= — the old /superadmin/cycles.astro was a
+// separate, read-only, non-functional duplicate (no create/edit form at
+// all), while the real cycle-management form was only reachable from an
+// unlinked URL. Consolidated: both nav items point into the one real page.
 const superAdminNav = [
   { label: 'System Overview', href: '/superadmin/dashboard', icon: LayoutDashboard, active: activePath === '/superadmin/dashboard' },
+  { label: 'Government Admins', href: '/superadmin/government-admins', icon: UserCog, active: activePath === '/superadmin/government-admins' },
   { label: 'Institutions', href: '/superadmin/institutions', icon: Building2, active: activePath === '/superadmin/institutions' },
   { label: 'Admin Scopes', href: '/superadmin/scopes', icon: UserCog, active: activePath === '/superadmin/scopes' },
-  { label: 'Cycles', href: '/superadmin/cycles', icon: CalendarDays, active: activePath === '/superadmin/cycles' },
+  { label: 'Cycles', href: '/superadmin/questions?tab=cycles', icon: CalendarDays, active: activePath === '/superadmin/questions-cycles' },
+  { label: 'Question Library', href: '/superadmin/questions?tab=library', icon: Library, active: activePath === '/superadmin/questions-library' },
 ];
 ---
 

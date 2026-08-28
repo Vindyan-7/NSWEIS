@@ -42,7 +42,7 @@ if (Astro.request.method === 'POST') {
     const taskId = formData.get('task_id')?.toString();
 
     if (action === 'complete_task' && taskId) {
-      const res = await completeStudentTask(supabase, taskId);
+      const res = await completeStudentTask(supabase, taskId, user.id);
       if (!res.success) {
         errorMessage = res.error || 'Unable to complete this activity right now. Please try again.';
       } else if (res.alreadyCompleted) {

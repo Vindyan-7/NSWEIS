@@ -25,8 +25,9 @@ export function createSupabaseServerClient(context: {
 }
 
 export function createSupabaseAdminClient() {
-  const supabaseUrl = (import.meta.env as any).PUBLIC_SUPABASE_URL || '';
-  const serviceKey = (import.meta.env as any).SUPABASE_SERVICE_ROLE_KEY || '';
+  const env = typeof import.meta !== 'undefined' ? (import.meta as any).env : {};
+  const supabaseUrl = env?.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL || '';
+  const serviceKey = env?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
   return createClient<Database>(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },

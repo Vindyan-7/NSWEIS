@@ -1,0 +1,139 @@
+---
+import ClinicianLayout from '../../layouts/ClinicianLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Alert from '../../components/ui/Alert.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getFlaggedQuestions, resolveQuestionFlag } from '../../services/clinician';
+import { Flag } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'clinician') {
+  return Astro.redirect('/no-access');
+}
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const flagId = formData.get('flag_id')?.toString();
+  const resolution = formData.get('resolution')?.toString() as 'upheld' | 'amended' | 'retired';
+
+  if (flagId && resolution) {
+    const result = await resolveQuestionFlag(supabase, flagId, resolution, user.id);
+    if (!result.success) {
+      message = result.error || 'Could not resolve that flag.';
+      isError = true;
+    }
+  }
+}
+
+const flaggedItems = await getFlaggedQuestions(supabase);
+---
+
+<ClinicianLayout title="Flags" activePath="/clinician/flags">
+  <PageHeader title="Flags Raised by Colleges" subtitle="A college officer can flag an active question with a reason. Resolve each one." />
+
+  {message && <Alert type="error" title="Could not resolve">{message}</Alert>}
+
+  {flaggedItems.length === 0 ? (
+    <EmptyState title="No open flags" description="Every flag raised by a college officer has been resolved." icon={Flag} />
+  ) : (
+    <div class="flag-list">
+      {flaggedItems.map((item) => (
+        <Card padding="lg">
+          <div class="q-tags">
+            <Badge variant="neutral" size="sm">{item.category.replace(/_/g, ' ')}</Badge>
+            <Badge variant="declining" size="sm">{item.flags.length} open flag{item.flags.length > 1 ? 's' : ''}</Badge>
+          </div>
+          <p class="q-text">{item.text}</p>
+
+          <div class="reasons-list">
+            {item.flags.map((f) => (
+              <p class="reason-item">"{f.reason}"<span class="reason-date"> — {new Date(f.raised_at).toLocaleDateString()}</span></p>
+            ))}
+          </div>
+
+          <form method="POST" class="resolve-form">
+            <input type="hidden" name="flag_id" value={item.flags[0].id} />
+            <Button type="submit" name="resolution" value="upheld" variant="outline" size="sm">Upheld — no change needed</Button>
+            <Button type="submit" name="resolution" value="amended" variant="outline" size="sm">Amended — will revise</Button>
+            <Button type="submit" name="resolution" value="retired" variant="danger" size="sm">Retire this question</Button>
+          </form>
+          {item.flags.length > 1 && (
+            <p class="multi-flag-note">Resolving clears the oldest open flag on this item; {item.flags.length - 1} more will remain until addressed separately.</p>
+          )}
+        </Card>
+      ))}
+    </div>
+  )}
+</ClinicianLayout>
+
+<style>
+  .flag-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .q-tags {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .q-text {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-4);
+  }
+
+  .reasons-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+  }
+
+  .reason-item {
+    font-size: 0.9375rem;
+    color: var(--color-text-main);
+    background: var(--color-bg-subtle);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    font-style: italic;
+  }
+
+  .reason-date {
+    font-style: normal;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .resolve-form {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .multi-flag-note {
+    margin-top: var(--space-3);
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+</style>

@@ -1,0 +1,219 @@
+---
+import ClinicianLayout from '../../../layouts/ClinicianLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import Button from '../../../components/ui/Button.astro';
+import Input from '../../../components/ui/Input.astro';
+import Select from '../../../components/ui/Select.astro';
+import Alert from '../../../components/ui/Alert.astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { createQuestionWithOptions } from '../../../services/question-management';
+import type { WellnessCategory } from '../../../types/domain';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'clinician') {
+  return Astro.redirect('/no-access');
+}
+
+const CATEGORIES: WellnessCategory[] = [
+  'academic', 'sleep_rest', 'emotional_wellbeing', 'social_connection', 'family_home',
+  'financial', 'career', 'campus_experience', 'physical_wellbeing', 'digital_balance',
+];
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+
+  const question_code = formData.get('question_code')?.toString().trim() || '';
+  const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
+  const text = formData.get('question_text')?.toString().trim() || '';
+  const category = formData.get('category')?.toString() as WellnessCategory;
+  const depth_level = formData.get('depth_level')?.toString() as 'light' | 'moderate' | 'deep';
+  const target_department = formData.get('target_department')?.toString() || 'ALL';
+
+  const optionCodes = formData.getAll('option_code[]').map((v) => v.toString().trim());
+  const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
+  const optionScores = formData.getAll('option_score[]').map((v) => parseFloat(v.toString()));
+
+  if (!question_code || !text || !category || !depth_level) {
+    message = 'Please provide a question code, text, domain, and depth level.';
+    isError = true;
+  } else if (optionLabels.some((l) => !l) || optionScores.some((s) => isNaN(s))) {
+    message = 'Every option needs text and a numeric score.';
+    isError = true;
+  } else {
+    const optionsData = optionCodes.map((code, idx) => ({
+      option_code: code || `OPT_${idx + 1}`,
+      label: optionLabels[idx],
+      score: optionScores[idx],
+      signal_value: optionScores[idx],
+      order_index: idx + 1,
+    }));
+
+    const result = await createQuestionWithOptions(
+      supabase,
+      {
+        question_code,
+        week_number,
+        text,
+        category,
+        target_department,
+        depth_level,
+        authored_by: user.id,
+        active: false,
+      },
+      optionsData
+    );
+
+    if (!result.success) {
+      message = result.error || 'Failed to save the draft.';
+      isError = true;
+    } else {
+      return Astro.redirect('/clinician/dashboard?tab=drafts&created=1');
+    }
+  }
+}
+---
+
+<ClinicianLayout title="Author a Question" activePath="/clinician/questions/new">
+  <PageHeader title="Author a Question" subtitle="Saved as a draft — a different clinician must review it before it can reach a student." />
+
+  {message && (
+    <Alert type={isError ? 'error' : 'success'} title={isError ? 'Could not save' : 'Saved'}>
+      {message}
+    </Alert>
+  )}
+
+  <Card padding="lg">
+    <form method="POST" class="author-form">
+      <div class="form-grid">
+        <Input label="Question Code" name="question_code" placeholder="W02-Q05" required />
+        <Input label="Week Number" name="week_number" type="number" min="1" value="1" required />
+        <Select
+          label="Domain (Category)"
+          name="category"
+          required
+          options={CATEGORIES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') }))}
+        />
+        <Select
+          label="Depth Level"
+          name="depth_level"
+          required
+          options={[
+            { value: 'light', label: 'Light — general check-in' },
+            { value: 'moderate', label: 'Moderate — asks for specifics' },
+            { value: 'deep', label: 'Deep — probes a sensitive area' },
+          ]}
+        />
+        <Input label="Target Department" name="target_department" value="ALL" helperText="Department code, or ALL" />
+      </div>
+
+      <div class="text-field">
+        <label class="field-label" for="question_text">Question Text</label>
+        <textarea id="question_text" name="question_text" rows="3" required placeholder="How manageable has your coursework felt this week?"></textarea>
+      </div>
+
+      <h3 class="options-heading">Answer Options</h3>
+      <p class="options-help">Each option needs a score (0–10). Students never see the score — only the label.</p>
+
+      <div class="options-grid">
+        {['A', 'B', 'C', 'D', 'E'].map((letter) => (
+          <div class="option-row">
+            <Input label={`Code`} name="option_code[]" value={letter} required />
+            <Input label={`Option ${letter} — label`} name="option_text[]" placeholder="e.g. Very manageable" required />
+            <Input label="Score (0–10)" name="option_score[]" type="number" min="0" max="10" step="0.5" required />
+          </div>
+        ))}
+      </div>
+
+      <div class="form-actions">
+        <Button type="submit" variant="primary" size="lg">Save Draft</Button>
+      </div>
+    </form>
+  </Card>
+</ClinicianLayout>
+
+<style>
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  .text-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-bottom: var(--space-6);
+  }
+
+  .field-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+
+  .text-field textarea {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    font-size: 1rem;
+    font-family: inherit;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    resize: vertical;
+  }
+
+  .options-heading {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-1);
+  }
+
+  .options-help {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .option-row {
+    display: grid;
+    grid-template-columns: 5rem 1fr 10rem;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-bg-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 640px) {
+    .option-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

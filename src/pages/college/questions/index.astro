@@ -1,0 +1,146 @@
+---
+import CollegeLayout from '../../../layouts/CollegeLayout.astro';
+import PageHeader from '../../../components/navigation/PageHeader.astro';
+import Card from '../../../components/ui/Card.astro';
+import Button from '../../../components/ui/Button.astro';
+import Badge from '../../../components/ui/Badge.astro';
+import Alert from '../../../components/ui/Alert.astro';
+import EmptyState from '../../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../../lib/supabase/server';
+import { getProfile } from '../../../services/users';
+import { getActiveQuestions, raiseQuestionFlag } from '../../../services/clinician';
+import { Flag, FileQuestion } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'college_officer' && profile.role !== 'super_admin')) {
+  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
+  if (profile?.role === 'government_admin') return Astro.redirect('/admin/dashboard');
+}
+
+const institutionId = profile?.institution_id || '11111111-1111-1111-1111-111111111111';
+
+let message = '';
+let isError = false;
+let flaggedQuestionId = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const questionId = formData.get('question_id')?.toString();
+  const reason = formData.get('reason')?.toString().trim();
+
+  if (!questionId || !reason) {
+    message = 'A reason is required to raise a flag.';
+    isError = true;
+  } else {
+    const result = await raiseQuestionFlag(supabase, questionId, user.id, institutionId, reason);
+    if (!result.success) {
+      message = result.error || 'Could not raise the flag.';
+      isError = true;
+    } else {
+      message = 'Flag raised. A clinician will review it.';
+      flaggedQuestionId = questionId;
+    }
+  }
+}
+
+const questions = await getActiveQuestions(supabase);
+---
+
+<CollegeLayout title="Active Questions" activePath="/college/questions">
+  <PageHeader
+    title="Active Questions"
+    subtitle="Flag a question with a reason if it seems wrong for your students. There is no edit control here — flagging is the entire write surface."
+  />
+
+  {message && (
+    <Alert type={isError ? 'error' : 'success'} title={isError ? 'Could not flag' : 'Flag raised'}>{message}</Alert>
+  )}
+
+  {questions.length === 0 ? (
+    <EmptyState title="No active questions yet" description="Once the regional tier activates reviewed questions, they'll appear here." icon={FileQuestion} />
+  ) : (
+    <div class="q-list">
+      {questions.map((q) => (
+        <Card padding="lg">
+          <div class="q-tags">
+            <Badge variant="neutral" size="sm">{q.category.replace(/_/g, ' ')}</Badge>
+          </div>
+          <p class="q-text">{q.text}</p>
+
+          {flaggedQuestionId === q.id ? (
+            <p class="flagged-note"><Flag size={14} aria-hidden="true" /> Flag submitted — a clinician will review it.</p>
+          ) : (
+            <form method="POST" class="flag-form">
+              <input type="hidden" name="question_id" value={q.id} />
+              <textarea name="reason" rows="2" placeholder="Why does this question need a look?" required></textarea>
+              <Button type="submit" variant="outline" size="sm">
+                <Flag size={14} aria-hidden="true" /> Flag
+              </Button>
+            </form>
+          )}
+        </Card>
+      ))}
+    </div>
+  )}
+</CollegeLayout>
+
+<style>
+  .q-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .q-tags {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .q-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+    margin-bottom: var(--space-4);
+  }
+
+  .flag-form {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+
+  .flag-form textarea {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    font-family: inherit;
+    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    resize: vertical;
+  }
+
+  .flagged-note {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    color: var(--color-primary-700);
+    font-weight: 500;
+  }
+
+  @media (max-width: 640px) {
+    .flag-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+</style>

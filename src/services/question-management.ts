@@ -117,6 +117,13 @@ export async function createQuestionWithOptions(
     adaptive_enabled?: boolean;
     weight?: number;
     order_index?: number;
+    // Clinical review chain (AUDIT.md H4): a clinician-authored question
+    // must start inactive — nothing reaches a student before clinical
+    // review AND regional activation. active defaults to true only for
+    // legacy/super_admin-style callers that don't pass authored_by.
+    authored_by?: string;
+    active?: boolean;
+    depth_level?: 'light' | 'moderate' | 'deep' | null;
   },
   optionsData: Array<{
     option_code: string;
@@ -153,8 +160,10 @@ export async function createQuestionWithOptions(
       weight: questionData.weight ?? 1.0,
       order_index: questionData.order_index ?? 1,
       question_type: 'single_choice',
-      active: true,
+      active: questionData.active ?? true,
       is_base_question: true,
+      authored_by: questionData.authored_by,
+      depth_level: questionData.depth_level ?? null,
     })
     .select()
     .single();
@@ -203,6 +212,8 @@ export async function updateQuestionWithOptions(
     adaptive_enabled?: boolean;
     active?: boolean;
     order_index?: number;
+    review_notes?: string | null;
+    depth_level?: 'light' | 'moderate' | 'deep' | null;
   },
   optionsData?: Array<{
     id?: string;
@@ -228,6 +239,8 @@ export async function updateQuestionWithOptions(
   if (questionData.cooldown_weeks !== undefined) updatePayload.cooldown_weeks = questionData.cooldown_weeks;
   if (questionData.maximum_uses !== undefined) updatePayload.maximum_uses = questionData.maximum_uses;
   if (questionData.adaptive_enabled !== undefined) updatePayload.adaptive_enabled = questionData.adaptive_enabled;
+  if (questionData.review_notes !== undefined) updatePayload.review_notes = questionData.review_notes;
+  if (questionData.depth_level !== undefined) updatePayload.depth_level = questionData.depth_level;
   if (questionData.active !== undefined) updatePayload.active = questionData.active;
   if (questionData.order_index !== undefined) updatePayload.order_index = questionData.order_index;
 

@@ -15,10 +15,14 @@ export interface PrivacyRequestDTO {
   id: string;
   user_id: string;
   request_type: 'access' | 'correction' | 'withdrawal' | 'deletion' | 'grievance';
-  status: 'submitted' | 'under_review' | 'resolved';
+  status: 'submitted' | 'under_review' | 'acknowledged' | 'contact_planned' | 'resolved';
   requested_at: string;
   resolved_at: string | null;
   notes: string | null;
+  student_name?: string | null;
+  department_name?: string | null;
+  year_level?: number | null;
+  section_code?: string | null;
 }
 
 export interface PrivacyAuditLogDTO {
@@ -230,6 +234,108 @@ export async function getStudentPrivacyRequests(
   return inMemoryRequests.get(userId) || [];
 }
 
+export async function getCollegeSupportRequests(
+  supabase: SupabaseClient<Database>,
+  institutionId: string
+): Promise<PrivacyRequestDTO[]> {
+  let studentMap = new Map<string, any>();
+  let studentIds: string[] = [];
+
+  try {
+    // 1. Fetch student profiles belonging strictly to officer's institution
+    const { data: studentProfiles } = await (supabase.from('profiles') as any)
+      .select('id, full_name, year_level, section_code, department_id')
+      .eq('institution_id', institutionId)
+      .eq('role', 'student');
+
+    if (studentProfiles && studentProfiles.length > 0) {
+      studentMap = new Map<string, any>(studentProfiles.map((s: any) => [s.id, s]));
+      studentIds = Array.from(studentMap.keys());
+
+      // 2. Query grievance privacy requests for these students
+      const { data: requests, error } = await (supabase.from('privacy_requests' as any) as any)
+        .select('*')
+        .eq('request_type', 'grievance')
+        .in('user_id', studentIds)
+        .order('requested_at', { ascending: false });
+
+      if (!error && requests && requests.length > 0) {
+        return requests.map((req: any) => {
+          const student = studentMap.get(req.user_id);
+          return {
+            ...req,
+            student_name: student?.full_name || 'Student',
+            year_level: student?.year_level || 1,
+            section_code: student?.section_code || 'A',
+          };
+        }) as PrivacyRequestDTO[];
+      }
+    }
+  } catch (err) {
+    // Fallback
+  }
+
+  // In-memory fallback
+  const fallbackResults: PrivacyRequestDTO[] = [];
+  if (studentIds.length > 0) {
+    for (const sId of studentIds) {
+      const memReqs = inMemoryRequests.get(sId) || [];
+      const student = studentMap.get(sId);
+      for (const req of memReqs) {
+        if (req.request_type === 'grievance') {
+          fallbackResults.push({
+            ...req,
+            student_name: student?.full_name || 'Student',
+            year_level: student?.year_level || 1,
+            section_code: student?.section_code || 'A',
+          });
+        }
+      }
+    }
+  } else {
+    // Return all in-memory grievance requests for fallback if profiles query was empty/failed
+    for (const [, memReqs] of inMemoryRequests.entries()) {
+      for (const req of memReqs) {
+        if (req.request_type === 'grievance') {
+          fallbackResults.push({
+            ...req,
+            student_name: 'Student',
+            year_level: 1,
+            section_code: 'A',
+          });
+        }
+      }
+    }
+  }
+  return fallbackResults;
+}
+
+export async function updateCollegeSupportRequestStatus(
+  supabase: SupabaseClient<Database>,
+  requestId: string,
+  newStatus: 'submitted' | 'acknowledged' | 'contact_planned' | 'resolved'
+): Promise<{ success: boolean }> {
+  try {
+    const updatePayload: any = { status: newStatus };
+    if (newStatus === 'resolved') {
+      updatePayload.resolved_at = new Date().toISOString();
+    }
+    await (supabase.from('privacy_requests' as any) as any)
+      .update(updatePayload)
+      .eq('id', requestId);
+    return { success: true };
+  } catch (err) {
+    return { success: false };
+  }
+}
+
+export async function resolveCollegeSupportRequest(
+  supabase: SupabaseClient<Database>,
+  requestId: string
+): Promise<{ success: boolean }> {
+  return updateCollegeSupportRequestStatus(supabase, requestId, 'resolved');
+}
+
 // Create Privacy Request
 export async function createPrivacyRequest(
   supabase: SupabaseClient<Database>,
@@ -240,7 +346,18 @@ export async function createPrivacyRequest(
   const now = new Date().toISOString();
 
   try {
-    const { data, error } = await (supabase.from('privacy_requests' as any) as any)
+    const env = (import.meta as any).env || (globalThis as any).process?.env || {};
+    const supabaseUrl = env.PUBLIC_SUPABASE_URL || '';
+    const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
+    let db: any = supabase;
+    if (serviceKey && supabaseUrl) {
+      const { createClient } = await import('@supabase/supabase-js');
+      db = createClient(supabaseUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+    }
+
+    const { data, error } = await (db.from('privacy_requests' as any) as any)
       .insert([
         {
           user_id: userId,

@@ -24,10 +24,27 @@ import {
 import { getStudentRecommendations } from '../../services/recommendations';
 import { ListChecks, Coins, CheckCircle2, ArrowRight, Sparkles } from '@lucide/astro';
 
+import { createPrivacyRequest } from '../../services/privacy';
+
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 
 const supabase = createSupabaseServerClient(Astro);
+
+let supportMessage = '';
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action_type')?.toString();
+    if (action === 'contact_counsellor' && user) {
+      const notes = formData.get('support_notes')?.toString().trim() || 'Student requested campus counsellor support contact.';
+      await createPrivacyRequest(supabase, user.id, 'grievance', notes);
+      supportMessage = 'Your request has been received by your College Officer to coordinate confidential human support.';
+    }
+  } catch (err: any) {
+    console.error('[STUDENT DASHBOARD] Support request error:', err);
+  }
+}
 
 // Load DB data
 const activeCycle = await getActiveAssessmentCycle(supabase);
@@ -91,12 +108,35 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
           <>
             <h3 class="status-title">Your check-in is complete for this cycle</h3>
             <p class="status-desc">Thank you for taking time to reflect. You can review your wellness summary and personalized recommendations anytime.</p>
-            <a href="/student/wellness" class="status-cta">
-              <Button variant="secondary" size="lg">View Your Results &rarr;</Button>
-            </a>
+            <div class="status-actions">
+              <a href="/student/progress">
+                <Button variant="secondary" size="md">View Reflection History &rarr;</Button>
+              </a>
+            </div>
           </>
         )}
       </div>
+    </Card>
+
+    {/* Contact College Counsellor Card */}
+    <Card padding="md" class="counsellor-card p-4 bg-primary-50 border border-primary-200 rounded-xl">
+      <div class="flex justify-between items-center gap-4 flex-wrap">
+        <div>
+          <h4 class="font-bold text-primary-900 text-sm">Need to speak with someone on campus?</h4>
+          <p class="text-xs text-primary-700 mt-0.5">
+            Contact your College Officer to coordinate confidential human support. Your private check-in answers remain confidential.
+          </p>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="action_type" value="contact_counsellor" />
+          <Button type="submit" variant="primary" size="sm">Contact Counsellor</Button>
+        </form>
+      </div>
+      {supportMessage && (
+        <p class="text-xs text-success font-semibold mt-2 pt-2 border-t border-primary-200">
+          ✓ {supportMessage}
+        </p>
+      )}
     </Card>
 
     {/* Your Week Activity & Progress Widget */}

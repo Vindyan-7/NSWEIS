@@ -1,0 +1,174 @@
+---
+import RegionalLayout from '../../layouts/RegionalLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import Button from '../../components/ui/Button.astro';
+import Badge from '../../components/ui/Badge.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getQuestionsAwaitingActivation } from '../../services/clinician';
+import { getLiveGovernmentDashboardData } from '../../services/analytics';
+import { FileCheck, Building, CheckCircle2, ShieldCheck, HelpCircle } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || (profile.role !== 'regional_officer' && profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
+  return Astro.redirect('/no-access');
+}
+
+const awaitingActivation = await getQuestionsAwaitingActivation(supabase);
+const govData = await getLiveGovernmentDashboardData(supabase, user.id);
+---
+
+<RegionalLayout title="Regional Officer Dashboard" activePath="/regional/dashboard">
+  <PageHeader
+    title="Regional Implementation & Governance"
+    subtitle="Oversee assigned institutions, review clinician-approved question pools, and monitor regional wellbeing implementation."
+  >
+    <a href="/regional/questions">
+      <Button variant="primary" size="sm">
+        Review Question Pool ({awaitingActivation.length}) &rarr;
+      </Button>
+    </a>
+  </PageHeader>
+
+  <div class="regional-dashboard-grid">
+    {/* Section 1: Overview Metrics */}
+    <div class="metrics-row">
+      <MetricCard
+        title="Assigned Institutions"
+        value={govData.participation.total_institutions.toString()}
+        change="Regional Institution Scope"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Question Pool Queue"
+        value={awaitingActivation.length.toString()}
+        change="Awaiting Regional Activation"
+        changeType={awaitingActivation.length > 0 ? "positive" : "neutral"}
+      />
+      <MetricCard
+        title="Regional Student Scope"
+        value={govData.participation.total_eligible_students.toLocaleString()}
+        change="Eligible Enrolled Students"
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Privacy Protection"
+        value="≥ 10 Threshold"
+        change="Strict Anonymity Enforced"
+        changeType="positive"
+      />
+    </div>
+
+    {/* Section 2: Question Pool Governance */}
+    <div class="two-col-grid">
+      <Card padding="lg">
+        <div class="card-top-header">
+          <div>
+            <h3 class="font-bold text-lg text-main">Clinician Question Pool Review</h3>
+            <p class="text-sm text-muted mt-1">
+              Review clinician peer-approved questions before activating them for active student weekly cycles.
+            </p>
+          </div>
+          <Badge variant={awaitingActivation.length > 0 ? "needs_attention" : "neutral"} size="sm">
+            {awaitingActivation.length} Pending
+          </Badge>
+        </div>
+
+        {awaitingActivation.length === 0 ? (
+          <EmptyState
+            title="No questions awaiting review"
+            description="All peer-reviewed clinician questions have been evaluated and activated for regional students."
+            icon={CheckCircle2}
+          />
+        ) : (
+          <div class="queue-list mt-4">
+            {awaitingActivation.map((q) => (
+              <div class="queue-item p-4 bg-surface-subtle rounded-lg border border-subtle mb-3">
+                <div class="flex justify-between items-start mb-2">
+                  <span class="font-semibold text-main text-sm">{q.question_code} &bull; {q.category.replace('_', ' ')}</span>
+                  <Badge variant="primary" size="sm">Week {q.week_number}</Badge>
+                </div>
+                <p class="text-sm text-main font-medium mb-2">{q.text}</p>
+                <div class="text-xs text-muted flex justify-between items-center">
+                  <span>Author: <strong>{q.author_name || 'Clinician A'}</strong> &bull; Reviewer: <strong>{q.reviewer_name || 'Clinician B'}</strong></span>
+                  <a href="/regional/questions" class="text-primary font-semibold hover:underline">Review Question &rarr;</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Section 3: Assigned Colleges Status */}
+      <Card padding="lg">
+        <div class="card-top-header">
+          <div>
+            <h3 class="font-bold text-lg text-main">Assigned Colleges Status</h3>
+            <p class="text-sm text-muted mt-1">Implementation and check-in participation rates across regional campuses.</p>
+          </div>
+          <a href="/regional/colleges" class="text-xs text-primary font-semibold hover:underline">View All &rarr;</a>
+        </div>
+
+        <div class="colleges-status-list mt-4">
+          {govData.institution_summaries.map((inst) => (
+            <div class="inst-status-card p-3 bg-surface-subtle rounded-lg border border-subtle mb-3">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-main text-sm">{inst.institution_name}</span>
+                <Badge variant={inst.completion_percentage > 50 ? "stable" : "neutral"} size="sm">
+                  {inst.completion_percentage.toFixed(1)}% Participation
+                </Badge>
+              </div>
+              <div class="text-xs text-muted flex justify-between">
+                <span>Completed: <strong>{inst.completed_students} / {inst.eligible_students}</strong></span>
+                <span>Active Cycle: <strong>{govData.cycle ? govData.cycle.name : 'Week 1'}</strong></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  </div>
+</RegionalLayout>
+
+<style>
+  .regional-dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .two-col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+  }
+
+  .card-top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 768px) {
+    .two-col-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

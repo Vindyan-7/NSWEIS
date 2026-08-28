@@ -1,0 +1,40 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import Card from '../components/ui/Card.astro';
+import Button from '../components/ui/Button.astro';
+import { ShieldAlert } from '@lucide/astro';
+---
+
+<PublicLayout title="Access not configured — NSWEIS">
+  <main class="na-wrap">
+    <Card padding="lg" class="na-card">
+      <div class="na-icon"><ShieldAlert size={28} aria-hidden="true" /></div>
+      <h1>Your account isn't set up yet</h1>
+      <p>
+        You're signed in, but your account hasn't been assigned to an institution
+        yet. Someone at your college needs to add you before you can start.
+      </p>
+      <p class="na-help">
+        If you're a student, ask your college's well-being coordinator. If you're
+        staff, contact whoever set up NSWEIS at your institution.
+      </p>
+      <form action="/logout" method="POST">
+        <Button type="submit" variant="secondary">Sign out</Button>
+      </form>
+    </Card>
+  </main>
+</PublicLayout>
+
+<style>
+  .na-wrap { display: grid; place-items: center; min-height: 70vh; padding: var(--space-6, 1.5rem); }
+  .na-card { max-width: 34rem; text-align: center; }
+  .na-icon {
+    display: inline-grid; place-items: center;
+    width: 3.5rem; height: 3.5rem; border-radius: 999px;
+    background: var(--color-warning-bg, #FEF3E2); color: var(--color-warning-fg, #B45309);
+    margin-bottom: var(--space-4, 1rem);
+  }
+  .na-card h1 { font-size: 1.5rem; margin-bottom: var(--space-3, 0.75rem); }
+  .na-card p { color: var(--color-text-muted, #62708A); line-height: 1.6; margin-bottom: var(--space-3, 0.75rem); }
+  .na-help { font-size: 0.9375rem; }
+</style>

@@ -11,6 +11,7 @@ import type {
 } from '../types/domain';
 import { calculateCategoryScores, calculateOverallIndicator } from '../lib/scoring/engine';
 import { createSupabaseAdminClient } from '../lib/supabase/server';
+import { getGovernedWeeklyPoolQuestions } from './clinician';
 
 export async function getActiveAssessmentCycle(
   supabase: SupabaseClient<Database>
@@ -118,7 +119,16 @@ export async function getBaseQuestions(
   weekNumber?: number,
   departmentCode?: string
 ): Promise<Question[]> {
-  let query = supabase
+  const activeCycle = await getActiveAssessmentCycle(supabase);
+  if (!activeCycle) return [];
+
+  const poolQuestions = await getGovernedWeeklyPoolQuestions(supabase, activeCycle.id, 'reg-demo-north-01');
+  if (!poolQuestions || poolQuestions.length === 0) return [];
+
+  const poolIds = new Set(poolQuestions.map((q) => q.id));
+
+  const admin = createSupabaseAdminClient();
+  let query = admin
     .from('questions')
     .select('*, options:question_options(*)')
     .eq('is_base_question', true)
@@ -136,8 +146,11 @@ export async function getBaseQuestions(
 
   if (qError || !questionsData) return [];
 
+  // Filter out any questions not in the active weekly question pool
+  const filtered = (questionsData as any[]).filter((q) => poolIds.has(q.id));
+
   // Sort question options by order_index
-  const sorted = questionsData.map((q: any) => ({
+  const sorted = filtered.map((q: any) => ({
     ...q,
     options: (q.options || []).sort((a: any, b: any) => a.order_index - b.order_index),
   }));

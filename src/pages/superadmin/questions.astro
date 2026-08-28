@@ -54,6 +54,13 @@ let isError = false;
 const url = new URL(Astro.request.url);
 const activeTab = url.searchParams.get('tab') || 'cycles';
 
+// Sidebar nav lives in SuperAdminLayout and only sees a bare pathname, but
+// "Cycles" and "Question Library" are both this same route split by ?tab= —
+// give it a synthetic path per tab so the correct nav item highlights.
+const layoutActivePath = activeTab === 'library'
+  ? '/superadmin/questions-library'
+  : '/superadmin/questions-cycles';
+
 // Question Filters
 const weekFilter = url.searchParams.get('week') ? parseInt(url.searchParams.get('week')!, 10) : undefined;
 const deptFilter = url.searchParams.get('department') || undefined;
@@ -346,7 +353,7 @@ const allActiveQuestions = await listQuestions(supabase, { activeState: 'active'
 const importHistory = await getImportHistory(supabase);
 ---
 
-<SuperAdminLayout title="Master Question & Cycle Management" activePath="/superadmin/questions">
+<SuperAdminLayout title="Master Question & Cycle Management" activePath={layoutActivePath}>
   <PageHeader
     title="Master Question & Cycle Management"
     subtitle="Super Admin workspace for weekly reflection cycles, master question library, options, and adaptive rules"
@@ -619,23 +626,9 @@ const importHistory = await getImportHistory(supabase);
                       </td>
                       <td>
                         <div class="action-row">
-                          {q.active !== false ? (
-                            <form method="POST" inline-form style="display:inline;">
-                              <input type="hidden" name="action" value="archive_question" />
-                              <input type="hidden" name="question_id" value={q.id} />
-                              <button type="submit" class="action-link-danger" onclick="return confirm('Archive this question? Historical responses will be preserved.');">
-                                <Archive size={12} aria-hidden="true" /> Archive
-                              </button>
-                            </form>
-                          ) : (
-                            <form method="POST" style="display:inline;">
-                              <input type="hidden" name="action" value="unarchive_question" />
-                              <input type="hidden" name="question_id" value={q.id} />
-                              <button type="submit" class="action-link">
-                                Reactivate
-                              </button>
-                            </form>
-                          )}
+                          <span class="action-disabled-note" title="Authoring moved to the clinician review chain (BUILD_PLAN Phase 4) — super_admin no longer has a write policy on this table.">
+                            Managed via Clinician workflow
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -650,86 +643,18 @@ const importHistory = await getImportHistory(supabase);
           </div>
         </Card>
 
-        {/* Add Question to Library Form */}
-        <Card padding="lg">
-          <h3 class="card-section-title">+ Add New Question to Library</h3>
-          <p class="section-subtext">Add a curated question, reuse parameters, and choice option signals.</p>
-
-          <form method="POST" class="standard-form">
-            <input type="hidden" name="action" value="create_question" />
-
-            <div class="form-grid-4">
-              <Input label="Question Code" name="question_code" placeholder="e.g. W01-Q01" required />
-              <Input label="Target Week" name="week_number" type="number" min="1" value="1" required />
-              <Select label="Category" name="category" required>
-                <option value="academic">Academic Balance</option>
-                <option value="sleep_rest">Sleep & Rest</option>
-                <option value="emotional_wellbeing">Emotional Reflection</option>
-                <option value="social_connection">Social Connection</option>
-                <option value="family_home">Routine Self-Management</option>
-                <option value="digital_balance">Digital Balance</option>
-                <option value="physical_wellbeing">Physical Activity</option>
-                <option value="career">Career & Future Confidence</option>
-              </Select>
-              <Select label="Target Department" name="target_department" required>
-                <option value="ALL">ALL (Global)</option>
-                {departmentsList.map((d) => (
-                  <option value={d.code}>{d.code} &ndash; {d.name}</option>
-                ))}
-              </Select>
-            </div>
-
-            <Input label="Question Statement Text" name="question_text" placeholder="Enter clear, non-clinical question text..." required />
-
-            <h4 class="sub-section-title">Question Reuse & Adaptive Eligibility Parameters</h4>
-            <div class="form-grid-4">
-              <Select label="Reusable Across Weeks" name="reusable">
-                <option value="true">Yes (Can be re-asked in future cycles)</option>
-                <option value="false">No (Single-use only)</option>
-              </Select>
-              <Input label="Cooldown Weeks" name="cooldown_weeks" type="number" min="0" value="0" />
-              <Input label="Max Uses (Optional)" name="maximum_uses" type="number" min="1" placeholder="Unlimited" />
-              <Select label="Adaptive Engine Eligible" name="adaptive_enabled">
-                <option value="true">Eligible for Adaptive Selection</option>
-                <option value="false">Common Pool Only</option>
-              </Select>
-            </div>
-
-            <h4 class="sub-section-title">Choice Options & Signal Values (Internal 0.0 &ndash; 10.0 Scale)</h4>
-            <div class="options-grid">
-              <div class="option-row">
-                <Input label="Code" name="option_code[]" value="A" required />
-                <Input label="Option Text A" name="option_text[]" placeholder="Very manageable" required />
-                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="9.0" required />
-                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-              </div>
-              <div class="option-row">
-                <Input label="Code" name="option_code[]" value="B" required />
-                <Input label="Option Text B" name="option_text[]" placeholder="Mostly manageable" required />
-                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="7.0" required />
-                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-              </div>
-              <div class="option-row">
-                <Input label="Code" name="option_code[]" value="C" required />
-                <Input label="Option Text C" name="option_text[]" placeholder="Somewhat difficult" required />
-                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="5.0" required />
-                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="Optional" />
-              </div>
-              <div class="option-row">
-                <Input label="Code" name="option_code[]" value="D" required />
-                <Input label="Option Text D" name="option_text[]" placeholder="Very difficult" required />
-                <Input label="Signal Value (0-10)" name="signal_value[]" type="number" step="0.5" value="2.5" required />
-                <Input label="Follow-up Group" name="follow_up_group[]" placeholder="academic_low" />
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <Button variant="primary" type="submit">
-                <Plus size={14} aria-hidden="true" /> Save Question to Library
-              </Button>
-            </div>
-          </form>
-        </Card>
+        {/* Question authoring moved to the clinical review chain (BUILD_PLAN
+             Phase 4). 12_security_hardening.sql dropped the super_admin
+             write policy on questions/question_options without replacing
+             it — that's deliberate (AUDIT.md H4/M4: no single person,
+             including super_admin, should be able to put a question in
+             front of a student unreviewed), but this page's create form
+             would otherwise submit and fail with a raw RLS error. */}
+        <Alert type="info" title="Authoring moved to the clinician workflow">
+          Questions are now authored by a clinician, peer-reviewed by a different clinician, and
+          activated by the regional (government_admin) tier — see AUDIT.md finding H4. This page
+          remains for viewing the library only.
+        </Alert>
       </div>
     )}
 
@@ -870,47 +795,14 @@ const importHistory = await getImportHistory(supabase);
     {/* ============================================================ */}
     {activeTab === 'csv' && (
       <div class="tab-content">
-        <Card padding="lg">
-          <h3 class="card-section-title">Bulk Question Import (Dual CSV)</h3>
-          <p class="section-subtext">Import questions and options in bulk using the NSWEIS contract with pre-mutation validation.</p>
-
-          <form method="POST" class="csv-form">
-            <input type="hidden" name="action" value="import_csv" />
-            <input type="hidden" name="filename" value="bulk_questions_import.csv" />
-
-            <div class="csv-inputs-grid">
-              <div class="csv-box">
-                <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 1. Questions CSV</h4>
-                <p class="csv-box-hint">Headers: question_code, week_number, question_text, category, target_department, adaptive_trigger_group, required, question_type</p>
-                <textarea
-                  name="questions_csv"
-                  rows="8"
-                  class="csv-textarea"
-                  placeholder={`question_code,week_number,question_text,category,target_department,adaptive_trigger_group,required,question_type\nW01-Q01,1,"How manageable has your academic workload felt this week?",academic,ALL,academic_low,true,single_choice`}
-                  required
-                ></textarea>
-              </div>
-
-              <div class="csv-box">
-                <h4 class="csv-box-title"><FileText size={16} aria-hidden="true" /> 2. Options CSV</h4>
-                <p class="csv-box-hint">Headers: question_code, option_code, option_text, signal_value, follow_up_group, display_order</p>
-                <textarea
-                  name="options_csv"
-                  rows="8"
-                  class="csv-textarea"
-                  placeholder={`question_code,option_code,option_text,signal_value,follow_up_group,display_order\nW01-Q01,A,"Very manageable",9.0,,1\nW01-Q01,B,"Mostly manageable",7.0,,2\nW01-Q01,C,"Somewhat difficult",5.0,academic_low,3\nW01-Q01,D,"Very difficult",2.5,academic_low,4`}
-                  required
-                ></textarea>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <Button variant="primary" type="submit">
-                <Upload size={14} aria-hidden="true" /> Validate & Import CSVs
-              </Button>
-            </div>
-          </form>
-        </Card>
+        {/* Same reason as the Question Library tab: super_admin has no
+             write policy on questions/question_options any more, so this
+             importer can no longer succeed. */}
+        <Alert type="info" title="Bulk import moved to the clinician workflow">
+          Bulk CSV import wrote directly to the question bank, bypassing clinical review entirely —
+          that's no longer permitted (AUDIT.md H4). Questions are authored one at a time at
+          <code>/clinician/questions/new</code> so each one goes through peer review before activation.
+        </Alert>
 
         {importHistory.length > 0 && (
           <Card padding="lg">

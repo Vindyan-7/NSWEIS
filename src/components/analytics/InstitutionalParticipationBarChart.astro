@@ -52,7 +52,7 @@ const { institutions } = Astro.props;
               }
               size="sm"
             >
-              {inst.participation_status.replace('_', ' ')}
+              {inst.participation_status.replace(/_/g, ' ')}
             </Badge>
 
             {inst.action_signal === 'PARTICIPATION_REQUIRES_FOLLOWUP' ? (

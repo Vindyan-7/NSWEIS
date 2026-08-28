@@ -2,34 +2,44 @@ import { defineMiddleware } from 'astro:middleware';
 import { getAuthSession } from './lib/auth/session';
 import { getDashboardForRole, isRouteAllowedForRole } from './lib/permissions/roles';
 
-const PUBLIC_ROUTES = ['/', '/login', '/privacy'];
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/signup',
+  '/student/signup',
+  '/privacy',
+  '/privacy-policy',
+  '/no-access',
+  '/logout',
+];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const pathname = new URL(context.request.url).pathname;
 
-  // Retrieve user session & profile
   const { user, profile } = await getAuthSession(context);
   context.locals.user = user;
   context.locals.profile = profile;
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
-  // Unauthenticated user attempting to access protected route
   if (!user && !isPublicRoute) {
     return context.redirect('/login');
   }
 
-  // Authenticated user on login page redirect to role dashboard
-  if (user && pathname === '/login') {
-    const role = profile?.role || 'student';
-    return context.redirect(getDashboardForRole(role));
+  // SECURITY (AUDIT.md C1b): a signed-in user with no profile row has NO role.
+  // We no longer fall back to 'student' — an unprovisioned account is shown a
+  // dead end rather than being guessed into a tier.
+  if (user && !profile && !isPublicRoute) {
+    return context.redirect('/no-access');
   }
 
-  // Authenticated user attempting to access route disallowed for their role
-  if (user && !isPublicRoute) {
-    const role = profile?.role || 'student';
-    if (!isRouteAllowedForRole(pathname, role)) {
-      return context.redirect(getDashboardForRole(role));
+  if (user && pathname === '/login') {
+    return context.redirect(getDashboardForRole(profile?.role));
+  }
+
+  if (user && profile && !isPublicRoute) {
+    if (!isRouteAllowedForRole(pathname, profile.role)) {
+      return context.redirect(getDashboardForRole(profile.role));
     }
   }
 

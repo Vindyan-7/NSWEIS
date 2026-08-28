@@ -4,7 +4,7 @@ import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
 
-import { LayoutDashboard, ChartNoAxesCombined, CalendarCheck } from '@lucide/astro';
+import { LayoutDashboard, ChartNoAxesCombined, CalendarCheck, Flag, Layers, FileText } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -17,8 +17,11 @@ const profile = Astro.locals.profile;
 
 const collegeNav = [
   { label: 'Dashboard', href: '/college/dashboard', icon: LayoutDashboard, active: activePath === '/college/dashboard' },
+  { label: 'Academic Structure', href: '/college/academic-structure', icon: Layers, active: activePath === '/college/academic-structure' },
   { label: 'Aggregate Insights', href: '/college/insights', icon: ChartNoAxesCombined, active: activePath === '/college/insights' },
+  { label: 'Reports & Audit', href: '/college/reports', icon: FileText, active: activePath === '/college/reports' },
   { label: 'Interventions', href: '/college/interventions', icon: CalendarCheck, active: activePath === '/college/interventions' },
+  { label: 'Active Questions', href: '/college/questions', icon: Flag, active: activePath === '/college/questions' },
 ];
 ---
 

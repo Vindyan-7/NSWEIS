@@ -1,4 +1,10 @@
-export type UserRole = 'student' | 'college_officer' | 'government_admin' | 'super_admin';
+export type UserRole =
+  | 'student'
+  | 'clinician'        // authors and peer-reviews the question bank; sees no student data
+  | 'college_officer'
+  | 'regional_officer' // regional governance: oversees assigned region, reviews question pools
+  | 'government_admin' // state/national governance: manages colleges, regions, and officers
+  | 'super_admin';
 
 export type WellnessCategory =
   | 'academic'
@@ -30,6 +36,9 @@ export interface UserProfile {
   role: UserRole;
   institution_id?: string | null;
   department_id?: string | null;
+  region_id?: string | null;
+  region_code?: string | null;
+  created_by?: string | null;
   student_roll_no?: string | null;
   year_level?: number | null;
   section_code?: string | null;
@@ -73,6 +82,17 @@ export interface AssessmentCycle {
   updated_at: string;
 }
 
+export type QuestionLifecycleStatus =
+  | 'draft'
+  | 'peer_review'
+  | 'revision_requested'
+  | 'peer_approved'
+  | 'regional_review'
+  | 'regional_revision_requested'
+  | 'regionally_approved'
+  | 'active'
+  | 'archived';
+
 export interface Question {
   id: string;
   text: string;
@@ -94,6 +114,59 @@ export interface Question {
   created_by?: string | null;
   updated_at?: string;
   options?: QuestionOption[];
+  // Clinical review chain (12_security_hardening.sql FIX H4)
+  authored_by?: string | null;
+  clinical_reviewed_by?: string | null;
+  clinical_reviewed_at?: string | null;
+  activated_by?: string | null;
+  activated_at?: string | null;
+  // 14_clinician_workflow_extras.sql & 15_question_governance_engine.sql
+  review_notes?: string | null;
+  depth_level?: 'light' | 'moderate' | 'deep' | null;
+  status?: QuestionLifecycleStatus;
+  version?: number;
+  parent_question_id?: string | null;
+  region_id?: string | null;
+  recommendation_title?: string | null;
+  recommendation_description?: string | null;
+  task_title?: string | null;
+  task_description?: string | null;
+  estimated_minutes?: number | null;
+  credits_awarded?: number | null;
+}
+
+export interface QuestionAuditLog {
+  id: string;
+  question_id: string;
+  actor_id?: string | null;
+  action: string;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface WeeklyQuestionPool {
+  id: string;
+  region_id: string;
+  week_number: number;
+  cycle_id?: string | null;
+  name: string;
+  status: 'draft' | 'peer_approved' | 'regional_review' | 'active' | 'archived';
+  activated_by?: string | null;
+  activated_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuestionFlag {
+  id: string;
+  question_id: string;
+  raised_by: string;
+  institution_id: string;
+  reason: string;
+  raised_at: string;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  resolution?: 'upheld' | 'amended' | 'retired' | null;
 }
 
 export interface WeeklyCycle {

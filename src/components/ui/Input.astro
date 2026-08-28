@@ -6,6 +6,7 @@ interface Props {
   type?: 'text' | 'email' | 'password' | 'number' | 'date' | 'time' | 'datetime-local';
   value?: string | number;
   placeholder?: string;
+  autocomplete?: string;
   required?: boolean;
   disabled?: boolean;
   error?: string;
@@ -23,6 +24,7 @@ const {
   type = 'text',
   value,
   placeholder,
+  autocomplete,
   required = false,
   disabled = false,
   error,
@@ -44,6 +46,7 @@ const {
     type={type}
     value={value}
     placeholder={placeholder}
+    autocomplete={autocomplete}
     required={required}
     disabled={disabled}
     class={`input-field ${error ? 'has-error' : ''}`}

@@ -3,7 +3,7 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
-import { LayoutDashboard, Building2, ChartNoAxesCombined, CalendarCheck } from '@lucide/astro';
+import { LayoutDashboard, Building2, ChartNoAxesCombined, CalendarCheck, ClipboardCheck, MapPin } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -15,10 +15,12 @@ const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 
 const govNav = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, active: activePath === '/admin/dashboard' },
+  { label: 'Dashboard', href: '/government/dashboard', icon: LayoutDashboard, active: activePath === '/government/dashboard' },
+  { label: 'Regional Officers', href: '/admin/regions', icon: MapPin, active: activePath === '/admin/regions' },
   { label: 'Institutions', href: '/admin/institutions', icon: Building2, active: activePath === '/admin/institutions' },
   { label: 'Insights', href: '/admin/insights', icon: ChartNoAxesCombined, active: activePath === '/admin/insights' },
   { label: 'Interventions', href: '/admin/interventions', icon: CalendarCheck, active: activePath === '/admin/interventions' },
+  { label: 'Question Activation', href: '/admin/questions', icon: ClipboardCheck, active: activePath === '/admin/questions' },
 ];
 ---
 

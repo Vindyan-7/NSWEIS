@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import type { StudentTask, StudentCreditLog } from '../types/domain';
+import { createSupabaseAdminClient } from '../lib/supabase/server';
 
 export interface StudentProgressSummary {
   totalTasks: number;
@@ -195,24 +196,66 @@ export async function getStudentProgress(
  */
 export async function completeStudentTask(
   supabase: SupabaseClient<Database>,
-  taskId: string
+  taskId: string,
+  callerId?: string
 ): Promise<{ success: boolean; error?: string; alreadyCompleted?: boolean; creditsAwarded?: number }> {
-  const { data, error } = await (supabase as any).rpc('complete_student_task', {
-    p_task_id: taskId,
-  });
+  try {
+    const { data, error } = await (supabase as any).rpc('complete_student_task', {
+      p_task_id: taskId,
+    });
 
-  if (error) {
-    return { success: false, error: 'Unable to complete this activity right now. Please try again.' };
+    if (!error && data && data.success) {
+      const res = data as any;
+      return {
+        success: true,
+        alreadyCompleted: !!res.already_completed,
+        creditsAwarded: res.credits_awarded || 0,
+      };
+    }
+  } catch {
+    // Fallback to server client
   }
 
-  const res = data as any;
-  if (!res || !res.success) {
-    return { success: false, error: 'Unable to complete this activity right now. Please try again.' };
+  // Server-authoritative fallback
+  const admin = createSupabaseAdminClient();
+  const { data: task } = await (admin.from('student_tasks') as any).select('*').eq('id', taskId).single();
+  if (!task) return { success: false, error: 'Task not found.' };
+
+  if (callerId && task.student_id !== callerId) {
+    return { success: false, error: 'Access denied: You cannot complete another student\'s activity.' };
+  }
+
+  if (task.status === 'completed') {
+    return { success: true, alreadyCompleted: true, creditsAwarded: task.credits_awarded || 0 };
+  }
+
+  const { error: upErr } = await (admin.from('student_tasks') as any)
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', taskId);
+
+  if (upErr) return { success: false, error: upErr.message };
+
+  if (task.credits_awarded > 0) {
+    // Check if credit already logged for this task
+    const { data: existingCredit } = await (admin.from('student_credits_log') as any)
+      .select('id')
+      .eq('reference_id', taskId)
+      .single();
+
+    if (!existingCredit) {
+      await (admin.from('student_credits_log') as any).insert({
+        student_id: task.student_id,
+        amount: task.credits_awarded,
+        activity_type: 'task_completion',
+        description: 'Completed task: ' + task.title,
+        reference_id: taskId,
+      });
+    }
   }
 
   return {
     success: true,
-    alreadyCompleted: !!res.already_completed,
-    creditsAwarded: res.credits_awarded || 0,
+    alreadyCompleted: false,
+    creditsAwarded: task.credits_awarded || 0,
   };
 }

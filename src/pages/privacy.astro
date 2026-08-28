@@ -2,6 +2,7 @@
 import PublicLayout from '../layouts/PublicLayout.astro';
 import PageHeader from '../components/navigation/PageHeader.astro';
 import Card from '../components/ui/Card.astro';
+import Button from '../components/ui/Button.astro';
 import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
 ---
 
@@ -30,6 +31,12 @@ import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
         <p>
           NSWEIS does not diagnose mental illness, compute psychiatric risk scores, or replace licensed medical professionals. Indicators provide self-reflection guidance and enable proactive institutional support.
         </p>
+
+        <div class="mt-6 pt-4 border-t border-subtle">
+          <a href="/privacy-policy">
+            <Button variant="primary" size="md">&rarr; Read Full NSWEIS Public Privacy Policy (19 Sections)</Button>
+          </a>
+        </div>
       </Card>
     </div>
   </div>
