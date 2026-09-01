@@ -46,11 +46,27 @@ export async function getAuthSession(context: {
     return { user: { id: user.id, email: user.email }, profile: null };
   }
 
+  const resolvedProfile = { ...(profile as any) } as UserProfile;
+
+  // DB enum fallback compatibility for regional_officer / clinician when DB enum is government_admin
+  const metaRole = user.user_metadata?.role;
+  if (metaRole && (metaRole === 'regional_officer' || metaRole === 'clinician')) {
+    resolvedProfile.role = metaRole;
+  }
+
+  if (user.user_metadata?.region_id && !resolvedProfile.region_id) {
+    resolvedProfile.region_id = user.user_metadata.region_id;
+  }
+  if (user.user_metadata?.institution_id && !resolvedProfile.institution_id) {
+    resolvedProfile.institution_id = user.user_metadata.institution_id;
+  }
+
   return {
     user: {
       id: user.id,
       email: user.email,
     },
-    profile: profile as UserProfile,
+    profile: resolvedProfile,
   };
 }
+

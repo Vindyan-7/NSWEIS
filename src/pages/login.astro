@@ -39,7 +39,12 @@ if (Astro.request.method === 'POST') {
           if ((profile as any).active === false) {
             errorMessage = 'Your account has been deactivated. Please contact your administrator.';
           } else {
-            return Astro.redirect(getDashboardForRole((profile as any).role));
+            let role = (profile as any).role;
+            const metaRole = authData.user.user_metadata?.role;
+            if (metaRole && (metaRole === 'regional_officer' || metaRole === 'clinician')) {
+              role = metaRole;
+            }
+            return Astro.redirect(getDashboardForRole(role));
           }
         } else {
           return Astro.redirect('/no-access');
