@@ -51,14 +51,14 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
     <div class="metrics-grid">
       <MetricCard
         title="Regional Scope"
-        value={`${metrics.authorized_institutions_count} Institutions`}
-        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics.active_reporting_institutions_count} Actively Reporting`}
+        value={`${metrics?.authorized_institutions_count ?? 0} Institutions`}
+        change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics?.active_reporting_institutions_count ?? 0} Actively Reporting`}
         changeType="neutral"
       />
       <MetricCard
         title="Participating Population"
-        value={isDataSuppressed ? "Insufficient data" : metrics.participating_students.toLocaleString()}
-        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `${metrics.participation_rate.toFixed(1)}% Regional Participation`}
+        value={isDataSuppressed ? "Insufficient data" : (metrics?.participating_students ?? 0).toLocaleString()}
+        change={isDataSuppressed ? "Privacy threshold: ≥10 students required" : `${(metrics?.participation_rate ?? 0).toFixed(1)}% Regional Participation`}
         changeType="neutral"
       />
       <MetricCard
@@ -116,12 +116,11 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
               </div>
 
               {inst.is_suppressed ? (
-                <p class="suppressed-note">Insufficient group size for anonymous reporting.</p>
+                <p class="suppressed-note">{inst.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
               ) : (
                 <div class="inst-comp-meta">
-                  <span>Completed: <strong>{inst.completed_students}</strong></span>
-                  <span>Rate: <strong>{inst.participation_rate.toFixed(1)}%</strong></span>
-                  <span>Avg: <strong>{inst.average_overall_score?.toFixed(1) || 'N/A'}</strong>/10</span>
+                  <span>Reporting: <strong>{inst.participating_student_count ?? 0} students</strong></span>
+                  <span>Avg Score: <strong>{inst.average_overall_score?.toFixed(1) || 'N/A'}</strong> / 10</span>
                 </div>
               )}
             </div>
@@ -133,43 +132,45 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
       </Card>
     </div>
 
-    {/* Longitudinal Trends Section */}
+    {/* Regional Category Trajectory Section */}
     <Card padding="lg">
-      <h3 class="card-section-title">Participation & Trend Trajectory</h3>
-      <p class="section-subtext">Historical comparison of check-in completions and overall index.</p>
+      <h3 class="card-section-title">Regional Category Trajectory & Momentum</h3>
+      <p class="section-subtext">Aggregated movement across wellness dimensions in your region.</p>
 
       {trends.length === 0 ? (
-        <p class="text-sm text-muted">No historical cycle data available yet for trend analysis.</p>
+        <p class="text-sm text-muted">No trend data available yet.</p>
       ) : (
         <div class="trends-table-wrap">
           <table class="trends-table">
             <thead>
               <tr>
-                <th>Cycle Name</th>
-                <th>Check-in Window</th>
-                <th>Participating Students</th>
-                <th>Participation Rate</th>
-                <th>Avg Wellbeing Score</th>
-                <th>Status</th>
+                <th>Category</th>
+                <th>Current Index</th>
+                <th>Previous Cycle</th>
+                <th>Trend Direction</th>
               </tr>
             </thead>
             <tbody>
               {trends.map((t) => (
                 <tr>
-                  <td class="font-medium">{t.cycle_name}</td>
-                  <td>{new Date(t.start_date).toLocaleDateString()} - {new Date(t.end_date).toLocaleDateString()}</td>
-                  <td>{t.participating_students.toLocaleString()}</td>
-                  <td>{t.participation_rate.toFixed(1)}%</td>
+                  <td class="font-medium capitalize">{t.category.replace(/_/g, ' ')}</td>
                   <td>
-                    {t.average_score !== null ? (
-                      <strong>{t.average_score.toFixed(1)} / 10</strong>
+                    {t.current_score !== null ? (
+                      <strong>{t.current_score.toFixed(1)} / 10</strong>
                     ) : (
-                      <span class="text-muted">Suppressed</span>
+                      <span class="text-muted">Suppressed (&lt;10)</span>
                     )}
                   </td>
                   <td>
-                    <Badge variant={t.is_active ? 'stable' : 'neutral'} size="sm">
-                      {t.is_active ? 'Active' : 'Closed'}
+                    {t.previous_score !== null ? (
+                      <span>{t.previous_score.toFixed(1)} / 10</span>
+                    ) : (
+                      <span class="text-muted">Baseline</span>
+                    )}
+                  </td>
+                  <td>
+                    <Badge variant={t.trend_direction === 'stable' ? 'stable' : t.trend_direction === 'declining' ? 'elevated' : 'neutral'} size="sm">
+                      {t.trend_direction.replace(/_/g, ' ')}
                     </Badge>
                   </td>
                 </tr>
