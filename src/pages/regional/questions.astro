@@ -13,8 +13,9 @@ import {
   activateQuestion,
   requestQuestionChange,
   getActiveQuestions,
+  deleteOrDeactivateQuestion,
 } from '../../services/clinician';
-import { CheckCircle2 } from '@lucide/astro';
+import { CheckCircle2, Check, MessageSquare, Layers, Trash2, ShieldCheck, UserCheck } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -33,42 +34,78 @@ let message = '';
 let isError = false;
 
 if (Astro.request.method === 'POST') {
-  const formData = await Astro.request.formData();
-  const actionType = formData.get('action_type')?.toString();
-  const questionId = formData.get('question_id')?.toString();
+  try {
+    const contentType = Astro.request.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await Astro.request.formData();
+      const actionType = formData.get('action_type')?.toString();
+      const questionId = formData.get('question_id')?.toString();
 
-  if (questionId) {
-    if (actionType === 'activate') {
-      const res = await activateQuestion(supabase, questionId, user.id);
-      if (res.success) {
-        message = 'Question activated successfully for student weekly cycles!';
-      } else {
-        message = res.error || 'Could not activate question.';
-        isError = true;
-      }
-    } else if (actionType === 'request_revision') {
-      const notes = formData.get('review_notes')?.toString().trim() || '';
-      if (!notes) {
-        message = 'Please provide feedback explaining what needs to be revised.';
-        isError = true;
-      } else {
-        const res = await requestQuestionChange(supabase, questionId, notes);
-        if (res.success) {
-          message = 'Feedback sent to clinicians for question revision.';
-        } else {
-          message = res.error || 'Could not send feedback.';
-          isError = true;
+      if (questionId) {
+        if (actionType === 'activate') {
+          const res = await activateQuestion(supabase, questionId, user.id);
+          if (res.success) {
+            message = 'Question approved and activated into the live regional question pool!';
+          } else {
+            message = res.error || 'Could not activate question.';
+            isError = true;
+          }
+        } else if (actionType === 'request_revision') {
+          const notes = formData.get('review_notes')?.toString().trim() || '';
+          if (!notes) {
+            message = 'Please provide revision feedback in the notes field before requesting changes.';
+            isError = true;
+          } else {
+            const res = await requestQuestionChange(supabase, questionId, notes);
+            if (res.success) {
+              message = 'Revision request sent back to the clinical authors.';
+            } else {
+              message = res.error || 'Could not send revision request.';
+              isError = true;
+            }
+          }
+        } else if (actionType === 'delete_question') {
+          const res = await deleteOrDeactivateQuestion(supabase, questionId, user.id);
+          if (res.success) {
+            message = 'Question removed successfully.';
+          } else {
+            message = res.error || 'Failed to remove question.';
+            isError = true;
+          }
         }
       }
     }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
   }
 }
 
+const url = new URL(Astro.request.url);
+const selectedWeek = url.searchParams.get('week') || 'all';
+
 const awaitingActivation = await getQuestionsAwaitingActivation(supabase);
 const activeQuestions = await getActiveQuestions(supabase);
+
+const categoryLabel = (cat: string) => cat.replace(/_/g, ' ');
+
+// Distinct week numbers for Active Library filtering
+const weekNumbers = Array.from(new Set(activeQuestions.map((q) => q.week_number || 1))).sort((a, b) => a - b);
+
+const filteredActiveQuestions = selectedWeek === 'all'
+  ? activeQuestions
+  : activeQuestions.filter((q) => (q.week_number || 1) === parseInt(selectedWeek, 10));
+
+// Group questions by week for structured presentation
+const questionsByWeek = new Map<number, typeof activeQuestions>();
+filteredActiveQuestions.forEach((q) => {
+  const w = q.week_number || 1;
+  if (!questionsByWeek.has(w)) questionsByWeek.set(w, []);
+  questionsByWeek.get(w)!.push(q);
+});
 ---
 
-<RegionalLayout title="Question Pool Review — Regional Officer" activePath="/regional/questions">
+<RegionalLayout title="Question Pool Governance — Regional Officer" activePath="/regional/questions">
   <PageHeader
     title="Regional Question Pool Governance"
     subtitle="Review clinician peer-approved questions, communicate feedback, and activate approved pools for student weekly check-ins."
@@ -79,96 +116,124 @@ const activeQuestions = await getActiveQuestions(supabase);
   </PageHeader>
 
   {message && (
-    <Alert type={isError ? "error" : "success"} class="mb-6">
-      {message}
-    </Alert>
+    <div class="alert-container">
+      <Alert type={isError ? "error" : "success"} title={isError ? "Notice" : "Success"}>
+        {message}
+      </Alert>
+    </div>
   )}
 
   <div class="regional-questions-stack">
     {/* Section 1: Questions Awaiting Regional Activation */}
     <Card padding="lg">
-      <div class="card-header-row mb-4">
+      <div class="card-header-row">
         <div>
-          <h3 class="font-bold text-lg text-main">Clinician Peer-Approved Queue</h3>
-          <p class="text-sm text-muted">
-            These questions have completed clinician peer review and are awaiting your regional governance review and activation.
+          <div class="header-with-badge">
+            <ShieldCheck size={22} class="text-primary" />
+            <h3 class="section-title">Clinician Peer-Approved Queue</h3>
+          </div>
+          <p class="section-desc">
+            These questions have completed clinical peer review and are awaiting your regional governance review and pool activation.
           </p>
         </div>
-        <Badge variant={awaitingActivation.length > 0 ? "elevated" : "neutral"} size="sm">
+        <span class={`queue-badge ${awaitingActivation.length > 0 ? 'highlight' : ''}`}>
           {awaitingActivation.length} Awaiting Activation
-        </Badge>
+        </span>
       </div>
 
       {awaitingActivation.length === 0 ? (
         <EmptyState
-          title="No questions in review queue"
-          description="All reviewed questions have been activated for active student reflection cycles."
+          title="No questions awaiting activation"
+          description="All reviewed questions have been approved and activated into active student reflection cycles."
           icon={CheckCircle2}
         />
       ) : (
-        <div class="questions-review-list">
+        <div class="review-queue-stack">
           {awaitingActivation.map((q) => (
-            <div class="review-card p-5 bg-surface-subtle border border-subtle rounded-xl mb-4">
-              <div class="flex justify-between items-start mb-3">
-                <div>
-                  <span class="font-bold text-main">{q.question_code}</span> &bull;{' '}
-                  <span class="text-sm text-muted capitalize">{q.category.replace('_', ' ')}</span> &bull;{' '}
-                  <span class="text-xs text-primary font-semibold">Week {q.week_number}</span>
+            <div class="review-item-card">
+              <div class="item-header-row">
+                <div class="tags-group">
+                  <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-CODE'}</span>
+                  <span class="q-week-badge">Week {q.week_number || 1}</span>
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                  <span class="status-pill peer-approved">
+                    <UserCheck size={13} />
+                    Peer Approved
+                  </span>
                 </div>
-                <Badge variant="primary" size="sm">Peer Approved</Badge>
               </div>
 
-              <p class="text-base font-semibold text-main mb-3">{q.text}</p>
+              <div class="question-body">
+                <h4 class="question-title">{q.text}</h4>
 
-              {q.options && q.options.length > 0 && (
-                <div class="options-preview grid grid-cols-2 gap-2 mb-4">
-                  {q.options.map((opt: any) => (
-                    <div class="opt-pill p-2 bg-surface rounded border border-subtle text-xs flex justify-between">
-                      <span>{opt.label}</span>
-                      <span class="font-bold text-muted">Score: {opt.score}</span>
+                {q.options && q.options.length > 0 && (
+                  <div class="options-container">
+                    <span class="options-label">Scored Response Options:</span>
+                    <div class="options-grid">
+                      {q.options.map((opt: any) => (
+                        <div class="option-pill">
+                          <span class="opt-label">{opt.label}</span>
+                          <span class="opt-score">Score: {opt.score}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )}
 
-              <div class="meta-authors text-xs text-muted mb-4">
-                <span>Authored by: <strong>{q.author_name || 'Clinician A'}</strong></span> &bull;{' '}
-                <span>Peer Reviewed by: <strong>{q.reviewer_name || 'Clinician B'}</strong></span>
-                {q.review_notes && (
-                  <div class="notes-box p-2 bg-amber-50 text-amber-900 border border-amber-200 rounded mt-2">
-                    <strong>Previous Review Notes:</strong> {q.review_notes}
+                <div class="governance-meta-strip">
+                  <div class="author-meta-item">
+                    <span class="meta-label">Authored by:</span>
+                    <strong class="meta-value">{q.author_name || 'Clinician Author'}</strong>
+                  </div>
+                  <span class="meta-dot">&bull;</span>
+                  <div class="author-meta-item">
+                    <span class="meta-label">Peer Reviewed by:</span>
+                    <strong class="meta-value">{q.reviewer_name || 'Peer Clinician'}</strong>
+                  </div>
+                </div>
+
+                {q.review_notes && q.review_notes !== '[PEER_REVIEW]' && (
+                  <div class="clinical-notes-box">
+                    <strong>Peer Clinical Notes:</strong> {q.review_notes}
                   </div>
                 )}
               </div>
 
               {/* Action Form */}
-              <div class="action-form-box pt-3 border-t border-subtle">
-                <form method="POST" class="flex flex-col gap-3">
+              <div class="action-bar-container">
+                <form method="POST" class="action-form">
                   <input type="hidden" name="question_id" value={q.id} />
                   
-                  <div class="flex gap-2">
+                  <div class="action-inputs-row">
                     <input
                       type="text"
                       name="review_notes"
-                      placeholder="Optional revision notes or comment for clinicians..."
-                      class="flex-1 px-3 py-2 text-sm border border-subtle rounded-lg"
+                      placeholder="Optional feedback note (required if requesting changes)..."
+                      class="notes-input"
                     />
-                    <button
-                      type="submit"
-                      name="action_type"
-                      value="request_revision"
-                      class="px-4 py-2 bg-neutral-100 text-neutral-800 text-sm font-semibold rounded-lg hover:bg-neutral-200"
-                    >
-                      Request Revision
-                    </button>
-                    <button
-                      type="submit"
-                      name="action_type"
-                      value="activate"
-                      class="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark"
-                    >
-                      Approve & Activate &rarr;
-                    </button>
+                    <div class="action-buttons-group">
+                      <button
+                        type="submit"
+                        name="action_type"
+                        value="request_revision"
+                        class="btn-action-revision"
+                        title="Send back for revisions"
+                      >
+                        <MessageSquare size={14} />
+                        <span>Request Revision</span>
+                      </button>
+                      <button
+                        type="submit"
+                        name="action_type"
+                        value="activate"
+                        class="btn-action-activate"
+                        title="Approve and activate question for region"
+                      >
+                        <Check size={15} />
+                        <span>Approve & Activate &rarr;</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -179,31 +244,107 @@ const activeQuestions = await getActiveQuestions(supabase);
     </Card>
 
     {/* Section 2: Currently Active Questions */}
-    <Card padding="lg">
-      <div class="card-header-row mb-4">
-        <div>
-          <h3 class="font-bold text-lg text-main">Active Student Questions ({activeQuestions.length})</h3>
-          <p class="text-sm text-muted">Questions currently available for adaptive weekly student reflections in your region.</p>
+    <div class="active-library-section">
+      <div class="week-filter-bar glass-panel">
+        <div class="week-filter-label">
+          <Layers size={16} class="text-primary" />
+          <span>Active Reflection Cycles:</span>
+        </div>
+        <div class="week-pills">
+          <a
+            href="?week=all"
+            class={`week-pill ${selectedWeek === 'all' ? 'active' : ''}`}
+          >
+            All Cycles ({activeQuestions.length})
+          </a>
+          {weekNumbers.map((w) => {
+            const count = activeQuestions.filter((q) => (q.week_number || 1) === w).length;
+            return (
+              <a
+                href={`?week=${w}`}
+                class={`week-pill ${selectedWeek === String(w) ? 'active' : ''}`}
+              >
+                Week {w} Reflection ({count})
+              </a>
+            );
+          })}
         </div>
       </div>
 
-      <div class="active-list">
-        {activeQuestions.map((q) => (
-          <div class="active-item p-3 bg-surface-subtle border border-subtle rounded-lg mb-2 flex justify-between items-center">
-            <div>
-              <span class="font-bold text-sm text-main">{q.question_code}</span> &bull;{' '}
-              <span class="text-xs text-muted capitalize">{q.category.replace('_', ' ')}</span> &bull;{' '}
-              <span class="text-xs font-semibold">{q.text}</span>
-            </div>
-            <Badge variant="stable" size="sm">Active</Badge>
-          </div>
-        ))}
-      </div>
-    </Card>
+      {activeQuestions.length === 0 ? (
+        <Card padding="lg">
+          <EmptyState
+            title="No active questions"
+            description="Activate questions from the review queue above to deploy them to students."
+            icon={CheckCircle2}
+          />
+        </Card>
+      ) : filteredActiveQuestions.length === 0 ? (
+        <Card padding="lg">
+          <EmptyState
+            title={`No active questions for Week ${selectedWeek}`}
+            description="There are no active questions in this specific reflection cycle."
+            icon={CheckCircle2}
+          />
+        </Card>
+      ) : (
+        <div class="week-stacks">
+          {Array.from(questionsByWeek.entries()).map(([weekNum, questions]) => (
+            <Card padding="lg">
+              <div class="week-section-header">
+                <div class="week-header-title">
+                  <span class="week-number-badge">Week {weekNum}</span>
+                  <h3 class="week-title-text">Active Reflection Pool — Week {weekNum}</h3>
+                </div>
+                <span class="week-count-tag">{questions.length} Live Questions</span>
+              </div>
+
+              <div class="active-q-list">
+                {questions.map((q) => (
+                  <div class="active-q-card">
+                    <div class="active-q-main">
+                      <div class="active-q-tags">
+                        <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-ACTIVE'}</span>
+                        <span class="q-week-badge">Week {q.week_number || weekNum}</span>
+                        <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                        {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                        <Badge variant="stable" size="sm">Active</Badge>
+                      </div>
+                      <p class="active-q-text">{q.text}</p>
+                      <div class="active-q-meta">
+                        <span>Authored by <strong>{q.author_name || '—'}</strong></span>
+                        <span class="meta-dot">&bull;</span>
+                        <span>Reviewed by <strong>{q.reviewer_name || '—'}</strong></span>
+                        <span class="meta-dot">&bull;</span>
+                        <span>Activated by <strong>{q.activator_name || '—'}</strong></span>
+                      </div>
+                    </div>
+                    <div class="active-q-actions">
+                      <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to deactivate and remove this question from live check-ins?');">
+                        <input type="hidden" name="action_type" value="delete_question" />
+                        <input type="hidden" name="question_id" value={q.id} />
+                        <button type="submit" class="btn-delete" title="Deactivate/Delete Question">
+                          <Trash2 size={14} />
+                          <span>Delete</span>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   </div>
 </RegionalLayout>
 
 <style>
+  .alert-container {
+    margin-bottom: var(--space-6);
+  }
+
   .regional-questions-stack {
     display: flex;
     flex-direction: column;
@@ -214,9 +355,478 @@ const activeQuestions = await getActiveQuestions(supabase);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-wrap: wrap;
   }
 
-  .options-preview {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  .header-with-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .section-title {
+    font-size: 1.1875rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .section-desc {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .queue-badge {
+    padding: 0.25rem 0.75rem;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .queue-badge.highlight {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+
+  /* Review Queue Stack */
+  .review-queue-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .review-item-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+  }
+
+  .review-item-card:hover {
+    border-color: var(--color-primary-300);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+  }
+
+  .item-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+
+  .tags-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .q-code-badge {
+    padding: 0.15rem 0.55rem;
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.025em;
+  }
+
+  .q-week-badge {
+    padding: 0.15rem 0.55rem;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--color-primary-700);
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .status-pill.peer-approved {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .question-body {
+    margin-bottom: var(--space-4);
+  }
+
+  .question-title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    line-height: 1.5;
+    margin-bottom: var(--space-3);
+  }
+
+  .options-container {
+    margin-bottom: var(--space-3);
+    background: var(--color-bg-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+  }
+
+  .options-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-2);
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-2);
+  }
+
+  .option-pill {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    padding: 0.4rem 0.65rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+  }
+
+  .opt-label {
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+
+  .opt-score {
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--color-primary-700);
+    background: rgba(99, 102, 241, 0.08);
+    padding: 0.1rem 0.35rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .governance-meta-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
+
+  .meta-dot {
+    color: var(--color-border-subtle);
+  }
+
+  .meta-value {
+    color: var(--color-text-main);
+    font-weight: 600;
+  }
+
+  .clinical-notes-box {
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: #92400e;
+  }
+
+  /* Action Bar */
+  .action-bar-container {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .action-inputs-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .notes-input {
+    flex: 1;
+    min-width: 250px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+    transition: all 0.15s ease;
+  }
+
+  .notes-input:focus {
+    outline: none;
+    background: var(--color-bg-surface);
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .action-buttons-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .btn-action-revision {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-revision:hover {
+    background: var(--color-bg-surface);
+    color: #d97706;
+    border-color: #fcd34d;
+  }
+
+  .btn-action-activate {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: white;
+    background: var(--color-primary-600);
+    border: 1px solid var(--color-primary-600);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-activate:hover {
+    background: var(--color-primary-700);
+    border-color: var(--color-primary-700);
+  }
+
+  /* Active Library Styles */
+  .active-library-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .week-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-surface);
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .week-filter-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .week-pills {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .week-pill {
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-full);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+
+  .week-pill:hover {
+    color: var(--color-primary-700);
+    border-color: var(--color-primary-300);
+  }
+
+  .week-pill.active {
+    background-color: var(--color-primary-600);
+    color: white;
+    border-color: var(--color-primary-600);
+  }
+
+  .week-stacks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .week-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .week-header-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .week-number-badge {
+    padding: 0.25rem 0.65rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-weight: 700;
+    font-size: 0.8125rem;
+    border-radius: var(--radius-md);
+  }
+
+  .week-title-text {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .week-count-tag {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+
+  .active-q-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .active-q-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-bg-surface);
+    transition: all 0.15s ease;
+  }
+
+  .active-q-card:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .active-q-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .active-q-tags {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .active-q-text {
+    font-size: 0.9375rem;
+    color: var(--color-text-main);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .active-q-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    flex-wrap: wrap;
+  }
+
+  .active-q-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+
+  .btn-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ef4444;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-delete:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+  }
+
+  @media (max-width: 768px) {
+    .action-inputs-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .action-buttons-group {
+      justify-content: flex-end;
+    }
+    .active-q-card {
+      flex-direction: column;
+    }
+    .active-q-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
   }
 </style>
