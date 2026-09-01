@@ -34,39 +34,42 @@ let isError = false;
 
 if (Astro.request.method === 'POST') {
   try {
-    const formData = await Astro.request.formData();
-    const actionType = formData.get('action_type')?.toString();
+    const contentType = Astro.request.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await Astro.request.formData();
+      const actionType = formData.get('action_type')?.toString();
 
-    if (actionType === 'toggle_status') {
-      const targetUserId = formData.get('target_user_id')?.toString() || '';
-      const newStatus = formData.get('new_status')?.toString() === 'true';
+      if (actionType === 'toggle_status') {
+        const targetUserId = formData.get('target_user_id')?.toString() || '';
+        const newStatus = formData.get('new_status')?.toString() === 'true';
 
-      const res = await toggleStaffAccountStatus(supabase, user.id, targetUserId, newStatus);
-      if (!res.success) {
-        message = res.error || 'Failed to update account status.';
-        isError = true;
+        const res = await toggleStaffAccountStatus(supabase, user.id, targetUserId, newStatus);
+        if (!res.success) {
+          message = res.error || 'Failed to update account status.';
+          isError = true;
+        } else {
+          message = `Clinician status updated to ${newStatus ? 'Active' : 'Deactivated'}.`;
+        }
       } else {
-        message = `Clinician status updated to ${newStatus ? 'Active' : 'Deactivated'}.`;
-      }
-    } else {
-      const fullName = formData.get('full_name')?.toString().trim() || '';
-      const email = formData.get('email')?.toString().trim() || '';
-      const password = formData.get('password')?.toString() || '';
-      const confirmPassword = formData.get('confirm_password')?.toString() || '';
+        const fullName = formData.get('full_name')?.toString().trim() || '';
+        const email = formData.get('email')?.toString().trim() || '';
+        const password = formData.get('password')?.toString() || '';
+        const confirmPassword = formData.get('confirm_password')?.toString() || '';
 
-      const res = await provisionStaffAccount(supabase, user.id, {
-        fullName,
-        email,
-        password,
-        confirmPassword,
-        targetRole: 'clinician',
-      });
+        const res = await provisionStaffAccount(supabase, user.id, {
+          fullName,
+          email,
+          password,
+          confirmPassword,
+          targetRole: 'clinician',
+        });
 
-      if (!res.success) {
-        message = res.error || 'Failed to provision Clinician.';
-        isError = true;
-      } else {
-        message = `Clinician account for '${fullName}' (${email}) provisioned successfully. Account is immediately active.`;
+        if (!res.success) {
+          message = res.error || 'Failed to provision Clinician.';
+          isError = true;
+        } else {
+          message = `Clinician account for '${fullName}' (${email}) provisioned successfully. Account is immediately active.`;
+        }
       }
     }
   } catch (err: any) {
