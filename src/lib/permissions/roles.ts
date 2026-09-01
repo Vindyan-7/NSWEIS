@@ -25,7 +25,7 @@ const ROUTE_TREES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/college/',    roles: ['college_officer'] },
   { prefix: '/regional/',   roles: ['regional_officer', 'government_admin'] },
   { prefix: '/government/', roles: ['government_admin'] },
-  { prefix: '/admin/',      roles: ['regional_officer', 'government_admin'] },
+  { prefix: '/admin/',      roles: ['government_admin'] },
   { prefix: '/superadmin/', roles: ['super_admin'] },
 ];
 
