@@ -2,6 +2,7 @@
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
+import { LayoutDashboard, ClipboardCheck, Stethoscope, Building, TrendingUp } from '@lucide/astro';
 import type { UserRole } from '../types/domain';
 import '../styles/globals.css';
 
@@ -15,19 +16,19 @@ const { title, activePath = '/regional/dashboard' } = Astro.props;
 const profile = Astro.locals.profile;
 
 const navItems = [
-  { label: 'Overview', href: '/regional/dashboard', icon: 'LayoutDashboard', active: activePath === '/regional/dashboard' },
-  { label: 'Question Pools', href: '/regional/questions', icon: 'ClipboardCheck', active: activePath === '/regional/questions' },
-  { label: 'Clinical Team', href: '/regional/clinicians', icon: 'Stethoscope', active: activePath === '/regional/clinicians' },
-  { label: 'College Officers', href: '/regional/colleges', icon: 'Building', active: activePath === '/regional/colleges' },
-  { label: 'Regional Insights', href: '/admin/insights', icon: 'TrendingUp', active: activePath === '/admin/insights' },
+  { label: 'Overview', href: '/regional/dashboard', icon: LayoutDashboard, active: activePath === '/regional/dashboard' },
+  { label: 'Question Pools', href: '/regional/questions', icon: ClipboardCheck, active: activePath === '/regional/questions' },
+  { label: 'Clinical Team', href: '/regional/clinicians', icon: Stethoscope, active: activePath === '/regional/clinicians' },
+  { label: 'College Officers', href: '/regional/colleges', icon: Building, active: activePath === '/regional/colleges' },
+  { label: 'Regional Insights', href: '/admin/insights', icon: TrendingUp, active: activePath === '/admin/insights' },
 ];
 
 const mobileNavItems = [
-  { label: 'Overview', href: '/regional/dashboard', icon: 'LayoutDashboard', active: activePath === '/regional/dashboard' },
-  { label: 'Question Pools', href: '/regional/questions', icon: 'ClipboardCheck', active: activePath === '/regional/questions' },
-  { label: 'Clinicians', href: '/regional/clinicians', icon: 'Stethoscope', active: activePath === '/regional/clinicians' },
-  { label: 'Colleges', href: '/regional/colleges', icon: 'Building', active: activePath === '/regional/colleges' },
-  { label: 'Insights', href: '/admin/insights', icon: 'TrendingUp', active: activePath === '/admin/insights' },
+  { label: 'Overview', href: '/regional/dashboard', icon: LayoutDashboard, active: activePath === '/regional/dashboard' },
+  { label: 'Question Pools', href: '/regional/questions', icon: ClipboardCheck, active: activePath === '/regional/questions' },
+  { label: 'Clinicians', href: '/regional/clinicians', icon: Stethoscope, active: activePath === '/regional/clinicians' },
+  { label: 'Colleges', href: '/regional/colleges', icon: Building, active: activePath === '/regional/colleges' },
+  { label: 'Insights', href: '/admin/insights', icon: TrendingUp, active: activePath === '/admin/insights' },
 ];
 ---
 
