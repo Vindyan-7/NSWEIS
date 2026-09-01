@@ -2,12 +2,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 import type { Institution } from '../types/domain';
 
+import { createSupabaseAdminClient } from '../lib/supabase/server';
+
 export interface CreateInstitutionInput {
   name: string;
   code: string;
   state?: string;
   district?: string;
-  type?: 'university' | 'college' | 'autonomous' | 'polytechnic';
+  type?: 'university' | 'college' | 'autonomous' | 'polytechnic' | string;
+  regionId?: string;
   active?: boolean;
 }
 
@@ -25,7 +28,11 @@ export async function getAuthorizedInstitutions(
       name: r.institution_name || r.name,
       code: r.institution_code || r.code,
       state: r.state || 'National',
+      district: r.district || 'Central',
+      institution_type: r.institution_type || r.type || 'college',
+      type: r.institution_type || r.type || 'college',
       active: true,
+      region_id: r.region_id,
     })) as Institution[];
   }
 
@@ -43,7 +50,11 @@ export async function getAuthorizedInstitutions(
       .select('*')
       .in('id', instIds)
       .eq('active', true);
-    return (insts || []) as Institution[];
+    return ((insts || []).map((r: any) => ({
+      ...r,
+      type: r.institution_type || r.type || 'college',
+      institution_type: r.institution_type || r.type || 'college',
+    }))) as Institution[];
   }
 
   // If super admin or fallback, fetch all active institutions
@@ -52,7 +63,11 @@ export async function getAuthorizedInstitutions(
     .select('*')
     .eq('active', true);
 
-  return (allInsts || []) as Institution[];
+  return ((allInsts || []).map((r: any) => ({
+    ...r,
+    type: r.institution_type || r.type || 'college',
+    institution_type: r.institution_type || r.type || 'college',
+  }))) as Institution[];
 }
 
 export async function getAllInstitutions(
@@ -64,7 +79,11 @@ export async function getAllInstitutions(
     .order('name', { ascending: true });
 
   if (error || !data) return [];
-  return data as Institution[];
+  return (data.map((r: any) => ({
+    ...r,
+    type: r.institution_type || r.type || 'college',
+    institution_type: r.institution_type || r.type || 'college',
+  }))) as Institution[];
 }
 
 export async function getInstitutionById(
@@ -78,32 +97,63 @@ export async function getInstitutionById(
     .single();
 
   if (error || !data) return null;
-  return data as Institution;
+  const r = data as any;
+  return {
+    ...r,
+    type: r.institution_type || r.type || 'college',
+    institution_type: r.institution_type || r.type || 'college',
+  } as Institution;
 }
 
 export async function createInstitution(
   supabase: SupabaseClient<Database>,
   input: CreateInstitutionInput
 ): Promise<{ success: boolean; data?: Institution; error?: string }> {
-  const { data, error } = await (supabase.from('institutions' as any) as any)
-    .insert([
-      {
-        name: input.name,
-        code: input.code,
-        state: input.state || 'National',
-        district: input.district || null,
-        type: input.type || 'college',
-        active: input.active !== undefined ? input.active : true,
-      },
-    ])
-    .select()
-    .single();
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const payload: any = {
+      name: input.name.trim(),
+      code: input.code.trim().toUpperCase(),
+      state: input.state?.trim() || 'National',
+      district: input.district?.trim() || 'Central',
+      institution_type: input.type || 'college',
+      active: input.active !== undefined ? input.active : true,
+    };
 
-  if (error || !data) {
-    return { success: false, error: error?.message || 'Failed to create institution' };
+    if (input.regionId) {
+      payload.region_id = input.regionId;
+    }
+
+    let { data, error } = await (adminClient.from('institutions' as any) as any)
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error && (error.message?.includes('region_id') || error.message?.includes('schema cache'))) {
+      // Fallback insert without region_id if column pending in schema cache
+      delete payload.region_id;
+      const res = await (adminClient.from('institutions' as any) as any)
+        .insert([payload])
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    }
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to create institution' };
+    }
+
+    const created = {
+      ...data,
+      type: data.institution_type || data.type || 'college',
+      institution_type: data.institution_type || data.type || 'college',
+    };
+
+    return { success: true, data: created as Institution };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'An error occurred while creating institution' };
   }
-
-  return { success: true, data: data as Institution };
 }
 
 export async function updateInstitutionStatus(
@@ -111,7 +161,8 @@ export async function updateInstitutionStatus(
   institutionId: string,
   active: boolean
 ): Promise<{ success: boolean; error?: string }> {
-  const { error } = await (supabase.from('institutions' as any) as any)
+  const adminClient = createSupabaseAdminClient();
+  const { error } = await (adminClient.from('institutions' as any) as any)
     .update({ active, updated_at: new Date().toISOString() })
     .eq('id', institutionId);
 
