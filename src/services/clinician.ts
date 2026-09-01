@@ -632,10 +632,60 @@ export async function getActiveQuestions(
   const { data, error } = await (supabase.from('questions') as any)
     .select('*, options:question_options(*)')
     .eq('active', true)
+    .order('week_number', { ascending: true })
     .order('category', { ascending: true });
 
   if (error || !data) return [];
   return attachNames(supabase, data as Question[]);
+}
+
+/** Delete or safely deactivate a question */
+export async function deleteOrDeactivateQuestion(
+  supabase: SupabaseClient<Database>,
+  questionId: string,
+  actorId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminClient = createSupabaseAdminClient();
+
+    // Check if question has student assessment responses
+    const { count: responseCount } = await (adminClient.from('assessment_responses') as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('question_id', questionId);
+
+    if (responseCount && responseCount > 0) {
+      // If student responses exist, soft-delete (deactivate) to protect student assessment history
+      const { error: deactErr } = await (adminClient.from('questions') as any)
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('id', questionId);
+
+      if (deactErr) return { success: false, error: deactErr.message };
+
+      await recordQuestionAuditLog(supabase, questionId, actorId, 'QUESTION_DEACTIVATED', 'Deactivated question with existing responses.');
+      return { success: true };
+    }
+
+    // Clean delete cascade
+    await (adminClient.from('weekly_pool_questions') as any).delete().eq('question_id', questionId);
+    await (adminClient.from('question_options') as any).delete().eq('question_id', questionId);
+    await (adminClient.from('question_flags') as any).delete().eq('question_id', questionId);
+    await (adminClient.from('question_audit_logs') as any).delete().eq('question_id', questionId);
+
+    const { error: delErr } = await (adminClient.from('questions') as any)
+      .delete()
+      .eq('id', questionId);
+
+    if (delErr) {
+      // Fallback to soft delete
+      await (adminClient.from('questions') as any)
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('id', questionId);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to delete question.' };
+  }
 }
 
 export async function raiseQuestionFlag(

@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
 import Badge from '../../components/ui/Badge.astro';
 import Button from '../../components/ui/Button.astro';
+import Alert from '../../components/ui/Alert.astro';
 import EmptyState from '../../components/ui/EmptyState.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
@@ -13,8 +14,9 @@ import {
   getMyDraftQuestions,
   getPendingReviewQuestions,
   getActiveQuestions,
+  deleteOrDeactivateQuestion,
 } from '../../services/clinician';
-import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight } from '@lucide/astro';
+import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -29,8 +31,38 @@ if (!profile || profile.role !== 'clinician') {
   return Astro.redirect('/no-access');
 }
 
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const contentType = Astro.request.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await Astro.request.formData();
+      const actionType = formData.get('action_type')?.toString();
+
+      if (actionType === 'delete_question') {
+        const questionId = formData.get('question_id')?.toString() || '';
+        if (questionId) {
+          const res = await deleteOrDeactivateQuestion(supabase, questionId, user.id);
+          if (res.success) {
+            message = 'Question deleted successfully.';
+          } else {
+            message = res.error || 'Failed to delete question.';
+            isError = true;
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    message = err.message || 'An unexpected error occurred.';
+    isError = true;
+  }
+}
+
 const url = new URL(Astro.request.url);
 const activeTab = url.searchParams.get('tab') || 'drafts';
+const selectedWeek = url.searchParams.get('week') || 'all';
 
 const counts = await getClinicianQueueCounts(supabase, user.id);
 
@@ -48,10 +80,21 @@ if (activeTab === 'drafts') {
 
 const categoryLabel = (cat: string) => cat.replace(/_/g, ' ');
 
-// The sidebar's "Peer Review" link points at ?tab=review on this same
-// route (there's no separate page for it) — activePath only tracks a bare
-// pathname, so it needs to shift with the tab or that nav item never
-// highlights and every tab looks like "nothing happened" when clicked.
+// Distinct week numbers for Active Library filtering
+const weekNumbers = Array.from(new Set(activeQuestions.map((q) => q.week_number || 1))).sort((a, b) => a - b);
+
+const filteredActiveQuestions = selectedWeek === 'all'
+  ? activeQuestions
+  : activeQuestions.filter((q) => (q.week_number || 1) === parseInt(selectedWeek, 10));
+
+// Group questions by week for structured week-by-week presentation
+const questionsByWeek = new Map<number, typeof activeQuestions>();
+filteredActiveQuestions.forEach((q) => {
+  const w = q.week_number || 1;
+  if (!questionsByWeek.has(w)) questionsByWeek.set(w, []);
+  questionsByWeek.get(w)!.push(q);
+});
+
 const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinician/dashboard';
 ---
 
@@ -63,6 +106,12 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
       </Button>
     </a>
   </PageHeader>
+
+  {message && (
+    <Alert type={isError ? 'error' : 'success'} title={isError ? 'Notice' : 'Success'}>
+      {message}
+    </Alert>
+  )}
 
   <div class="metrics-grid">
     <MetricCard title="My Drafts" value={counts.myDrafts} subtitle="Authored by you, not yet reviewed" />
@@ -90,6 +139,8 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
             <div class="q-row">
               <div class="q-main">
                 <div class="q-tags">
+                  <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-DRAFT'}</span>
+                  <span class="q-week-badge">Week {q.week_number || 1}</span>
                   <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
                   {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
                   {q.clinical_reviewed_at ? (
@@ -105,9 +156,18 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
                   </p>
                 )}
               </div>
-              <a href={`/clinician/review/${q.id}`}>
-                <Button variant="outline" size="sm">View <ArrowRight size={14} aria-hidden="true" /></Button>
-              </a>
+              <div class="q-actions">
+                <a href={`/clinician/review/${q.id}`}>
+                  <Button variant="outline" size="sm">View <ArrowRight size={14} aria-hidden="true" /></Button>
+                </a>
+                <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this draft question?');">
+                  <input type="hidden" name="action_type" value="delete_question" />
+                  <input type="hidden" name="question_id" value={q.id} />
+                  <button type="submit" class="btn-delete" title="Delete Draft">
+                    <Trash2 size={15} />
+                  </button>
+                </form>
+              </div>
             </div>
           ))}
         </div>
@@ -125,15 +185,19 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
             <div class="q-row">
               <div class="q-main">
                 <div class="q-tags">
+                  <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-REVIEW'}</span>
+                  <span class="q-week-badge">Week {q.week_number || 1}</span>
                   <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
                   {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
                   <span class="q-author">by {q.author_name || 'another clinician'}</span>
                 </div>
                 <p class="q-text">{q.text}</p>
               </div>
-              <a href={`/clinician/review/${q.id}`}>
-                <Button variant="primary" size="sm">Review <ArrowRight size={14} aria-hidden="true" /></Button>
-              </a>
+              <div class="q-actions">
+                <a href={`/clinician/review/${q.id}`}>
+                  <Button variant="primary" size="sm">Review <ArrowRight size={14} aria-hidden="true" /></Button>
+                </a>
+              </div>
             </div>
           ))}
         </div>
@@ -142,27 +206,86 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
   )}
 
   {activeTab === 'active' && (
-    <Card padding="lg">
+    <div class="active-library-container">
+      {/* Week Filter Pills Bar */}
+      <div class="week-filter-bar glass-panel">
+        <div class="week-filter-label">
+          <Layers size={16} class="text-primary" />
+          <span>Filter by Reflection Cycle:</span>
+        </div>
+        <div class="week-pills">
+          <a
+            href="?tab=active&week=all"
+            class={`week-pill ${selectedWeek === 'all' ? 'active' : ''}`}
+          >
+            All Cycles ({activeQuestions.length})
+          </a>
+          {weekNumbers.map((w) => {
+            const count = activeQuestions.filter((q) => (q.week_number || 1) === w).length;
+            return (
+              <a
+                href={`?tab=active&week=${w}`}
+                class={`week-pill ${selectedWeek === String(w) ? 'active' : ''}`}
+              >
+                Week {w} Reflection ({count})
+              </a>
+            );
+          })}
+        </div>
+      </div>
+
       {activeQuestions.length === 0 ? (
-        <EmptyState title="Nothing active yet" description="Activated questions will appear here once the regional tier signs off." icon={CheckCircle2} />
+        <Card padding="lg">
+          <EmptyState title="Nothing active yet" description="Activated questions will appear here once the regional tier signs off." icon={CheckCircle2} />
+        </Card>
+      ) : filteredActiveQuestions.length === 0 ? (
+        <Card padding="lg">
+          <EmptyState title={`No questions for Week ${selectedWeek}`} description="There are no active questions assigned to this week reflection cycle." icon={CheckCircle2} />
+        </Card>
       ) : (
-        <div class="q-list">
-          {activeQuestions.map((q) => (
-            <div class="q-row">
-              <div class="q-main">
-                <div class="q-tags">
-                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
-                  {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
-                  <Badge variant="stable" size="sm">Active</Badge>
+        <div class="week-sections-stack">
+          {Array.from(questionsByWeek.entries()).map(([weekNum, questions]) => (
+            <Card padding="lg">
+              <div class="week-section-header">
+                <div class="week-header-title">
+                  <span class="week-number-badge">Week {weekNum}</span>
+                  <h3 class="week-title-text">Weekly Reflection Cycle — Week {weekNum}</h3>
                 </div>
-                <p class="q-text">{q.text}</p>
-                <span class="q-meta">Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} · activated by {q.activator_name || '—'}</span>
+                <span class="week-count-tag">{questions.length} Questions Allotted</span>
               </div>
-            </div>
+
+              <div class="q-list">
+                {questions.map((q) => (
+                  <div class="q-row">
+                    <div class="q-main">
+                      <div class="q-tags">
+                        <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-ACTIVE'}</span>
+                        <span class="q-week-badge">Week {q.week_number || weekNum}</span>
+                        <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                        {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                        <Badge variant="stable" size="sm">Active</Badge>
+                      </div>
+                      <p class="q-text">{q.text}</p>
+                      <span class="q-meta">Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} · activated by {q.activator_name || '—'}</span>
+                    </div>
+                    <div class="q-actions">
+                      <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this active question from the library?');">
+                        <input type="hidden" name="action_type" value="delete_question" />
+                        <input type="hidden" name="question_id" value={q.id} />
+                        <button type="submit" class="btn-delete" title="Delete Question">
+                          <Trash2 size={15} />
+                          <span>Delete</span>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           ))}
         </div>
       )}
-    </Card>
+    </div>
   )}
 </ClinicianLayout>
 
@@ -207,6 +330,107 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
     padding: 0.0625rem 0.5rem;
   }
 
+  .active-library-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .week-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-surface);
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .week-filter-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .week-pills {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .week-pill {
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-full);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-subtle);
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+
+  .week-pill:hover {
+    color: var(--color-primary-700);
+    border-color: var(--color-primary-300);
+  }
+
+  .week-pill.active {
+    background-color: var(--color-primary-600);
+    color: white;
+    border-color: var(--color-primary-600);
+  }
+
+  .week-sections-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .week-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .week-header-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .week-number-badge {
+    padding: 0.25rem 0.65rem;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-800);
+    font-weight: 700;
+    font-size: 0.8125rem;
+    border-radius: var(--radius-md);
+  }
+
+  .week-title-text {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .week-count-tag {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+
   .q-list {
     display: flex;
     flex-direction: column;
@@ -221,6 +445,7 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
     padding: var(--space-4);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
+    background-color: var(--color-bg-surface);
   }
 
   .q-main {
@@ -234,6 +459,26 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
     gap: var(--space-2);
     margin-bottom: var(--space-2);
     flex-wrap: wrap;
+  }
+
+  .q-code-badge {
+    padding: 0.125rem 0.5rem;
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.025em;
+  }
+
+  .q-week-badge {
+    padding: 0.125rem 0.5rem;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--color-primary-700);
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
   }
 
   .q-author {
@@ -264,9 +509,47 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
     color: var(--color-text-muted);
   }
 
+  .q-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+
+  .delete-form {
+    display: inline-block;
+    margin: 0;
+  }
+
+  .btn-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ef4444;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-delete:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+  }
+
   @media (max-width: 640px) {
     .q-row {
       flex-direction: column;
+    }
+    .q-actions {
+      margin-top: var(--space-2);
+      width: 100%;
+      justify-content: flex-end;
     }
   }
 </style>
