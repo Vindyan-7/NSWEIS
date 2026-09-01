@@ -19,6 +19,7 @@ import {
   getManagedStaffAccounts,
   toggleStaffAccountStatus,
   createInstitutionWithRegion,
+  assignInstitutionToRegion,
 } from '../../services/provisioning';
 
 const user = Astro.locals.user;
@@ -82,6 +83,17 @@ if (Astro.request.method === 'POST') {
         isError = true;
       } else {
         message = `Institution '${name}' (${code}) created and assigned to region successfully.`;
+      }
+    } else if (actionType === 'assign_institution_region') {
+      const institutionId = formData.get('institution_id')?.toString() || '';
+      const regionId = formData.get('region_id')?.toString() || '';
+
+      const res = await assignInstitutionToRegion(supabase, user.id, institutionId, regionId);
+      if (!res.success) {
+        message = res.error || 'Failed to assign college to region.';
+        isError = true;
+      } else {
+        message = 'College successfully assigned to selected region!';
       }
     } else if (actionType === 'create_regional_officer') {
       const fullName = formData.get('full_name')?.toString().trim() || '';
@@ -355,6 +367,77 @@ const regionOptions = regions.map((r) => ({
         </div>
       )}
     </Card>
+
+    {/* Regional Campuses & Assignment Directory */}
+    <Card padding="lg">
+      <div class="card-header-row">
+        <Building2 size={20} class="text-primary" />
+        <h3 class="card-title">Regional Campuses Directory & Jurisdiction Assignment ({allInstitutions.length})</h3>
+      </div>
+      <p class="section-subtext">
+        View registered colleges and reassign their regional jurisdiction to connect them with the appropriate Regional Officer.
+      </p>
+
+      {allInstitutions.length === 0 ? (
+        <EmptyState
+          title="No Colleges Registered"
+          description="Use the form above to register and assign the first college."
+        />
+      ) : (
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>College / Institution</th>
+                <th>Code</th>
+                <th>State / Province</th>
+                <th>Current Region</th>
+                <th>Reassign Region</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allInstitutions.map((inst) => {
+                const currentRegionId = inst.district || '';
+                const currentRegion = regions.find((r) => r.id === currentRegionId || r.code === currentRegionId);
+                return (
+                  <tr>
+                    <td>
+                      <strong class="user-name">{inst.name}</strong>
+                    </td>
+                    <td>
+                      <span class="region-tag">{inst.code}</span>
+                    </td>
+                    <td>{inst.state || 'National'}</td>
+                    <td>
+                      <Badge variant={currentRegion ? 'primary' : 'neutral'} size="sm">
+                        {currentRegion ? `${currentRegion.name} (${currentRegion.code})` : 'National / Unassigned'}
+                      </Badge>
+                    </td>
+                    <td>
+                      <form method="POST" class="assign-form">
+                        <input type="hidden" name="action_type" value="assign_institution_region" />
+                        <input type="hidden" name="institution_id" value={inst.id} />
+                        <select name="region_id" class="table-select" required>
+                          <option value="">-- Select Region --</option>
+                          {regions.map((r) => (
+                            <option value={r.id} selected={r.id === currentRegionId || r.code === currentRegionId}>
+                              {r.name} ({r.code})
+                            </option>
+                          ))}
+                        </select>
+                        <Button type="submit" variant="primary" size="sm">
+                          Save
+                        </Button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   </div>
 </GovernmentLayout>
 
@@ -468,6 +551,21 @@ const regionOptions = regions.map((r) => ({
 
   .inline-form {
     display: inline-block;
+  }
+
+  .assign-form {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .table-select {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8125rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
   }
 
   @media (max-width: 1024px) {

@@ -760,14 +760,17 @@ export const INSTITUTION_REGION_MAP = new Map<string, string>([
 export async function getInstitutionsForRegionalOfficer(
   supabase: SupabaseClient<Database>,
   regionalOfficerId: string
-): Promise<Array<{ id: string; name: string; code: string; state?: string; region_id?: string }>> {
+): Promise<Array<{ id: string; name: string; code: string; state?: string; region_id?: string; district?: string }>> {
   const officer = await getUserProfile(supabase, regionalOfficerId);
   if (!officer) return [];
 
   // Super Admin or Government Admin sees all institutions
   if (officer.role === 'super_admin' || officer.role === 'government_admin') {
-    const { data } = await supabase.from('institutions').select('id, name, code, state, region_id' as any).eq('active', true);
-    return (data || []) as any[];
+    const { data } = await supabase.from('institutions').select('id, name, code, state, district' as any).eq('active', true);
+    return ((data || []).map((inst: any) => ({
+      ...inst,
+      region_id: inst.district || inst.region_id || INSTITUTION_REGION_MAP.get(inst.id),
+    }))) as any[];
   }
 
   if (officer.role !== 'regional_officer') {
@@ -780,7 +783,7 @@ export async function getInstitutionsForRegionalOfficer(
   const adminClient = createSupabaseAdminClient();
   try {
     const { data, error } = await (adminClient.from('institutions') as any)
-      .select('id, name, code, state')
+      .select('id, name, code, state, district')
       .eq('active', true)
       .order('name');
 
@@ -789,11 +792,43 @@ export async function getInstitutionsForRegionalOfficer(
     return data
       .map((inst: any) => ({
         ...inst,
-        region_id: inst.region_id || INSTITUTION_REGION_MAP.get(inst.id) || 'reg-demo-north-01',
+        region_id: inst.district || inst.region_id || INSTITUTION_REGION_MAP.get(inst.id),
       }))
-      .filter((inst: any) => inst.region_id === regionId);
+      .filter((inst: any) => {
+        const instReg = inst.district || inst.region_id || INSTITUTION_REGION_MAP.get(inst.id);
+        return instReg === regionId;
+      });
   } catch (e) {
     return [];
+  }
+}
+
+/**
+ * Assign an existing institution to a region
+ */
+export async function assignInstitutionToRegion(
+  supabase: SupabaseClient<Database>,
+  callerId: string,
+  institutionId: string,
+  regionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const caller = await getUserProfile(supabase, callerId);
+  if (!caller || (caller.role !== 'government_admin' && caller.role !== 'super_admin')) {
+    return { success: false, error: 'Unauthorized: Only Government or Super Administrators can assign institutions to regions.' };
+  }
+
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const { error } = await (adminClient.from('institutions') as any)
+      .update({ district: regionId, updated_at: new Date().toISOString() })
+      .eq('id', institutionId);
+
+    if (error) return { success: false, error: error.message };
+
+    INSTITUTION_REGION_MAP.set(institutionId, regionId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to assign institution to region.' };
   }
 }
 
@@ -823,7 +858,7 @@ export async function createInstitutionWithRegion(
       name,
       code,
       state: input.state || 'National',
-      district: input.district || 'Central',
+      district: input.regionId || input.district || 'Central',
       institution_type: input.type || 'college',
       active: true,
     };

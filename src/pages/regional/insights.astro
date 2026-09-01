@@ -1,5 +1,5 @@
 ---
-import GovernmentLayout from '../../layouts/GovernmentLayout.astro';
+import RegionalLayout from '../../layouts/RegionalLayout.astro';
 import PageHeader from '../../components/navigation/PageHeader.astro';
 import Card from '../../components/ui/Card.astro';
 import MetricCard from '../../components/ui/MetricCard.astro';
@@ -25,14 +25,8 @@ if (!user) {
 
 const profile = await getProfile(supabase, user.id);
 
-if (!profile || (profile.role !== 'government_admin' && profile.role !== 'super_admin' && profile.role !== 'regional_officer')) {
-  if (profile?.role === 'student') return Astro.redirect('/student/dashboard');
-  if (profile?.role === 'college_officer') return Astro.redirect('/college/dashboard');
+if (!profile || (profile.role !== 'regional_officer' && profile.role !== 'government_admin' && profile.role !== 'super_admin')) {
   return Astro.redirect('/no-access');
-}
-
-if (profile.role === 'regional_officer') {
-  return Astro.redirect('/regional/insights');
 }
 
 const metrics = await getGovernmentParticipationMetrics(supabase, user.id);
@@ -43,20 +37,20 @@ const trends = await getGovernmentTrends(supabase, user.id);
 const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) => cs.is_suppressed);
 ---
 
-<GovernmentLayout title="Regional Aggregate Insights" activePath="/admin/insights">
+<RegionalLayout title="Regional Aggregate Insights" activePath="/regional/insights">
   <PageHeader
-    title="Cross-Institutional Regional Insights"
-    subtitle={`Aggregated well-being trends and comparative indicators across authorized institutions for ${metrics.active_cycle_name}`}
+    title="Regional Well-being & Participation Insights"
+    subtitle={`Aggregated well-being trends and comparative indicators across regional institutions for ${metrics.active_cycle_name}`}
   >
-    <a href="/admin/dashboard">
+    <a href="/regional/dashboard">
       <Button variant="outline" size="sm">&larr; Back to Dashboard</Button>
     </a>
   </PageHeader>
 
-  <div class="gov-insights-layout">
+  <div class="regional-insights-layout">
     <div class="metrics-grid">
       <MetricCard
-        title="Authorized Scope"
+        title="Regional Scope"
         value={`${metrics.authorized_institutions_count} Institutions`}
         change={isDataSuppressed ? "Reporting Active Data: Suppressed (<10)" : `${metrics.active_reporting_institutions_count} Actively Reporting`}
         changeType="neutral"
@@ -79,7 +73,7 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
       {/* Category Indicators Bar Breakdown */}
       <ChartCard
         title="Regional Category Indicators"
-        subtitle="Aggregate average indicator scores (0.0 to 10.0) across authorized scope"
+        subtitle="Aggregate average indicator scores (0.0 to 10.0) across regional scope"
       >
         <div class="category-bars">
           {categorySummaries.map((cs) => (
@@ -104,8 +98,8 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
 
       {/* Institutional Comparison Table */}
       <Card padding="lg">
-        <h3 class="card-section-title">Institutional Well-being Comparison</h3>
-        <p class="section-subtext">Comparative status for institutions assigned under your government admin scope.</p>
+        <h3 class="card-section-title">Regional Institutions Status</h3>
+        <p class="section-subtext">Comparative status for campuses in your assigned regional jurisdiction.</p>
 
         <div class="inst-comp-list">
           {institutionSummaries.map((inst) => (
@@ -122,25 +116,76 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
               </div>
 
               {inst.is_suppressed ? (
-                <p class="inst-suppressed-desc">{inst.suppression_message || 'Insufficient group size for anonymous reporting.'}</p>
+                <p class="suppressed-note">Insufficient group size for anonymous reporting.</p>
               ) : (
-                <div class="inst-comp-stats">
-                  <span>Aggregate Score: <strong>{inst.average_overall_score?.toFixed(1)} / 10</strong></span>
-                  <span>Reporting Students: <strong>{inst.participating_student_count}</strong></span>
+                <div class="inst-comp-meta">
+                  <span>Completed: <strong>{inst.completed_students}</strong></span>
+                  <span>Rate: <strong>{inst.participation_rate.toFixed(1)}%</strong></span>
+                  <span>Avg: <strong>{inst.average_overall_score?.toFixed(1) || 'N/A'}</strong>/10</span>
                 </div>
               )}
             </div>
           ))}
+          {institutionSummaries.length === 0 && (
+            <p class="text-sm text-muted">No institutions registered in this region yet.</p>
+          )}
         </div>
       </Card>
     </div>
 
+    {/* Longitudinal Trends Section */}
+    <Card padding="lg">
+      <h3 class="card-section-title">Participation & Trend Trajectory</h3>
+      <p class="section-subtext">Historical comparison of check-in completions and overall index.</p>
+
+      {trends.length === 0 ? (
+        <p class="text-sm text-muted">No historical cycle data available yet for trend analysis.</p>
+      ) : (
+        <div class="trends-table-wrap">
+          <table class="trends-table">
+            <thead>
+              <tr>
+                <th>Cycle Name</th>
+                <th>Check-in Window</th>
+                <th>Participating Students</th>
+                <th>Participation Rate</th>
+                <th>Avg Wellbeing Score</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trends.map((t) => (
+                <tr>
+                  <td class="font-medium">{t.cycle_name}</td>
+                  <td>{new Date(t.start_date).toLocaleDateString()} - {new Date(t.end_date).toLocaleDateString()}</td>
+                  <td>{t.participating_students.toLocaleString()}</td>
+                  <td>{t.participation_rate.toFixed(1)}%</td>
+                  <td>
+                    {t.average_score !== null ? (
+                      <strong>{t.average_score.toFixed(1)} / 10</strong>
+                    ) : (
+                      <span class="text-muted">Suppressed</span>
+                    )}
+                  </td>
+                  <td>
+                    <Badge variant={t.is_active ? 'stable' : 'neutral'} size="sm">
+                      {t.is_active ? 'Active' : 'Closed'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+
     <PrivacyNotice variant="full" />
   </div>
-</GovernmentLayout>
+</RegionalLayout>
 
 <style>
-  .gov-insights-layout {
+  .regional-insights-layout {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
@@ -148,7 +193,7 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
 
   .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--space-4);
   }
 
@@ -162,7 +207,6 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
     font-size: 1.125rem;
     font-weight: 700;
     color: var(--color-text-main);
-    margin-bottom: var(--space-1);
   }
 
   .section-subtext {
@@ -175,27 +219,30 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    margin-top: var(--space-2);
   }
 
   .bar-row {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
+    align-items: center;
+    gap: var(--space-3);
   }
 
   .bar-label {
+    width: 140px;
     font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--color-text-main);
+    font-weight: 500;
     text-transform: capitalize;
+    color: var(--color-text-main);
+    flex-shrink: 0;
   }
 
   .bar-track {
+    flex: 1;
     height: 24px;
     background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     overflow: hidden;
+    position: relative;
   }
 
   .bar-fill {
@@ -204,40 +251,30 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
     align-items: center;
     justify-content: flex-end;
     padding-right: var(--space-2);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     transition: width 0.3s ease;
-  }
-
-  .bar-fill.band-stable {
-    background-color: var(--color-band-stable);
-  }
-
-  .bar-fill.band-watch {
-    background-color: var(--color-band-improving);
-  }
-
-  .bar-fill.band-needs_attention {
-    background-color: var(--color-band-attention);
-  }
-
-  .bar-fill.band-elevated {
-    background-color: var(--color-band-elevated);
   }
 
   .bar-val {
     font-size: 0.75rem;
     font-weight: 700;
-    color: var(--color-white);
+    color: white;
   }
+
+  .bar-fill.band-stable { background-color: var(--color-success); }
+  .bar-fill.band-watch { background-color: #3b82f6; }
+  .bar-fill.band-needs_attention { background-color: var(--color-warning); }
+  .bar-fill.band-elevated { background-color: var(--color-danger); }
 
   .bar-suppressed {
     height: 100%;
     display: flex;
     align-items: center;
-    padding-left: var(--space-3);
+    justify-content: center;
     font-size: 0.75rem;
     color: var(--color-text-muted);
     font-style: italic;
+    background-color: var(--color-bg-subtle);
   }
 
   .inst-comp-list {
@@ -247,16 +284,17 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
   }
 
   .inst-comp-item {
-    padding: var(--space-3) var(--space-4);
-    background-color: var(--color-bg-subtle);
-    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-surface);
   }
 
   .inst-comp-top {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--space-1);
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
   }
 
   .inst-comp-name {
@@ -265,17 +303,44 @@ const isDataSuppressed = metrics.is_suppressed || categorySummaries.every((cs) =
     color: var(--color-text-main);
   }
 
-  .inst-suppressed-desc {
-    font-size: 0.8125rem;
+  .suppressed-note {
+    font-size: 0.75rem;
     color: var(--color-text-muted);
     font-style: italic;
   }
 
-  .inst-comp-stats {
+  .inst-comp-meta {
     display: flex;
-    justify-content: space-between;
+    gap: var(--space-4);
     font-size: 0.8125rem;
     color: var(--color-text-muted);
-    margin-top: var(--space-1);
+  }
+
+  .trends-table-wrap {
+    overflow-x: auto;
+  }
+
+  .trends-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .trends-table th,
+  .trends-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .trends-table th {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .font-medium {
+    font-weight: 600;
+    color: var(--color-text-main);
   }
 </style>

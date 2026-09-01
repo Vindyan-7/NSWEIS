@@ -11,6 +11,7 @@ import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import { getAllInstitutions, createInstitution, updateInstitutionStatus, updateInstitutionDetails } from '../../services/institutions';
+import { getRegions } from '../../services/provisioning';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -38,12 +39,13 @@ if (Astro.request.method === 'POST') {
       const code = formData.get('code')?.toString();
       const state = formData.get('state')?.toString();
       const type = formData.get('type')?.toString() as any;
+      const regionId = formData.get('region_id')?.toString();
 
       if (!name || !code) {
         message = 'Institution Name and Code are required.';
         isError = true;
       } else {
-        const res = await createInstitution(supabase, { name, code, state, type, active: true });
+        const res = await createInstitution(supabase, { name, code, state, type, regionId, active: true });
         if (res.success) {
           message = `Institution '${name}' registered successfully.`;
         } else {
@@ -57,12 +59,19 @@ if (Astro.request.method === 'POST') {
       const code = formData.get('code')?.toString();
       const state = formData.get('state')?.toString();
       const type = formData.get('type')?.toString();
+      const regionId = formData.get('region_id')?.toString();
 
       if (!instId || !name || !code) {
         message = 'Institution ID, Name, and Code are required.';
         isError = true;
       } else {
-        const res = await updateInstitutionDetails(supabase, instId, { name, code, state, type });
+        const res = await updateInstitutionDetails(supabase, instId, {
+          name,
+          code,
+          state,
+          type,
+          district: regionId,
+        });
         if (res.success) {
           message = `Institution '${name}' updated successfully.`;
         } else {
@@ -90,6 +99,9 @@ if (Astro.request.method === 'POST') {
 }
 
 const institutions = await getAllInstitutions(supabase);
+const regions = await getRegions(supabase);
+
+const regionMap = new Map(regions.map((r) => [r.id, `${r.name} (${r.code})`]));
 ---
 
 <SuperAdminLayout title="Institution Management" activePath="/superadmin/institutions">
@@ -121,12 +133,18 @@ const institutions = await getAllInstitutions(supabase);
           <Input label="Short Code" name="code" placeholder="e.g. IIT01" required />
         </div>
         <div class="form-row">
-          <Input label="State / Region" name="state" placeholder="e.g. Maharashtra" />
+          <Input label="State / Province" name="state" placeholder="e.g. Andhra Pradesh / Maharashtra" />
           <Select label="Institution Type" name="type">
             <option value="university">University</option>
             <option value="college" selected>College</option>
             <option value="autonomous">Autonomous Institute</option>
             <option value="polytechnic">Polytechnic</option>
+          </Select>
+          <Select label="Assigned Region" name="region_id">
+            <option value="">National / Unassigned</option>
+            {regions.map((r) => (
+              <option value={r.id}>{r.name} ({r.code})</option>
+            ))}
           </Select>
         </div>
         <div class="form-actions">
@@ -146,6 +164,7 @@ const institutions = await getAllInstitutions(supabase);
               <th>Institution Name</th>
               <th>Code</th>
               <th>State</th>
+              <th>Assigned Region</th>
               <th>Type</th>
               <th>Status</th>
               <th>Actions</th>
@@ -157,6 +176,11 @@ const institutions = await getAllInstitutions(supabase);
                 <td class="font-medium">{inst.name}</td>
                 <td><span class="code-badge">{inst.code}</span></td>
                 <td>{inst.state || 'National'}</td>
+                <td>
+                  <span class="region-badge">
+                    {regionMap.get(inst.district || '') || (inst.district && inst.district !== 'Central' ? inst.district : 'National')}
+                  </span>
+                </td>
                 <td class="capitalize">{inst.type || 'college'}</td>
                 <td>
                   <Badge variant={inst.active ? 'stable' : 'neutral'} size="sm">
@@ -173,6 +197,7 @@ const institutions = await getAllInstitutions(supabase);
                       data-code={inst.code}
                       data-state={inst.state || ''}
                       data-type={inst.type || inst.institution_type || 'college'}
+                      data-region={inst.district || ''}
                       onclick="openEditModal(this)"
                     >
                       Edit
@@ -224,6 +249,16 @@ const institutions = await getAllInstitutions(supabase);
             </div>
 
             <div class="input-group">
+              <label for="edit-inst-region" class="form-label">Assigned Region Scope</label>
+              <select id="edit-inst-region" name="region_id" class="form-select">
+                <option value="">National / Unassigned</option>
+                {regions.map((r) => (
+                  <option value={r.id}>{r.name} ({r.code})</option>
+                ))}
+              </select>
+            </div>
+
+            <div class="input-group">
               <label for="edit-inst-type" class="form-label">Institution Type</label>
               <select id="edit-inst-type" name="type" class="form-select">
                 <option value="university">University</option>
@@ -253,6 +288,7 @@ const institutions = await getAllInstitutions(supabase);
       document.getElementById('edit-inst-name').value = btn.dataset.name || '';
       document.getElementById('edit-inst-code').value = btn.dataset.code || '';
       document.getElementById('edit-inst-state').value = btn.dataset.state || '';
+      document.getElementById('edit-inst-region').value = btn.dataset.region || '';
       document.getElementById('edit-inst-type').value = btn.dataset.type || 'college';
       if (typeof dialog.showModal === 'function') {
         dialog.showModal();
@@ -353,6 +389,16 @@ const institutions = await getAllInstitutions(supabase);
     color: var(--color-primary-800);
     font-size: 0.75rem;
     font-weight: 700;
+    border-radius: var(--radius-sm);
+  }
+
+  .region-badge {
+    padding: 0.125rem 0.5rem;
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-main);
+    border: 1px solid var(--color-border-subtle);
+    font-size: 0.75rem;
+    font-weight: 600;
     border-radius: var(--radius-sm);
   }
 
