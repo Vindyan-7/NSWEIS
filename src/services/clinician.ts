@@ -120,19 +120,20 @@ export async function getClinicianQueueCounts(
   supabase: SupabaseClient<Database>,
   clinicianId: string
 ): Promise<ClinicianQueueCounts> {
+  const adminClient = createSupabaseAdminClient();
   const [drafts, review, flagged, active] = await Promise.all([
-    (supabase.from('questions') as any)
+    (adminClient.from('questions') as any)
       .select('id', { count: 'exact', head: true })
       .eq('authored_by', clinicianId)
       .is('clinical_reviewed_at', null),
-    (supabase.from('questions') as any)
+    (adminClient.from('questions') as any)
       .select('id', { count: 'exact', head: true })
       .neq('authored_by', clinicianId)
       .is('clinical_reviewed_at', null),
-    (supabase.from('question_flags') as any)
+    (adminClient.from('question_flags') as any)
       .select('id', { count: 'exact', head: true })
       .is('resolved_at', null),
-    (supabase.from('questions') as any)
+    (adminClient.from('questions') as any)
       .select('id', { count: 'exact', head: true })
       .eq('active', true),
   ]);
@@ -150,7 +151,8 @@ export async function getMyDraftQuestions(
   supabase: SupabaseClient<Database>,
   clinicianId: string
 ): Promise<QuestionWithNames[]> {
-  const { data, error } = await (supabase.from('questions') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data, error } = await (adminClient.from('questions') as any)
     .select('*, options:question_options(*)')
     .eq('authored_by', clinicianId)
     .eq('active', false)
@@ -165,7 +167,8 @@ export async function getPendingReviewQuestions(
   supabase: SupabaseClient<Database>,
   clinicianId: string
 ): Promise<QuestionWithNames[]> {
-  const { data, error } = await (supabase.from('questions') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data, error } = await (adminClient.from('questions') as any)
     .select('*, options:question_options(*)')
     .neq('authored_by', clinicianId)
     .is('clinical_reviewed_at', null)
@@ -181,7 +184,8 @@ export async function getQuestionForReview(
   supabase: SupabaseClient<Database>,
   questionId: string
 ): Promise<QuestionWithNames | null> {
-  const { data, error } = await (supabase.from('questions') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data, error } = await (adminClient.from('questions') as any)
     .select('*, options:question_options(*)')
     .eq('id', questionId)
     .single();
@@ -526,7 +530,8 @@ export async function regionalReviewQuestion(
 export async function getQuestionsAwaitingActivation(
   supabase: SupabaseClient<Database>
 ): Promise<QuestionWithNames[]> {
-  const { data, error } = await (supabase.from('questions') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data, error } = await (adminClient.from('questions') as any)
     .select('*, options:question_options(*)')
     .not('clinical_reviewed_at', 'is', null)
     .eq('active', false)
