@@ -10,7 +10,7 @@ import Alert from '../../components/ui/Alert.astro';
 import PrivacyNotice from '../../components/privacy/PrivacyNotice.astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
-import { getAllInstitutions, createInstitution, updateInstitutionStatus } from '../../services/institutions';
+import { getAllInstitutions, createInstitution, updateInstitutionStatus, updateInstitutionDetails } from '../../services/institutions';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -51,6 +51,25 @@ if (Astro.request.method === 'POST') {
           isError = true;
         }
       }
+    } else if (action === 'edit') {
+      const instId = formData.get('institution_id')?.toString();
+      const name = formData.get('name')?.toString();
+      const code = formData.get('code')?.toString();
+      const state = formData.get('state')?.toString();
+      const type = formData.get('type')?.toString();
+
+      if (!instId || !name || !code) {
+        message = 'Institution ID, Name, and Code are required.';
+        isError = true;
+      } else {
+        const res = await updateInstitutionDetails(supabase, instId, { name, code, state, type });
+        if (res.success) {
+          message = `Institution '${name}' updated successfully.`;
+        } else {
+          message = res.error || 'Failed to update institution.';
+          isError = true;
+        }
+      }
     } else if (action === 'toggle') {
       const instId = formData.get('institution_id')?.toString();
       const currentActive = formData.get('current_active')?.toString() === 'true';
@@ -76,7 +95,7 @@ const institutions = await getAllInstitutions(supabase);
 <SuperAdminLayout title="Institution Management" activePath="/superadmin/institutions">
   <PageHeader
     title="National Institution Management"
-    subtitle="Register new universities and colleges or toggle institutional active status"
+    subtitle="Register new universities and colleges, edit details, or toggle institutional active status"
   >
     <a href="/superadmin/dashboard">
       <Button variant="outline" size="sm">&larr; Back to Overview</Button>
@@ -145,14 +164,29 @@ const institutions = await getAllInstitutions(supabase);
                   </Badge>
                 </td>
                 <td>
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="action" value="toggle" />
-                    <input type="hidden" name="institution_id" value={inst.id} />
-                    <input type="hidden" name="current_active" value={inst.active ? 'true' : 'false'} />
-                    <Button variant="outline" size="sm" type="submit">
-                      {inst.active ? 'Deactivate' : 'Activate'}
-                    </Button>
-                  </form>
+                  <div class="actions-cell">
+                    <button
+                      type="button"
+                      class="btn-edit"
+                      data-id={inst.id}
+                      data-name={inst.name}
+                      data-code={inst.code}
+                      data-state={inst.state || ''}
+                      data-type={inst.type || inst.institution_type || 'college'}
+                      onclick="openEditModal(this)"
+                    >
+                      Edit
+                    </button>
+
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="action" value="toggle" />
+                      <input type="hidden" name="institution_id" value={inst.id} />
+                      <input type="hidden" name="current_active" value={inst.active ? 'true' : 'false'} />
+                      <Button variant="outline" size="sm" type="submit">
+                        {inst.active ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </form>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -161,8 +195,90 @@ const institutions = await getAllInstitutions(supabase);
       </div>
     </Card>
 
+    {/* Edit Institution Modal */}
+    <dialog id="edit-institution-dialog" class="edit-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h3 class="dialog-title">Edit Institution Details</h3>
+          <button type="button" class="btn-close" onclick="closeEditModal()">&times;</button>
+        </div>
+
+        <form method="POST" class="edit-form">
+          <input type="hidden" name="action" value="edit" />
+          <input type="hidden" name="institution_id" id="edit-inst-id" value="" />
+
+          <div class="dialog-body">
+            <div class="input-group">
+              <label for="edit-inst-name" class="form-label">Institution Name *</label>
+              <input type="text" id="edit-inst-name" name="name" class="form-input" required />
+            </div>
+
+            <div class="input-group">
+              <label for="edit-inst-code" class="form-label">Short Code *</label>
+              <input type="text" id="edit-inst-code" name="code" class="form-input" required />
+            </div>
+
+            <div class="input-group">
+              <label for="edit-inst-state" class="form-label">State / Region</label>
+              <input type="text" id="edit-inst-state" name="state" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label for="edit-inst-type" class="form-label">Institution Type</label>
+              <select id="edit-inst-type" name="type" class="form-select">
+                <option value="university">University</option>
+                <option value="college">College</option>
+                <option value="autonomous">Autonomous Institute</option>
+                <option value="polytechnic">Polytechnic</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="dialog-footer">
+            <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
     <PrivacyNotice variant="full" />
   </div>
+
+  <script is:inline>
+    function openEditModal(btn) {
+      const dialog = document.getElementById('edit-institution-dialog');
+      if (!dialog) return;
+      document.getElementById('edit-inst-id').value = btn.dataset.id || '';
+      document.getElementById('edit-inst-name').value = btn.dataset.name || '';
+      document.getElementById('edit-inst-code').value = btn.dataset.code || '';
+      document.getElementById('edit-inst-state').value = btn.dataset.state || '';
+      document.getElementById('edit-inst-type').value = btn.dataset.type || 'college';
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute('open', '');
+      }
+    }
+
+    function closeEditModal() {
+      const dialog = document.getElementById('edit-institution-dialog');
+      if (!dialog) return;
+      if (typeof dialog.close === 'function') {
+        dialog.close();
+      } else {
+        dialog.removeAttribute('open');
+      }
+    }
+
+    // Close when clicking backdrop
+    const dialog = document.getElementById('edit-institution-dialog');
+    if (dialog) {
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) closeEditModal();
+      });
+    }
+  </script>
 </SuperAdminLayout>
 
 <style>
@@ -242,5 +358,161 @@ const institutions = await getAllInstitutions(supabase);
 
   .capitalize {
     text-transform: capitalize;
+  }
+
+  .actions-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .btn-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-edit:hover {
+    background-color: var(--color-primary-100);
+    border-color: var(--color-primary-300);
+  }
+
+  /* Modal Dialog Styles */
+  .edit-dialog {
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 0;
+    width: 90%;
+    max-width: 520px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-main);
+  }
+
+  .edit-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+  }
+
+  .dialog-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .dialog-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0;
+  }
+
+  .btn-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+  }
+
+  .btn-close:hover {
+    color: var(--color-text-main);
+  }
+
+  .dialog-body {
+    padding: var(--space-5) var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .form-input,
+  .form-select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    box-sizing: border-box;
+  }
+
+  .form-input:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+
+  .dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .btn-secondary {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+  }
+
+  .btn-primary {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: var(--color-primary-600);
+    border: 1px solid var(--color-primary-600);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-700);
   }
 </style>

@@ -156,6 +156,55 @@ export async function createInstitution(
   }
 }
 
+export interface UpdateInstitutionInput {
+  name?: string;
+  code?: string;
+  state?: string;
+  district?: string;
+  type?: 'university' | 'college' | 'autonomous' | 'polytechnic' | string;
+  active?: boolean;
+}
+
+export async function updateInstitutionDetails(
+  supabase: SupabaseClient<Database>,
+  institutionId: string,
+  input: UpdateInstitutionInput
+): Promise<{ success: boolean; data?: Institution; error?: string }> {
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const updatePayload: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.name !== undefined) updatePayload.name = input.name.trim();
+    if (input.code !== undefined) updatePayload.code = input.code.trim().toUpperCase();
+    if (input.state !== undefined) updatePayload.state = input.state.trim();
+    if (input.district !== undefined) updatePayload.district = input.district.trim();
+    if (input.type !== undefined) updatePayload.institution_type = input.type;
+    if (input.active !== undefined) updatePayload.active = input.active;
+
+    const { data, error } = await (adminClient.from('institutions' as any) as any)
+      .update(updatePayload)
+      .eq('id', institutionId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to update institution details' };
+    }
+
+    const updated = {
+      ...data,
+      type: data.institution_type || data.type || 'college',
+      institution_type: data.institution_type || data.type || 'college',
+    };
+
+    return { success: true, data: updated as Institution };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'An error occurred while updating institution' };
+  }
+}
+
 export async function updateInstitutionStatus(
   supabase: SupabaseClient<Database>,
   institutionId: string,
@@ -169,3 +218,4 @@ export async function updateInstitutionStatus(
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
+
