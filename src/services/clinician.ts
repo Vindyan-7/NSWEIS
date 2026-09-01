@@ -315,10 +315,11 @@ export async function submitQuestionForPeerReview(
   questionId: string,
   clinicianId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const { data: q } = await (supabase.from('questions') as any).select('authored_by').eq('id', questionId).single();
+  const adminClient = createSupabaseAdminClient();
+  const { data: q } = await (adminClient.from('questions') as any).select('authored_by').eq('id', questionId).single();
   if (!q) return { success: false, error: 'Question not found.' };
 
-  const { error } = await (supabase.from('questions') as any)
+  const { error } = await (adminClient.from('questions') as any)
     .update({
       review_notes: '[PEER_REVIEW]',
       updated_at: new Date().toISOString(),
@@ -339,8 +340,9 @@ export async function peerReviewQuestion(
   action: 'approve' | 'request_revision',
   notes?: string
 ): Promise<{ success: boolean; error?: string }> {
+  const adminClient = createSupabaseAdminClient();
   // 1. Fetch question record
-  const { data: q, error: fetchErr } = await (supabase.from('questions') as any)
+  const { data: q, error: fetchErr } = await (adminClient.from('questions') as any)
     .select('id, authored_by')
     .eq('id', questionId)
     .single();
@@ -360,7 +362,7 @@ export async function peerReviewQuestion(
       return { success: false, error: 'A revision note is required when requesting changes.' };
     }
 
-    const { error } = await (supabase.from('questions') as any)
+    const { error } = await (adminClient.from('questions') as any)
       .update({
         review_notes: notes.trim(),
         clinical_reviewed_by: reviewerId,
@@ -380,7 +382,7 @@ export async function peerReviewQuestion(
     return { success: true };
   } else {
     // Approve
-    const { error } = await (supabase.from('questions') as any)
+    const { error } = await (adminClient.from('questions') as any)
       .update({
         clinical_reviewed_by: reviewerId,
         clinical_reviewed_at: new Date().toISOString(),
@@ -410,7 +412,8 @@ export async function reviseClinicianQuestion(
   updatedText: string,
   _updatedOptions?: ClinicianOptionInput[]
 ): Promise<{ success: boolean; question?: Question; error?: string }> {
-  const { data: q } = await (supabase.from('questions') as any).select('*').eq('id', questionId).single();
+  const adminClient = createSupabaseAdminClient();
+  const { data: q } = await (adminClient.from('questions') as any).select('*').eq('id', questionId).single();
   if (!q) return { success: false, error: 'Question not found.' };
 
   const currentStatus = deriveQuestionStatus(q);
@@ -419,7 +422,7 @@ export async function reviseClinicianQuestion(
   if (q.active || currentStatus === 'regionally_approved' || currentStatus === 'active') {
     const nextVersion = (q.version || 1) + 1;
     const versionedCode = `${q.question_code}_v${nextVersion}`;
-    const { data: newVer, error: verErr } = await (supabase.from('questions') as any)
+    const { data: newVer, error: verErr } = await (adminClient.from('questions') as any)
       .insert({
         question_code: versionedCode,
         text: updatedText.trim(),
@@ -453,7 +456,7 @@ export async function reviseClinicianQuestion(
     return { success: true, question: revisedQuestion };
   } else {
     // Update existing draft in-place
-    const { error: upErr } = await (supabase.from('questions') as any)
+    const { error: upErr } = await (adminClient.from('questions') as any)
       .update({
         text: updatedText.trim(),
         review_notes: '[PEER_REVIEW]',
@@ -477,8 +480,9 @@ export async function regionalReviewQuestion(
   action: 'activate' | 'request_revision',
   notes?: string
 ): Promise<{ success: boolean; error?: string }> {
+  const adminClient = createSupabaseAdminClient();
   // 1. Fetch question
-  const { data: q } = await (supabase.from('questions') as any).select('*').eq('id', questionId).single();
+  const { data: q } = await (adminClient.from('questions') as any).select('*').eq('id', questionId).single();
   if (!q) return { success: false, error: 'Question not found.' };
 
   // 2. Region isolation check (national, ALL, or exact region match)
@@ -495,7 +499,7 @@ export async function regionalReviewQuestion(
       return { success: false, error: 'A revision note is required when requesting regional changes.' };
     }
 
-    const { error } = await (supabase.from('questions') as any)
+    const { error } = await (adminClient.from('questions') as any)
       .update({
         review_notes: notes.trim(),
         updated_at: new Date().toISOString(),
@@ -508,7 +512,7 @@ export async function regionalReviewQuestion(
     return { success: true };
   } else {
     // Activate
-    const { error } = await (supabase.from('questions') as any)
+    const { error } = await (adminClient.from('questions') as any)
       .update({
         active: true,
         activated_by: officerId,
@@ -552,19 +556,19 @@ export async function approveQuestion(
 export async function requestQuestionChange(
   supabase: SupabaseClient<Database>,
   questionId: string,
-  notes: string
+  notes: string,
+  regionId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const { data: q } = await (supabase.from('questions') as any).select('authored_by').eq('id', questionId).single();
-  const reviewerId = q?.authored_by === 'dummy' ? 'reviewer' : 'peer_reviewer';
-  return peerReviewQuestion(supabase, questionId, reviewerId, 'request_revision', notes);
+  return regionalReviewQuestion(supabase, questionId, 'regional_officer', regionId || 'national', 'request_revision', notes);
 }
 
 export async function activateQuestion(
   supabase: SupabaseClient<Database>,
   questionId: string,
-  activatorId: string
+  activatorId: string,
+  regionId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  return regionalReviewQuestion(supabase, questionId, activatorId, 'national', 'activate');
+  return regionalReviewQuestion(supabase, questionId, activatorId, regionId || 'national', 'activate');
 }
 
 export interface FlaggedQuestionItem extends QuestionWithNames {
