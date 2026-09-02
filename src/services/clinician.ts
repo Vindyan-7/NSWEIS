@@ -50,8 +50,9 @@ async function attachNames(
 
   const nameMap = new Map<string, string>((profileRows || []).map((p: any) => [p.id, p.full_name]));
 
-  return rows.map((r) => ({
+  return rows.map((r: any) => ({
     ...r,
+    options: (r.options || []).slice().sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)),
     status: deriveQuestionStatus(r),
     version: r.version || 1,
     author_name: r.authored_by ? nameMap.get(r.authored_by) || null : null,

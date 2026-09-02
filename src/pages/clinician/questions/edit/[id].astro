@@ -1,0 +1,647 @@
+---
+import ClinicianLayout from '../../../../layouts/ClinicianLayout.astro';
+import PageHeader from '../../../../components/navigation/PageHeader.astro';
+import Card from '../../../../components/ui/Card.astro';
+import Button from '../../../../components/ui/Button.astro';
+import Input from '../../../../components/ui/Input.astro';
+import Select from '../../../../components/ui/Select.astro';
+import Alert from '../../../../components/ui/Alert.astro';
+import { createSupabaseServerClient } from '../../../../lib/supabase/server';
+import { getProfile } from '../../../../services/users';
+import { getQuestionDetails, updateQuestionWithOptions } from '../../../../services/question-management';
+import { recordQuestionAuditLog } from '../../../../services/clinician';
+import type { WellnessCategory } from '../../../../types/domain';
+import { Plus, Trash2, ArrowLeft, Check, ListChecks } from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'clinician') {
+  return Astro.redirect('/no-access');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/clinician/dashboard?tab=active');
+}
+
+const CATEGORIES: WellnessCategory[] = [
+  'academic', 'sleep_rest', 'emotional_wellbeing', 'social_connection', 'family_home',
+  'financial', 'career', 'campus_experience', 'physical_wellbeing', 'digital_balance',
+];
+
+let message = '';
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+
+  const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
+  const text = formData.get('question_text')?.toString().trim() || '';
+  const category = formData.get('category')?.toString() as WellnessCategory;
+  const depth_level = formData.get('depth_level')?.toString() as 'light' | 'moderate' | 'deep';
+  const target_department = formData.get('target_department')?.toString() || 'ALL';
+
+  const optionCodes = formData.getAll('option_code[]').map((v) => v.toString().trim());
+  const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
+  const optionScores = formData.getAll('option_score[]').map((v) => parseFloat(v.toString()));
+
+  if (!text || !category || !depth_level) {
+    message = 'Please provide question text, domain, and depth level.';
+    isError = true;
+  } else if (optionLabels.length < 2) {
+    message = 'At least two response options are required.';
+    isError = true;
+  } else if (optionLabels.some((l) => !l) || optionScores.some((s) => isNaN(s))) {
+    message = 'Every option needs a label and a numeric score.';
+    isError = true;
+  } else {
+    const optionsData = optionCodes.map((code, idx) => ({
+      option_code: code || `OPT_${idx + 1}`,
+      label: optionLabels[idx],
+      score: optionScores[idx],
+      signal_value: optionScores[idx],
+      order_index: idx + 1,
+    }));
+
+    const result = await updateQuestionWithOptions(
+      supabase,
+      id,
+      {
+        week_number,
+        text,
+        category,
+        target_department,
+        depth_level,
+      },
+      optionsData
+    );
+
+    if (!result.success) {
+      message = result.error || 'Failed to update question.';
+      isError = true;
+    } else {
+      await recordQuestionAuditLog(
+        supabase,
+        id,
+        user.id,
+        'QUESTION_EDITED',
+        `Clinician updated active question text and ${optionsData.length} options.`
+      );
+      return Astro.redirect('/clinician/dashboard?tab=active&updated=1');
+    }
+  }
+}
+
+const question = await getQuestionDetails(supabase, id);
+
+if (!question) {
+  return Astro.redirect('/clinician/dashboard?tab=active');
+}
+
+const sortedOptions = (question.options || []).slice().sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+---
+
+<ClinicianLayout title={`Edit Question ${question.question_code}`} activePath="/clinician/dashboard">
+  <PageHeader
+    title={`Edit Question — ${question.question_code || 'Clinical Question'}`}
+    subtitle={`Modify question text, classification, and student response choices in the active library.`}
+  >
+    <a href="/clinician/dashboard?tab=active">
+      <Button variant="outline" size="sm">
+        <ArrowLeft size={15} aria-hidden="true" /> Back to Active Library
+      </Button>
+    </a>
+  </PageHeader>
+
+  {message && (
+    <Alert type={isError ? 'error' : 'success'} title={isError ? 'Could not save changes' : 'Saved'}>
+      {message}
+    </Alert>
+  )}
+
+  <Card padding="lg">
+    <form method="POST" class="edit-question-form" id="edit-question-form">
+      <div class="form-grid">
+        <div class="field-readonly-wrap">
+          <label class="field-label">Question Code</label>
+          <div class="readonly-code-pill">{question.question_code || 'Q-ACTIVE'}</div>
+          <span class="field-hint">Unique identifier for tracking</span>
+        </div>
+
+        <Input
+          label="Reflection Week Number"
+          name="week_number"
+          type="number"
+          min="1"
+          max="52"
+          value={String(question.week_number || 1)}
+          required
+        />
+
+        <Select
+          label="Domain (Category)"
+          name="category"
+          required
+          value={question.category}
+          options={CATEGORIES.map((c) => ({
+            value: c,
+            label: c.replace(/_/g, ' '),
+          }))}
+        />
+
+        <Select
+          label="Depth Level"
+          name="depth_level"
+          required
+          value={question.depth_level || 'light'}
+          options={[
+            { value: 'light', label: 'Light — general check-in' },
+            { value: 'moderate', label: 'Moderate — asks for specifics' },
+            { value: 'deep', label: 'Deep — probes a sensitive area' },
+          ]}
+        />
+
+        <Input
+          label="Target Department"
+          name="target_department"
+          value={question.target_department || 'ALL'}
+          helperText="Department code, or ALL for campus-wide"
+        />
+      </div>
+
+      <div class="text-field">
+        <label class="field-label" for="question_text">
+          Question Text <span class="required-star">*</span>
+        </label>
+        <textarea
+          id="question_text"
+          name="question_text"
+          rows="3"
+          required
+          placeholder="Enter the reflection question students will answer..."
+        >{question.text}</textarea>
+        <span class="field-hint">Ensure clear, empathetic, non-punitive phrasing per clinical guidelines.</span>
+      </div>
+
+      <div class="options-header-row">
+        <div>
+          <h3 class="options-heading">
+            <ListChecks size={18} class="text-primary" />
+            <span>Answer Options & Scoring</span>
+          </h3>
+          <p class="options-help">
+            Each option requires a code, student-visible text label, and a score weight (0 to 10).
+          </p>
+        </div>
+        <button type="button" class="btn-add-option" id="btn-add-option">
+          <Plus size={15} />
+          <span>Add Option</span>
+        </button>
+      </div>
+
+      <div class="options-container" id="options-container">
+        {sortedOptions.map((opt, idx) => (
+          <div class="option-row" data-index={idx}>
+            <div class="option-num-badge">{idx + 1}</div>
+            <div class="option-fields">
+              <div class="opt-code-col">
+                <label class="opt-field-label">Code</label>
+                <input
+                  type="text"
+                  name="option_code[]"
+                  class="field-input-sm"
+                  value={opt.option_code || String.fromCharCode(65 + idx)}
+                  required
+                />
+              </div>
+              <div class="opt-text-col">
+                <label class="opt-field-label">Option Label (Student Facing)</label>
+                <input
+                  type="text"
+                  name="option_text[]"
+                  class="field-input-sm"
+                  value={opt.label}
+                  placeholder="e.g. Very manageable"
+                  required
+                />
+              </div>
+              <div class="opt-score-col">
+                <label class="opt-field-label">Score (0–10)</label>
+                <input
+                  type="number"
+                  name="option_score[]"
+                  class="field-input-sm"
+                  value={String(opt.score ?? opt.signal_value ?? 0)}
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  required
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn-remove-option"
+              title="Remove this option"
+              aria-label="Remove option"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div class="form-actions-bar">
+        <a href="/clinician/dashboard?tab=active" class="btn-cancel">
+          Cancel
+        </a>
+        <Button type="submit" variant="primary" size="lg">
+          <Check size={16} aria-hidden="true" /> Save Changes
+        </Button>
+      </div>
+    </form>
+  </Card>
+</ClinicianLayout>
+
+<script>
+  const container = document.getElementById('options-container');
+  const addBtn = document.getElementById('btn-add-option');
+
+  function updateRemoveButtons() {
+    if (!container) return;
+    const rows = container.querySelectorAll('.option-row');
+    rows.forEach((row, idx) => {
+      const numBadge = row.querySelector('.option-num-badge');
+      if (numBadge) numBadge.textContent = String(idx + 1);
+
+      const removeBtn = row.querySelector('.btn-remove-option') as HTMLButtonElement | null;
+      if (removeBtn) {
+        removeBtn.disabled = rows.length <= 2;
+        removeBtn.style.opacity = rows.length <= 2 ? '0.4' : '1';
+        removeBtn.style.cursor = rows.length <= 2 ? 'not-allowed' : 'pointer';
+      }
+    });
+  }
+
+  if (container) {
+    container.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const removeBtn = target.closest('.btn-remove-option');
+      if (!removeBtn) return;
+
+      const rows = container.querySelectorAll('.option-row');
+      if (rows.length <= 2) {
+        alert('A question must have at least 2 answer options.');
+        return;
+      }
+
+      const row = removeBtn.closest('.option-row');
+      if (row) {
+        row.remove();
+        updateRemoveButtons();
+      }
+    });
+  }
+
+  if (addBtn && container) {
+    addBtn.addEventListener('click', () => {
+      const currentRows = container.querySelectorAll('.option-row');
+      const nextIndex = currentRows.length + 1;
+      const nextCode = String.fromCharCode(64 + nextIndex);
+
+      const row = document.createElement('div');
+      row.className = 'option-row';
+      row.setAttribute('data-index', String(nextIndex - 1));
+      row.innerHTML = `
+        <div class="option-num-badge">${nextIndex}</div>
+        <div class="option-fields">
+          <div class="opt-code-col">
+            <label class="opt-field-label">Code</label>
+            <input
+              type="text"
+              name="option_code[]"
+              class="field-input-sm"
+              value="${nextCode}"
+              required
+            />
+          </div>
+          <div class="opt-text-col">
+            <label class="opt-field-label">Option Label (Student Facing)</label>
+            <input
+              type="text"
+              name="option_text[]"
+              class="field-input-sm"
+              placeholder="e.g. Additional answer option"
+              required
+            />
+          </div>
+          <div class="opt-score-col">
+            <label class="opt-field-label">Score (0–10)</label>
+            <input
+              type="number"
+              name="option_score[]"
+              class="field-input-sm"
+              value="5"
+              min="0"
+              max="10"
+              step="0.5"
+              required
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-remove-option"
+          title="Remove this option"
+          aria-label="Remove option"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </button>
+      `;
+
+      container.appendChild(row);
+      updateRemoveButtons();
+
+      const newTextInput = row.querySelector('input[name="option_text[]"]') as HTMLInputElement | null;
+      if (newTextInput) newTextInput.focus();
+    });
+  }
+
+  updateRemoveButtons();
+</script>
+
+<style>
+  .edit-question-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5, 1.25rem);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-4, 1rem);
+    align-items: flex-start;
+  }
+
+  .field-readonly-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main, #1e293b);
+  }
+
+  .required-star {
+    color: #ef4444;
+  }
+
+  .readonly-code-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 42px;
+    padding: 0 14px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-family: monospace;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid #c7d2fe;
+  }
+
+  .field-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #64748b);
+  }
+
+  .text-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .text-field textarea {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--color-border-default, #cbd5e1);
+    background-color: var(--color-bg-surface, #ffffff);
+    color: var(--color-text-main, #0f172a);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .text-field textarea:focus {
+    border-color: var(--color-primary-600, #4f46e5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .options-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-top: var(--space-4, 1rem);
+    border-top: 1px solid var(--color-border-subtle, #e2e8f0);
+    margin-top: var(--space-2, 0.5rem);
+  }
+
+  .options-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main, #0f172a);
+    margin: 0;
+  }
+
+  .options-help {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted, #64748b);
+    margin: 4px 0 0 0;
+  }
+
+  .btn-add-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #4f46e5;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: var(--radius-md, 8px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .btn-add-option:hover {
+    background: #e0e7ff;
+    border-color: #a5b4fc;
+    color: #3730a3;
+  }
+
+  .options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .option-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--color-bg-subtle, #f8fafc);
+    border: 1px solid var(--color-border-subtle, #e2e8f0);
+    border-radius: var(--radius-lg, 10px);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .option-row:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+  }
+
+  .option-num-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .option-fields {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 80px 1fr 120px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .opt-field-label {
+    display: block;
+    font-size: 0.725rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .field-input-sm {
+    width: 100%;
+    height: 38px;
+    padding: 6px 10px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    border-radius: var(--radius-md, 6px);
+    border: 1px solid var(--color-border-default, #cbd5e1);
+    background-color: var(--color-bg-surface, #ffffff);
+    color: var(--color-text-main, #0f172a);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .field-input-sm:focus {
+    border-color: var(--color-primary-600, #4f46e5);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+
+  .btn-remove-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-md, 6px);
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #ef4444;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-top: 18px;
+  }
+
+  .btn-remove-option:hover:not(:disabled) {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+  }
+
+  .form-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    padding-top: var(--space-4, 1rem);
+    border-top: 1px solid var(--color-border-subtle, #e2e8f0);
+    margin-top: var(--space-4, 1rem);
+  }
+
+  .btn-cancel {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 18px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    text-decoration: none;
+    border-radius: var(--radius-md, 6px);
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .btn-cancel:hover {
+    color: var(--color-text-main, #0f172a);
+    background: var(--color-bg-subtle, #f1f5f9);
+  }
+
+  @media (max-width: 640px) {
+    .option-fields {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .btn-remove-option {
+      margin-top: 0;
+      align-self: flex-start;
+    }
+    .option-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .form-actions-bar {
+      flex-direction: column;
+      width: 100%;
+    }
+    .form-actions-bar button,
+    .form-actions-bar a {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
+    }
+  }
+</style>

@@ -4,7 +4,7 @@ import Card from '../components/ui/Card.astro';
 import Input from '../components/ui/Input.astro';
 import Button from '../components/ui/Button.astro';
 import Alert from '../components/ui/Alert.astro';
-import { createSupabaseServerClient } from '../lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseAdminClient } from '../lib/supabase/server';
 import { validateLoginInput } from '../lib/validation/schemas';
 import { getDashboardForRole } from '../lib/permissions/roles';
 
@@ -29,11 +29,21 @@ if (Astro.request.method === 'POST') {
       if (authError || !authData.user) {
         errorMessage = authError?.message || 'Authentication failed. Please check your credentials.';
       } else {
-        const { data: profile } = await supabase
+        let { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', authData.user.id)
-          .single();
+          .maybeSingle();
+
+        if (!profile) {
+          const adminClient = createSupabaseAdminClient();
+          const { data: adminProf } = await adminClient
+            .from('profiles')
+            .select('*')
+            .eq('id', authData.user.id)
+            .maybeSingle();
+          profile = adminProf;
+        }
 
         if (profile) {
           if ((profile as any).active === false) {
@@ -57,15 +67,13 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<PublicLayout title="Sign In — NSWEIS">
+<PublicLayout title="Sign In — NSWESI">
   <div class="login-container">
     <Card padding="lg" class="login-card glass-panel">
       <div class="login-header">
-        <div class="login-brand-icon">
-          <span class="brand-badge-text">NS</span>
-        </div>
+        <div class="brand-wordmark">NSWESI</div>
         <h1 class="login-title">Welcome back</h1>
-        <p class="login-sub">Sign in to your NSWEIS account to access your portal</p>
+        <p class="login-sub">Sign in to your NSWESI account to access your portal</p>
       </div>
 
       {errorMessage && <Alert type="error" title="Sign In Failed">{errorMessage}</Alert>}
@@ -143,18 +151,11 @@ if (Astro.request.method === 'POST') {
     gap: var(--space-2);
   }
 
-  .login-brand-icon {
-    width: 3rem;
-    height: 3rem;
-    background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
-    color: #ffffff;
-    border-radius: var(--radius-xl);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .brand-wordmark {
+    font-size: 1.5rem;
     font-weight: 800;
-    font-size: 1.125rem;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    letter-spacing: -0.03em;
+    color: var(--color-primary-600);
     margin-bottom: var(--space-1);
   }
 

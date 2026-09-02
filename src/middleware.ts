@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/privacy-policy',
   '/no-access',
   '/logout',
+  '/api/academic-structure',
 ];
 
 export const onRequest = defineMiddleware(async (context, next) => {

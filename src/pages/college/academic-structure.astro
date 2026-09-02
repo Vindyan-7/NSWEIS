@@ -8,7 +8,7 @@ import Select from '../../components/ui/Select.astro';
 import Alert from '../../components/ui/Alert.astro';
 import Badge from '../../components/ui/Badge.astro';
 import EmptyState from '../../components/ui/EmptyState.astro';
-import { Layers, Plus, Building, Calendar, Grid3X3 } from '@lucide/astro';
+import { Layers, Plus, Building, Calendar, Grid3X3, X } from '@lucide/astro';
 import { createSupabaseServerClient } from '../../lib/supabase/server';
 import { getProfile } from '../../services/users';
 import {
@@ -16,6 +16,7 @@ import {
   createDepartment,
   createAcademicYear,
   createAcademicSection,
+  deleteAcademicSection,
 } from '../../services/provisioning';
 
 const user = Astro.locals.user;
@@ -74,7 +75,8 @@ if (Astro.request.method === 'POST') {
         message = `Academic Year '${label}' configured successfully.`;
       }
     } else if (actionType === 'create_section') {
-      const sectionCode = formData.get('section_code')?.toString() || '';
+      let sectionCode = formData.get('section_code')?.toString().trim() || '';
+      sectionCode = sectionCode.replace(/^sections?\s+/i, '').replace(/^sec\.?\s+/i, '').trim();
       const departmentId = formData.get('department_id')?.toString() || undefined;
       const yearLevel = formData.get('year_level') ? parseInt(formData.get('year_level')!.toString(), 10) : undefined;
 
@@ -89,7 +91,16 @@ if (Astro.request.method === 'POST') {
         message = res.error || 'Failed to configure section.';
         isError = true;
       } else {
-        message = `Section '${sectionCode}' configured successfully.`;
+        message = `Section 'Section ${sectionCode.toUpperCase()}' configured successfully.`;
+      }
+    } else if (actionType === 'delete_section') {
+      const sectionCode = formData.get('section_code')?.toString().trim() || '';
+      const res = await deleteAcademicSection(supabase, user.id, institutionId, sectionCode);
+      if (!res.success) {
+        message = res.error || 'Failed to remove section.';
+        isError = true;
+      } else {
+        message = `Section 'Section ${sectionCode}' removed successfully.`;
       }
     }
   } catch (err: any) {
@@ -241,8 +252,15 @@ const { departments, years, sections } = structure;
 
         <div class="tags-grid">
           {sections.map((s) => (
-            <div class="structure-badge">
+            <div class="structure-badge section-pill">
               <span class="badge-title">Section {s.section_code}</span>
+              <form method="POST" class="inline-delete-form" onsubmit={`return confirm('Are you sure you want to remove Section ${s.section_code}?');`}>
+                <input type="hidden" name="action_type" value="delete_section" />
+                <input type="hidden" name="section_code" value={s.section_code} />
+                <button type="submit" class="btn-remove-tag" title={`Remove Section ${s.section_code}`}>
+                  <X size={13} />
+                </button>
+              </form>
             </div>
           ))}
         </div>
@@ -317,6 +335,37 @@ const { departments, years, sections } = structure;
   .badge-code {
     color: var(--color-primary-600);
     font-weight: 700;
+  }
+
+  .section-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .inline-delete-form {
+    display: inline-flex;
+    margin: 0;
+    padding: 0;
+  }
+
+  .btn-remove-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    margin-left: 2px;
+    color: var(--color-text-muted);
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+  }
+
+  .btn-remove-tag:hover {
+    color: #ef4444;
+    background-color: #fee2e2;
   }
 
   @media (max-width: 1024px) {

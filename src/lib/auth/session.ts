@@ -1,5 +1,5 @@
 import type { AstroCookies } from 'astro';
-import { createSupabaseServerClient } from '../supabase/server';
+import { createSupabaseServerClient, createSupabaseAdminClient } from '../supabase/server';
 import type { UserProfile } from '../../types/domain';
 
 export interface AuthSession {
@@ -24,11 +24,21 @@ export async function getAuthSession(context: {
     return { user: null, profile: null };
   }
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+
+  if (!profile) {
+    const adminClient = createSupabaseAdminClient();
+    const { data: adminProf } = await adminClient
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+    profile = adminProf;
+  }
 
   // SECURITY (AUDIT.md C1b): a role is NEVER derived from the user's own email
   // address, and a session NEVER provisions its own profile row.

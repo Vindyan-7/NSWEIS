@@ -1,8 +1,15 @@
 ---
 import PublicLayout from '../layouts/PublicLayout.astro';
-import Card from '../components/ui/Card.astro';
-import Button from '../components/ui/Button.astro';
-import Input from '../components/ui/Input.astro';
+import {
+  ShieldCheck,
+  CheckCircle2,
+  ArrowRight,
+  ExternalLink,
+  Lock,
+  Eye,
+  EyeOff,
+  Check,
+} from '@lucide/astro';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '../lib/supabase/server';
 import { updateStudentConsent } from '../services/privacy';
 import {
@@ -11,7 +18,17 @@ import {
 } from '../services/provisioning';
 
 let errorMessage = '';
-let successMessage = '';
+let isSuccess = false;
+let createdAccountSummary: {
+  fullName: string;
+  email: string;
+  collegeName: string;
+  departmentName: string;
+  yearLabel: string;
+  sectionCode: string;
+  studentRollNo: string;
+} | null = null;
+
 let formValues = {
   email: '',
   full_name: '',
@@ -32,7 +49,7 @@ const { data: institutionsData } = await adminClient
   .eq('active', true)
   .order('name');
 
-const validInstitutions = institutionsData || [];
+const validInstitutions: any[] = institutionsData || [];
 
 const institutionOptions = [
   { value: '', label: '-- Select Your College / Institution --' },
@@ -51,8 +68,6 @@ let initialStructure = {
 
 if (formValues.institution_id) {
   initialStructure = await getInstitutionAcademicStructure(supabase, formValues.institution_id);
-} else if (validInstitutions.length > 0 && validInstitutions[0]) {
-  initialStructure = await getInstitutionAcademicStructure(supabase, (validInstitutions[0] as any).id);
 }
 
 if (Astro.request.method === 'POST') {
@@ -86,20 +101,20 @@ if (Astro.request.method === 'POST') {
     // CRITICAL ROLE RULE: Ignore any client-submitted role value and hardcode to 'student'
     const HARDCODED_STUDENT_ROLE = 'student';
 
-    // 1. Server-side Input Validation
+    // 1. Server-side Input Validation with human-readable error messages
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : NaN;
 
     if (!email || !password || !confirmPassword || !fullName || !institutionId || !departmentId || !yearLevelRaw || !sectionCode) {
-      errorMessage = 'Please fill out all required fields marked with an asterisk (*).';
+      errorMessage = 'Please complete all required fields to proceed.';
     } else if (!emailRegex.test(email)) {
-      errorMessage = 'Please enter a valid email address.';
+      errorMessage = 'Please enter a valid official email address.';
     } else if (password !== confirmPassword) {
       errorMessage = 'Passwords do not match. Please re-enter your password.';
     } else if (password.length < 6) {
       errorMessage = 'Password must be at least 6 characters long.';
     } else if (!privacyConsent || privacyConsent !== 'accepted') {
-      errorMessage = 'You must review and explicitly accept the Privacy Policy to create a student account.';
+      errorMessage = 'Please review and accept the privacy consent before creating your account.';
     } else {
       // 2. Server-Authoritative Academic Placement Validation (Enforces configured hierarchy)
       const placementCheck = await validateStudentAcademicPlacement(supabase, {
@@ -110,21 +125,40 @@ if (Astro.request.method === 'POST') {
       });
 
       if (!placementCheck.valid) {
-        errorMessage = placementCheck.error || 'Invalid academic structure selection for this college.';
+        errorMessage = "We couldn't verify this academic placement. Please refresh your academic details and try again.";
       } else {
-        // 3. Create Auth User in Supabase Auth
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        // 3. Create Auth User with auto-confirmed email so student can log in immediately
+        const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-              role: HARDCODED_STUDENT_ROLE,
-            },
+          email_confirm: true,
+          user_metadata: {
+            full_name: fullName,
+            role: HARDCODED_STUDENT_ROLE,
           },
         });
 
-        const userObj = signUpData?.user;
+        let userObj = createData?.user;
+        let signUpError = createError;
+
+        if (createError && !createError.message?.toLowerCase().includes('already')) {
+          const { data: signUpData, error: sErr } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName,
+                role: HARDCODED_STUDENT_ROLE,
+              },
+            },
+          });
+          userObj = signUpData?.user;
+          signUpError = sErr;
+          if (userObj?.id) {
+            await adminClient.auth.admin.updateUserById(userObj.id, { email_confirm: true });
+          }
+        }
+
         const isDuplicateUser =
           signUpError?.message?.toLowerCase().includes('already registered') ||
           signUpError?.message?.toLowerCase().includes('already exists') ||
@@ -132,9 +166,9 @@ if (Astro.request.method === 'POST') {
 
         if (signUpError || !userObj || isDuplicateUser) {
           if (isDuplicateUser) {
-            errorMessage = 'An account with this email address already exists. Please sign in or use a different email address.';
+            errorMessage = 'This email is already registered. Try signing in instead.';
           } else {
-            errorMessage = signUpError?.message || 'Could not create authentication account. Please check details and try again.';
+            errorMessage = "We couldn't create your account right now. Please try again in a moment.";
           }
         } else {
           const userId = userObj.id;
@@ -161,257 +195,546 @@ if (Astro.request.method === 'POST') {
 
           if (profileError) {
             console.error('[SIGNUP] Profile creation error:', profileError);
-            // Rollback Auth user to prevent orphaned account lockout
             try {
               await adminClient.auth.admin.deleteUser(userId);
             } catch (delErr) {
               console.error('[SIGNUP] Auth rollback error:', delErr);
             }
-            errorMessage = 'Registration profile could not be saved. Please contact support or try again.';
+            errorMessage = "We couldn't create your account right now. Please try again in a moment.";
           } else {
             // 5. Persist DPDP Privacy Consent Server-Side with Policy Version & Timestamp
             await updateStudentConsent(supabase, userId, 'active');
 
-            // 6. Sign in automatically or direct to login/dashboard
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-              email,
-              password,
-            });
+            // 6. Resolve clean display names for dedicated success screen
+            const matchedInst = validInstitutions.find((i: any) => i.id === institutionId);
+            const matchedDept = initialStructure.departments.find((d: any) => d.id === departmentId);
+            const matchedYear = initialStructure.years.find((y: any) => String(y.year_level) === String(yearLevel));
 
-            if (!signInError) {
-              return Astro.redirect('/student/dashboard');
-            } else {
-              successMessage = 'Student account created successfully! Please sign in with your email and password.';
-            }
+            createdAccountSummary = {
+              fullName,
+              email,
+              collegeName: matchedInst ? `${matchedInst.name} (${matchedInst.code})` : 'Configured Institution',
+              departmentName: matchedDept ? `${matchedDept.name} (${matchedDept.code})` : 'Configured Department',
+              yearLabel: matchedYear ? matchedYear.label : `Year ${yearLevel}`,
+              sectionCode,
+              studentRollNo: studentRollNo || '',
+            };
+
+            isSuccess = true;
           }
         }
       }
     }
   } catch (err: any) {
     console.error('[SIGNUP] System error during registration:', err);
-    errorMessage = err.message || 'An unexpected server error occurred during registration.';
+    errorMessage = "We couldn't create your account right now. Please try again in a moment.";
   }
 }
 ---
 
-<PublicLayout title="Student Registration — NSWEIS">
+<PublicLayout
+  title={isSuccess ? "Account Created — NSWESI" : "Create Student Account — NSWESI"}
+  brandName="NSWESI"
+  navRightAction={{ label: "Sign in", href: "/login", subtext: "Already have an account?" }}
+>
   <div class="signup-page-wrapper">
     <div class="signup-card-container">
-      <div class="signup-header text-center">
-        <span class="brand-badge">NSWEIS STUDENT REGISTRATION</span>
-        <h1 class="signup-title">Create Your Student Account</h1>
-        <p class="signup-subtitle">
-          Join your institution's confidential weekly reflection and student support system.
-        </p>
-      </div>
+      {isSuccess && createdAccountSummary ? (
+        /* ============================================================ */
+        /* DEDICATED SUCCESS EXPERIENCE (PHASE 20.1)                    */
+        /* ============================================================ */
+        <div class="success-experience-card" role="region" aria-label="Account Created Successfully">
+          <div class="success-icon-badge" aria-hidden="true">
+            <CheckCircle2 size={38} class="success-check-icon" />
+          </div>
 
-      {errorMessage && (
-        <div class="alert alert-danger" role="alert">
-          {errorMessage}
-        </div>
-      )}
+          <h1 class="success-title">Account Created Successfully</h1>
+          <p class="success-welcome">Welcome to NSWESI, {createdAccountSummary.fullName}</p>
+          <p class="success-subtitle">
+            Your confidential student account is active and linked to your institution's wellbeing network.
+          </p>
 
-      {successMessage && (
-        <div class="alert alert-success" role="alert">
-          {successMessage}
-          <div class="mt-3">
-            <a href="/login"><Button variant="primary" size="sm">Go to Login &rarr;</Button></a>
+          <div class="success-summary-box">
+            <div class="summary-section">
+              <h2 class="summary-section-title">Account</h2>
+              <div class="summary-row">
+                <span class="summary-field-label">Official Email:</span>
+                <span class="summary-field-value">{createdAccountSummary.email}</span>
+              </div>
+            </div>
+
+            <div class="summary-divider"></div>
+
+            <div class="summary-section">
+              <h2 class="summary-section-title">Academic Placement</h2>
+              <div class="summary-grid">
+                <div class="summary-row">
+                  <span class="summary-field-label">College:</span>
+                  <span class="summary-field-value">{createdAccountSummary.collegeName}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-field-label">Department:</span>
+                  <span class="summary-field-value">{createdAccountSummary.departmentName}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-field-label">Academic Year:</span>
+                  <span class="summary-field-value">{createdAccountSummary.yearLabel}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-field-label">Section:</span>
+                  <span class="summary-field-value">Section {createdAccountSummary.sectionCode}</span>
+                </div>
+                {createdAccountSummary.studentRollNo && (
+                  <div class="summary-row">
+                    <span class="summary-field-label">Student Roll No:</span>
+                    <span class="summary-field-value">{createdAccountSummary.studentRollNo}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="next-steps-card">
+            <h3 class="next-steps-title">What's next?</h3>
+            <ol class="next-steps-list">
+              <li>
+                <span class="step-num-pill">1</span>
+                <span>Sign in with your official email address and password</span>
+              </li>
+              <li>
+                <span class="step-num-pill">2</span>
+                <span>Open your private <strong>Student Dashboard</strong></span>
+              </li>
+              <li>
+                <span class="step-num-pill">3</span>
+                <span>Complete your weekly wellness reflection when an active cycle is open</span>
+              </li>
+              <li>
+                <span class="step-num-pill">4</span>
+                <span>Explore confidential wellbeing activities, credit points, and campus support</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="success-actions">
+            <a href="/login" class="btn-success-primary" id="btn-goto-login">
+              <span>Go to Student Login</span>
+              <ArrowRight size={18} />
+            </a>
+            <a href="/" class="btn-success-secondary">Return to Home</a>
+          </div>
+
+          <div class="trust-footer-note">
+            <ShieldCheck size={14} class="text-emerald" />
+            <span>DPDP Act Protected · Non-clinical supportive student ecosystem</span>
           </div>
         </div>
-      )}
+      ) : (
+        /* ============================================================ */
+        /* SINGLE-PAGE GUIDED ONBOARDING JOURNEY (PHASE 20.1A)          */
+        /* ============================================================ */
+        <>
+          <header class="onboarding-hero text-center">
+            <div class="privacy-pill">
+              <Lock size={12} class="privacy-pill-icon" aria-hidden="true" />
+              <span>Private student onboarding</span>
+            </div>
+            <h1 class="hero-title">Create your student account</h1>
+            <p class="hero-subtitle">
+              Join your institution's confidential weekly reflection and student wellbeing support network.
+            </p>
+          </header>
 
-      {!successMessage && (
-        <Card padding="lg" class="signup-form-card">
-          <form method="POST" class="signup-form" id="student-signup-form">
-            {/* Step 1 & 2: Campus & Academic Alignment */}
-            <div class="form-section">
-              <h3 class="section-heading">1. Campus & Academic Program</h3>
-              <p class="section-help-text">
-                Select your college to load its configured academic departments, years, and sections.
-              </p>
+          <!-- 3-Step Visual Roadmap -->
+          <nav class="step-indicator-bar" aria-label="Onboarding Roadmap">
+            <div class="step-pill active" id="step-pill-1">
+              <span class="step-number">01</span>
+              <span class="step-text">Academic Details</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step-pill active" id="step-pill-2">
+              <span class="step-number">02</span>
+              <span class="step-text">Personal Details</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step-pill active" id="step-pill-3">
+              <span class="step-number">03</span>
+              <span class="step-text">Privacy & Consent</span>
+            </div>
+          </nav>
 
-              <div class="form-field-full mt-3">
-                <label for="institution_select" class="form-label font-semibold text-sm">
-                  College / Institution <span class="text-danger">*</span>
-                </label>
-                <select
-                  id="institution_select"
-                  name="institution_id"
-                  class="custom-select"
-                  required
-                >
-                  {institutionOptions.map((opt) => (
-                    <option value={opt.value} selected={formValues.institution_id === opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div id="structure-loading-indicator" class="loading-bar hidden">
-                <span class="spinner-sm"></span> Loading college academic structure...
-              </div>
-
-              <div id="structure-empty-alert" class="empty-structure-alert hidden">
-                <p id="structure-empty-message">Academic structure is not yet available for this college. Please contact your college administration.</p>
-              </div>
-
-              <div class="form-grid mt-3" id="academic-fields-container">
-                <div class="form-field">
-                  <label for="department_select" class="form-label font-semibold text-sm">
-                    Department / Branch <span class="text-danger">*</span>
-                  </label>
-                  <select
-                    id="department_select"
-                    name="department_id"
-                    class="custom-select"
-                    required
-                  >
-                    <option value="">-- Select Department --</option>
-                    {initialStructure.departments.map((d) => (
-                      <option value={d.id} selected={formValues.department_id === d.id}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div class="form-field">
-                  <label for="year_select" class="form-label font-semibold text-sm">
-                    Academic Year <span class="text-danger">*</span>
-                  </label>
-                  <select
-                    id="year_select"
-                    name="year_level"
-                    class="custom-select"
-                    required
-                  >
-                    <option value="">-- Select Year --</option>
-                    {initialStructure.years.map((y) => (
-                      <option value={y.year_level} selected={formValues.year_level === String(y.year_level)}>
-                        {y.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-grid mt-3">
-                <div class="form-field">
-                  <label for="section_select" class="form-label font-semibold text-sm">
-                    Section Code <span class="text-danger">*</span>
-                  </label>
-                  <select
-                    id="section_select"
-                    name="section_code"
-                    class="custom-select"
-                    required
-                  >
-                    <option value="">-- Select Section --</option>
-                    {initialStructure.sections.map((s) => (
-                      <option value={s.section_code} selected={formValues.section_code === s.section_code}>
-                        Section {s.section_code}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div class="form-field">
-                  <Input
-                    label="Student Roll No / University ID"
-                    name="student_roll_no"
-                    type="text"
-                    value={formValues.student_roll_no}
-                    placeholder="e.g. 2024CSE042"
-                  />
-                </div>
+          {errorMessage && (
+            <div class="error-banner" role="alert" aria-live="assertive">
+              <div class="error-icon-box">!</div>
+              <div class="error-text-content">
+                <span class="error-title">Unable to create account</span>
+                <p class="error-desc">{errorMessage}</p>
               </div>
             </div>
+          )}
 
-            {/* Step 3: Account Credentials */}
-            <div class="form-section mt-6">
-              <h3 class="section-heading">2. Personal & Login Details</h3>
-              <div class="form-grid mt-3">
-                <Input
-                  label="Full Name *"
-                  name="full_name"
-                  type="text"
-                  value={formValues.full_name}
-                  placeholder="e.g. Rahul Sharma"
-                  required
-                />
-                <Input
-                  label="Official Email Address *"
-                  name="email"
-                  type="email"
-                  value={formValues.email}
-                  placeholder="rahul.sharma@college.edu.in"
-                  required
-                />
-              </div>
+          <div class="onboarding-journey-wrap">
+            <form method="POST" class="onboarding-form" id="student-signup-form" novalidate>
+              {/* ============================================================ */}
+              {/* SECTION 01 — ACADEMIC DETAILS                                */}
+              {/* ============================================================ */}
+              <section class="onboarding-section" id="stage-academic">
+                <div class="section-badge-header">
+                  <div class="section-number-pill">01</div>
+                  <div class="section-title-group">
+                    <h2 class="section-main-title">Academic Details</h2>
+                    <p class="section-main-desc">Select your institution and academic placement.</p>
+                  </div>
+                </div>
 
-              <div class="form-grid mt-3">
-                <Input
-                  label="Password (min 6 chars) *"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                />
-                <Input
-                  label="Confirm Password *"
-                  name="confirm_password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
+                <div class="field-block mt-5">
+                  <label for="institution_select" class="field-label">
+                    College / Institution <span class="field-required">*</span>
+                  </label>
+                  <select
+                    id="institution_select"
+                    name="institution_id"
+                    class="field-select"
+                    required
+                  >
+                    {institutionOptions.map((opt) => (
+                      <option value={opt.value} selected={formValues.institution_id === opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Step 4: Privacy & DPDP Consent */}
-            <div class="form-section privacy-section mt-6">
-              <h3 class="section-heading">3. Privacy Policy & DPDP Consent</h3>
-              <div class="privacy-box">
-                <h4 class="font-semibold text-primary">Your Reflection Privacy Guarantee</h4>
-                <p class="privacy-desc text-sm text-muted mt-1">
-                  NSWEIS guarantees strict data isolation. Your individual reflection answers and wellbeing ratings are completely confidential to your student account and never visible to college officers, professors, or administrators.
+                <div id="structure-loading-indicator" class="loading-state-box hidden" aria-live="polite">
+                  <span class="spinner-dot"></span>
+                  <span>Retrieving academic structure for this institution...</span>
+                </div>
+
+                <div id="structure-empty-alert" class="structure-alert-box hidden" role="status">
+                  <h4 class="alert-title">Academic structure unavailable</h4>
+                  <p class="alert-desc" id="structure-empty-message">
+                    Your institution has not completed its academic setup yet. Please contact your college administrator.
+                  </p>
+                </div>
+
+                <div class="fields-grid mt-4">
+                  <div class="field-block">
+                    <label for="department_select" class="field-label">
+                      Department / Branch <span class="field-required">*</span>
+                    </label>
+                    <select
+                      id="department_select"
+                      name="department_id"
+                      class="field-select"
+                      required
+                      disabled={!formValues.institution_id}
+                    >
+                      <option value="">{formValues.institution_id ? '-- Select Department --' : '-- Select College First --'}</option>
+                      {initialStructure.departments.map((d) => (
+                        <option value={d.id} selected={formValues.department_id === d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div class="field-block">
+                    <label for="year_select" class="field-label">
+                      Academic Year <span class="field-required">*</span>
+                    </label>
+                    <select
+                      id="year_select"
+                      name="year_level"
+                      class="field-select"
+                      required
+                      disabled={!formValues.institution_id}
+                    >
+                      <option value="">{formValues.institution_id ? '-- Select Year --' : '-- Select College First --'}</option>
+                      {initialStructure.years.map((y) => (
+                        <option value={y.year_level} selected={formValues.year_level === String(y.year_level)}>
+                          {y.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div class="fields-grid mt-4">
+                  <div class="field-block">
+                    <label for="section_select" class="field-label">
+                      Section <span class="field-required">*</span>
+                    </label>
+                    <select
+                      id="section_select"
+                      name="section_code"
+                      class="field-select"
+                      required
+                      disabled={!formValues.institution_id}
+                    >
+                      <option value="">{formValues.institution_id ? '-- Select Section --' : '-- Select College First --'}</option>
+                      {initialStructure.sections.map((s) => (
+                        <option value={s.section_code} selected={formValues.section_code === s.section_code}>
+                          Section {s.section_code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div class="field-block">
+                    <label for="student_roll_no" class="field-label">
+                      Student Roll No / University ID
+                    </label>
+                    <input
+                      type="text"
+                      id="student_roll_no"
+                      name="student_roll_no"
+                      class="field-input"
+                      value={formValues.student_roll_no}
+                      placeholder="e.g. 2024CSE042"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+
+                <!-- Academic Placement Confirmation Summary (Section 5) -->
+                <div id="placement-summary-card" class="placement-summary-card hidden" aria-live="polite">
+                  <div class="summary-check-icon">
+                    <Check size={16} />
+                  </div>
+                  <div class="summary-info">
+                    <span class="summary-badge-text">Your academic placement</span>
+                    <p class="summary-detail-main" id="placement-dept-text">—</p>
+                    <p class="summary-detail-sub" id="placement-meta-text">—</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* SEPARATION DIVIDER BETWEEN 01 AND 02 (48-56px spacing) */}
+              <div class="section-divider-line" aria-hidden="true"></div>
+
+              {/* ============================================================ */}
+              {/* SECTION 02 — PERSONAL DETAILS                                */}
+              {/* ============================================================ */}
+              <section class="onboarding-section" id="stage-personal">
+                <div class="section-badge-header">
+                  <div class="section-number-pill">02</div>
+                  <div class="section-title-group">
+                    <h2 class="section-main-title">Personal Details</h2>
+                    <p class="section-main-desc">Enter your official credentials for your NSWESI account.</p>
+                  </div>
+                </div>
+
+                <div class="fields-grid mt-5">
+                  <div class="field-block">
+                    <label for="full_name" class="field-label">
+                      Full Name <span class="field-required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="full_name"
+                      name="full_name"
+                      class="field-input"
+                      value={formValues.full_name}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                      autocomplete="name"
+                    />
+                  </div>
+
+                  <div class="field-block">
+                    <label for="email" class="field-label">
+                      Official Email Address <span class="field-required">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      class="field-input"
+                      value={formValues.email}
+                      placeholder="rahul.sharma@college.edu.in"
+                      required
+                      autocomplete="email"
+                    />
+                    <span class="field-hint">Use an email address you can access for your NSWESI account.</span>
+                  </div>
+                </div>
+
+                <div class="fields-grid mt-4">
+                  <div class="field-block">
+                    <label for="password_input" class="field-label">
+                      Password <span class="field-required">*</span>
+                    </label>
+                    <div class="password-input-wrap">
+                      <input
+                        type="password"
+                        id="password_input"
+                        name="password"
+                        class="field-input pr-10"
+                        placeholder="••••••••"
+                        required
+                        autocomplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        class="pwd-toggle-btn"
+                        data-target="password_input"
+                        aria-label="Toggle password visibility"
+                      >
+                        <span class="icon-eye"><Eye size={18} /></span>
+                        <span class="icon-eye-off hidden"><EyeOff size={18} /></span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="field-block">
+                    <label for="confirm_password_input" class="field-label">
+                      Confirm Password <span class="field-required">*</span>
+                    </label>
+                    <div class="password-input-wrap">
+                      <input
+                        type="password"
+                        id="confirm_password_input"
+                        name="confirm_password"
+                        class="field-input pr-10"
+                        placeholder="••••••••"
+                        required
+                        autocomplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        class="pwd-toggle-btn"
+                        data-target="confirm_password_input"
+                        aria-label="Toggle password visibility"
+                      >
+                        <span class="icon-eye"><Eye size={18} /></span>
+                        <span class="icon-eye-off hidden"><EyeOff size={18} /></span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Password Requirements Checklist (Section 6) -->
+                <div class="password-reqs-card mt-3" id="password-reqs-card">
+                  <span class="reqs-title">Password requirements</span>
+                  <div class="reqs-list">
+                    <span class="req-item" id="req-length">
+                      <span class="req-check-icon">✓</span> Minimum 6 characters
+                    </span>
+                    <span class="req-item" id="req-match">
+                      <span class="req-check-icon">✓</span> Passwords match
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              {/* SEPARATION DIVIDER BETWEEN 02 AND 03 (48-56px spacing) */}
+              <div class="section-divider-line" aria-hidden="true"></div>
+
+              {/* ============================================================ */}
+              {/* SECTION 03 — PRIVACY & CONSENT                               */}
+              {/* ============================================================ */}
+              <section class="onboarding-section" id="stage-privacy">
+                <div class="section-badge-header">
+                  <div class="section-number-pill">03</div>
+                  <div class="section-title-group">
+                    <h2 class="section-main-title">Privacy & Consent</h2>
+                    <p class="section-main-desc">Your weekly reflections are confidential and protected.</p>
+                  </div>
+                </div>
+
+                <div class="privacy-guarantee-card mt-5">
+                  <div class="privacy-header-row">
+                    <div class="privacy-shield-icon">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <div>
+                      <h4 class="privacy-card-title">Your Privacy Comes First</h4>
+                      <p class="privacy-card-sub">Confidential Student Wellbeing Guarantee · Protected under DPDP Standards</p>
+                    </div>
+                  </div>
+
+                  <ul class="privacy-commitments-list">
+                    <li>
+                      <CheckCircle2 size={16} class="check-bullet" />
+                      <span>Your reflections belong strictly to your private student account.</span>
+                    </li>
+                    <li>
+                      <CheckCircle2 size={16} class="check-bullet" />
+                      <span>Individual responses are not displayed to college, regional, or government staff.</span>
+                    </li>
+                    <li>
+                      <CheckCircle2 size={16} class="check-bullet" />
+                      <span>Aggregate reporting uses strict privacy protection thresholds and is never tied to marks or grades.</span>
+                    </li>
+                  </ul>
+
+                  <div class="privacy-link-bar">
+                    <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="privacy-policy-link">
+                      <span>Read NSWESI Privacy Policy & DPDP Data Governance</span>
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                </div>
+
+                <div class="consent-agreement-box mt-5">
+                  <label class="consent-label" for="privacy_consent_cb">
+                    <input
+                      type="checkbox"
+                      id="privacy_consent_cb"
+                      name="privacy_consent"
+                      value="accepted"
+                      required
+                      class="consent-input-checkbox"
+                    />
+                    <span class="consent-caption">
+                      I have reviewed the <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="link-inline">NSWESI Privacy Policy</a> and explicitly consent to the confidential processing of my reflections for personal wellbeing support.
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              {/* SEPARATION DIVIDER BEFORE FINAL CTA */}
+              <div class="cta-divider-line" aria-hidden="true"></div>
+
+              {/* ============================================================ */}
+              {/* DEDICATED FINAL CTA AREA (Section 7)                         */}
+              {/* ============================================================ */}
+              <div class="final-cta-container">
+                <h3 class="final-cta-title">Ready to join NSWESI?</h3>
+                <p class="final-cta-desc">
+                  Your account will be created securely using the information provided above.
                 </p>
-                <div class="privacy-link-row mt-2">
-                  <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="policy-link font-semibold text-primary">
-                    &rarr; Review NSWEIS Privacy Policy & DPDP Data Governance
+
+                <div class="final-cta-btn-wrap">
+                  <button type="submit" class="btn-create-account" id="btn-submit-signup">
+                    <span class="btn-text-content">Create Student Account</span>
+                    <ArrowRight size={18} class="btn-arrow" />
+                    <span class="btn-spinner hidden" id="btn-spinner"></span>
+                  </button>
+                </div>
+
+                <div class="final-signin-row">
+                  <span class="text-sm text-muted">Already have an account?</span>{' '}
+                  <a href="/login" class="font-semibold text-primary hover:underline">
+                    Sign in here &rarr;
                   </a>
                 </div>
               </div>
-
-              <div class="consent-checkbox-row mt-3">
-                <label class="consent-label">
-                  <input type="checkbox" name="privacy_consent" value="accepted" required class="consent-checkbox" />
-                  <span class="consent-text text-sm">
-                    I have reviewed the <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" class="underline font-medium">NSWEIS Privacy Policy</a> and explicitly consent to the processing of my reflection responses for confidential wellbeing support.
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <div class="form-actions mt-6">
-              <Button type="submit" variant="primary" size="lg" class="w-full" id="btn-submit-signup">
-                Create Student Account
-              </Button>
-            </div>
-          </form>
-
-          <div class="login-footer-link text-center mt-6">
-            <span class="text-sm text-muted">Already have an account?</span>{' '}
-            <a href="/login" class="font-semibold text-primary">Sign In here &rarr;</a>
+            </form>
           </div>
-        </Card>
+
+          <footer class="trust-portal-footer">
+            <ShieldCheck size={14} class="text-emerald" />
+            <span>Official State Higher Education Student Reflection & Wellbeing Network</span>
+          </footer>
+        </>
       )}
     </div>
   </div>
 </PublicLayout>
 
 <script>
-  // Client-side dynamic academic structure cascading dropdowns
+  // Dynamic academic cascading, summaries, password toggle & submission lock
   const instSelect = document.getElementById('institution_select') as HTMLSelectElement | null;
   const deptSelect = document.getElementById('department_select') as HTMLSelectElement | null;
   const yearSelect = document.getElementById('year_select') as HTMLSelectElement | null;
@@ -419,332 +742,1236 @@ if (Astro.request.method === 'POST') {
   const loadingIndicator = document.getElementById('structure-loading-indicator');
   const emptyAlert = document.getElementById('structure-empty-alert');
   const emptyMessage = document.getElementById('structure-empty-message');
-  const btnSubmit = document.getElementById('btn-submit-signup') as HTMLButtonElement | null;
 
-  let currentSections: any[] = [];
+  // Placement summary card
+  const summaryCard = document.getElementById('placement-summary-card');
+  const summaryDeptText = document.getElementById('placement-dept-text');
+  const summaryMetaText = document.getElementById('placement-meta-text');
 
-  function filterSections() {
-    if (!secSelect) return;
-    const selectedDeptId = deptSelect?.value || '';
-    const selectedYear = yearSelect?.value ? Number(yearSelect.value) : null;
+  let currentStructure: {
+    departments: Array<{ id: string; name: string; code: string }>;
+    years: Array<{ year_level: number; label: string }>;
+    sections: Array<{ id: string; department_id: string; year_level: number; section_code: string }>;
+  } = { departments: [], years: [], sections: [] };
 
-    secSelect.innerHTML = '<option value="">-- Select Section --</option>';
+  function updatePlacementSummary() {
+    if (!summaryCard || !summaryDeptText || !summaryMetaText) return;
+    const instVal = instSelect?.value;
+    const deptVal = deptSelect?.value;
+    const yearVal = yearSelect?.value;
+    const secVal = secSelect?.value;
 
-    const matchingSections = currentSections.filter((s: any) => {
-      if (s.department_id && selectedDeptId && s.department_id !== selectedDeptId) return false;
-      if (s.year_level && selectedYear && s.year_level !== selectedYear) return false;
-      return true;
-    });
+    if (instVal && deptVal && yearVal && secVal) {
+      const deptOption = deptSelect?.options[deptSelect.selectedIndex]?.text || '';
+      const yearOption = yearSelect?.options[yearSelect.selectedIndex]?.text || '';
+      const secOption = secSelect?.options[secSelect.selectedIndex]?.text || '';
 
-    if (matchingSections.length > 0) {
-      matchingSections.forEach((s: any) => {
-        const opt = document.createElement('option');
-        opt.value = s.section_code;
-        opt.textContent = `Section ${s.section_code}`;
-        secSelect.appendChild(opt);
-      });
-      secSelect.disabled = false;
-      if (btnSubmit) btnSubmit.disabled = false;
-    } else if (currentSections.length > 0) {
-      // Fallback to all institution sections if not strictly partitioned
-      currentSections.forEach((s: any) => {
-        const opt = document.createElement('option');
-        opt.value = s.section_code;
-        opt.textContent = `Section ${s.section_code}`;
-        secSelect.appendChild(opt);
-      });
-      secSelect.disabled = false;
-      if (btnSubmit) btnSubmit.disabled = false;
+      summaryDeptText.textContent = deptOption;
+      summaryMetaText.textContent = `${yearOption} · ${secOption}`;
+      summaryCard.classList.remove('hidden');
     } else {
-      secSelect.disabled = true;
+      summaryCard.classList.add('hidden');
     }
   }
 
+  function filterSections() {
+    if (!secSelect) return;
+    const selectedDeptId = deptSelect ? deptSelect.value : '';
+    const selectedYear = yearSelect ? Number(yearSelect.value) : NaN;
+
+    const prevValue = secSelect.value;
+    secSelect.innerHTML = '';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- Select Section --';
+    secSelect.appendChild(defaultOption);
+
+    if (!currentStructure.sections || currentStructure.sections.length === 0) {
+      updatePlacementSummary();
+      return;
+    }
+
+    const availableSections = currentStructure.sections.filter((s) => {
+      const deptMatches = !s.department_id || s.department_id === selectedDeptId;
+      const yearMatches = !s.year_level || s.year_level === selectedYear;
+      return deptMatches && yearMatches;
+    });
+
+    const uniqueCodes = new Set<string>();
+    const uniqueSections: Array<{ section_code: string }> = [];
+
+    availableSections.forEach((s) => {
+      if (!uniqueCodes.has(s.section_code)) {
+        uniqueCodes.add(s.section_code);
+        uniqueSections.push(s);
+      }
+    });
+
+    uniqueSections.sort((a, b) => a.section_code.localeCompare(b.section_code));
+
+    uniqueSections.forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = s.section_code;
+      opt.textContent = `Section ${s.section_code}`;
+      if (s.section_code === prevValue) {
+        opt.selected = true;
+      }
+      secSelect.appendChild(opt);
+    });
+
+    updatePlacementSummary();
+  }
+
   if (instSelect) {
-    instSelect.addEventListener('change', async (e) => {
-      const instId = (e.target as HTMLSelectElement).value;
+    instSelect.addEventListener('change', async () => {
+      const institutionId = instSelect.value;
 
-      // Reset downstream selections
-      if (deptSelect) {
-        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
-        deptSelect.value = '';
-      }
-      if (yearSelect) {
-        yearSelect.innerHTML = '<option value="">-- Select Year --</option>';
-        yearSelect.value = '';
-      }
-      if (secSelect) {
-        secSelect.innerHTML = '<option value="">-- Select Section --</option>';
-        secSelect.value = '';
-        secSelect.disabled = true;
-      }
-      currentSections = [];
-
-      if (!instId) {
+      if (!institutionId) {
+        if (deptSelect) {
+          deptSelect.innerHTML = '<option value="">-- Select College First --</option>';
+          deptSelect.disabled = true;
+        }
+        if (yearSelect) {
+          yearSelect.innerHTML = '<option value="">-- Select College First --</option>';
+          yearSelect.disabled = true;
+        }
+        if (secSelect) {
+          secSelect.innerHTML = '<option value="">-- Select College First --</option>';
+          secSelect.disabled = true;
+        }
         if (emptyAlert) emptyAlert.classList.add('hidden');
-        if (btnSubmit) btnSubmit.disabled = false;
+        updatePlacementSummary();
         return;
       }
 
+      if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+      if (emptyAlert) emptyAlert.classList.add('hidden');
+
+      if (deptSelect) deptSelect.disabled = true;
+      if (yearSelect) yearSelect.disabled = true;
+      if (secSelect) secSelect.disabled = true;
+
       try {
-        if (loadingIndicator) loadingIndicator.classList.remove('hidden');
-        if (emptyAlert) emptyAlert.classList.add('hidden');
+        const res = await fetch(`/api/academic-structure?institution_id=${encodeURIComponent(institutionId)}`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch academic structure');
+        }
 
-        const res = await fetch(`/api/academic-structure?institution_id=${encodeURIComponent(instId)}`);
-        if (res.ok) {
-          const data = await res.json();
-          currentSections = data.sections || [];
+        const data = await res.json();
+        currentStructure = data;
 
-          // 1. Populate Departments
-          if (deptSelect) {
-            deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
-            if (data.departments && data.departments.length > 0) {
-              data.departments.forEach((d: any) => {
-                const opt = document.createElement('option');
-                opt.value = d.id;
-                opt.textContent = `${d.name} (${d.code})`;
-                deptSelect.appendChild(opt);
-              });
-              deptSelect.disabled = false;
-            } else {
-              deptSelect.disabled = true;
-            }
+        if (deptSelect) {
+          deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
+          if (data.departments && data.departments.length > 0) {
+            data.departments.forEach((d: any) => {
+              const opt = document.createElement('option');
+              opt.value = d.id;
+              opt.textContent = `${d.name} (${d.code})`;
+              deptSelect.appendChild(opt);
+            });
+            deptSelect.disabled = false;
           }
+        }
 
-          // 2. Populate Years
-          if (yearSelect) {
-            yearSelect.innerHTML = '<option value="">-- Select Year --</option>';
-            if (data.years && data.years.length > 0) {
-              data.years.forEach((y: any) => {
-                const opt = document.createElement('option');
-                opt.value = String(y.year_level);
-                opt.textContent = y.label;
-                yearSelect.appendChild(opt);
-              });
-              yearSelect.disabled = false;
-            } else {
-              yearSelect.disabled = true;
-            }
+        if (yearSelect) {
+          yearSelect.innerHTML = '<option value="">-- Select Year --</option>';
+          if (data.years && data.years.length > 0) {
+            data.years.forEach((y: any) => {
+              const opt = document.createElement('option');
+              opt.value = String(y.year_level);
+              opt.textContent = y.label;
+              yearSelect.appendChild(opt);
+            });
+            yearSelect.disabled = false;
           }
+        }
 
-          // Check Empty State
-          if (!data.departments || data.departments.length === 0) {
-            if (emptyAlert && emptyMessage) {
-              emptyMessage.textContent = 'Academic programs (Departments/Branches) are not yet configured for this college. Please contact your college administration.';
-              emptyAlert.classList.remove('hidden');
-            }
-            if (btnSubmit) btnSubmit.disabled = true;
-          } else if (!data.years || data.years.length === 0) {
-            if (emptyAlert && emptyMessage) {
-              emptyMessage.textContent = 'Academic years are not yet configured for this college. Please contact your college administration.';
-              emptyAlert.classList.remove('hidden');
-            }
-            if (btnSubmit) btnSubmit.disabled = true;
-          } else if (!data.sections || data.sections.length === 0) {
-            if (emptyAlert && emptyMessage) {
-              emptyMessage.textContent = 'Academic sections are not yet configured for this college. Please contact your college administration.';
-              emptyAlert.classList.remove('hidden');
-            }
-            if (btnSubmit) btnSubmit.disabled = true;
-          } else {
-            if (emptyAlert) emptyAlert.classList.add('hidden');
-            if (btnSubmit) btnSubmit.disabled = false;
+        if (secSelect) {
+          secSelect.innerHTML = '<option value="">-- Select Section --</option>';
+          if (data.sections && data.sections.length > 0) {
+            secSelect.disabled = false;
             filterSections();
           }
-        } else {
+        }
+
+        const hasDepts = data.departments && data.departments.length > 0;
+        const hasYears = data.years && data.years.length > 0;
+        const hasSections = data.sections && data.sections.length > 0;
+
+        if (!hasDepts || !hasYears || !hasSections) {
           if (emptyAlert && emptyMessage) {
-            emptyMessage.textContent = 'Could not load academic programs for this college. Please try again.';
+            emptyMessage.textContent = 'Your institution has not completed its academic setup yet. Please contact your college administrator.';
             emptyAlert.classList.remove('hidden');
           }
-          if (btnSubmit) btnSubmit.disabled = true;
         }
       } catch (err) {
-        console.error('Failed to load academic structure:', err);
+        if (emptyAlert && emptyMessage) {
+          emptyMessage.textContent = 'Academic structure is temporarily unavailable. Please try again or contact your administrator.';
+          emptyAlert.classList.remove('hidden');
+        }
       } finally {
         if (loadingIndicator) loadingIndicator.classList.add('hidden');
+        updatePlacementSummary();
       }
     });
   }
 
-  if (deptSelect) {
-    deptSelect.addEventListener('change', () => {
-      filterSections();
-    });
+  if (deptSelect) deptSelect.addEventListener('change', filterSections);
+  if (yearSelect) yearSelect.addEventListener('change', filterSections);
+  if (secSelect) secSelect.addEventListener('change', updatePlacementSummary);
+
+  // If institution is pre-selected on load, trigger fetch
+  if (instSelect && instSelect.value && (!deptSelect || deptSelect.children.length <= 1)) {
+    instSelect.dispatchEvent(new Event('change'));
   }
 
-  if (yearSelect) {
-    yearSelect.addEventListener('change', () => {
-      filterSections();
+  // Password Visibility Toggle
+  document.querySelectorAll('.pwd-toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-target');
+      if (!targetId) return;
+      const input = document.getElementById(targetId) as HTMLInputElement | null;
+      if (!input) return;
+
+      const eyeIcon = btn.querySelector('.icon-eye');
+      const eyeOffIcon = btn.querySelector('.icon-eye-off');
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon?.classList.add('hidden');
+        eyeOffIcon?.classList.remove('hidden');
+      } else {
+        input.type = 'password';
+        eyeIcon?.classList.remove('hidden');
+        eyeOffIcon?.classList.add('hidden');
+      }
+    });
+  });
+
+  // Password Requirements Real-Time Feedback
+  const pwdInput = document.getElementById('password_input') as HTMLInputElement | null;
+  const confirmPwdInput = document.getElementById('confirm_password_input') as HTMLInputElement | null;
+  const reqLength = document.getElementById('req-length');
+  const reqMatch = document.getElementById('req-match');
+
+  function checkPasswordReqs() {
+    const val = pwdInput?.value || '';
+    const confirmVal = confirmPwdInput?.value || '';
+
+    if (reqLength) {
+      if (val.length >= 6) {
+        reqLength.classList.add('valid');
+      } else {
+        reqLength.classList.remove('valid');
+      }
+    }
+
+    if (reqMatch) {
+      if (val && confirmVal && val === confirmVal) {
+        reqMatch.classList.add('valid');
+      } else {
+        reqMatch.classList.remove('valid');
+      }
+    }
+  }
+
+  if (pwdInput) pwdInput.addEventListener('input', checkPasswordReqs);
+  if (confirmPwdInput) confirmPwdInput.addEventListener('input', checkPasswordReqs);
+
+  // Prevent Double Submission & Show Loading State on Submit
+  const signupForm = document.getElementById('student-signup-form') as HTMLFormElement | null;
+  const submitBtn = document.getElementById('btn-submit-signup') as HTMLButtonElement | null;
+  const btnSpinner = document.getElementById('btn-spinner');
+
+  if (signupForm && submitBtn) {
+    signupForm.addEventListener('submit', () => {
+      // Allow browser validation to pass first
+      if (!signupForm.checkValidity()) return;
+
+      submitBtn.disabled = true;
+      const textSpan = submitBtn.querySelector('.btn-text-content');
+      if (textSpan) textSpan.textContent = 'Creating your account...';
+      const arrowIcon = submitBtn.querySelector('.btn-arrow');
+      if (arrowIcon) arrowIcon.classList.add('hidden');
+      if (btnSpinner) btnSpinner.classList.remove('hidden');
     });
   }
 </script>
 
 <style>
+  /* ------------------------------------------------------------ */
+  /* ONBOARDING PORTAL LAYOUT & THEME                             */
+  /* ------------------------------------------------------------ */
   .signup-page-wrapper {
-    min-height: 85vh;
+    min-height: 90vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-8) var(--space-4);
+    padding: 2.5rem 1.25rem;
+    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.05) 0%, rgba(248, 250, 252, 0) 70%), var(--color-bg-base, #f8fafc);
   }
 
   .signup-card-container {
     width: 100%;
-    max-width: 680px;
+    max-width: 900px; /* Spacious but compact width in 900-1000px range */
+    margin: 0 auto;
   }
 
-  .brand-badge {
-    display: inline-block;
+  /* ------------------------------------------------------------ */
+  /* HERO HEADER                                                  */
+  /* ------------------------------------------------------------ */
+  .onboarding-hero {
+    margin-bottom: 1.75rem;
+  }
+
+  .privacy-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--color-primary-600);
-    background: rgba(99, 102, 241, 0.1);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #4338ca;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.2);
     padding: 4px 12px;
-    border-radius: var(--radius-full);
-    margin-bottom: var(--space-2);
+    border-radius: var(--radius-full, 9999px);
+    margin-bottom: 0.75rem;
   }
 
-  .signup-title {
-    font-size: 1.75rem;
+  .privacy-pill-icon {
+    color: #4f46e5;
+  }
+
+  .hero-title {
+    font-size: 2.125rem;
     font-weight: 800;
-    color: var(--color-text-main);
-    letter-spacing: -0.02em;
+    color: var(--color-text-main, #0f172a);
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin: 0;
   }
 
-  .signup-subtitle {
+  .hero-subtitle {
     font-size: 0.9375rem;
-    color: var(--color-text-muted);
-    margin-top: var(--space-1);
-    margin-bottom: var(--space-6);
+    color: var(--color-text-muted, #64748b);
+    margin: 0.4rem 0 0 0;
+    line-height: 1.5;
   }
 
-  .signup-form {
+  /* ------------------------------------------------------------ */
+  /* 3-STEP PROGRESS ROADMAP                                      */
+  /* ------------------------------------------------------------ */
+  .step-indicator-bar {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid var(--color-border-default, #e2e8f0);
+    border-radius: var(--radius-xl, 12px);
+    padding: 10px 20px;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   }
 
-  .section-heading {
-    font-size: 1.0625rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-    border-bottom: 1px solid var(--color-border-subtle);
-    padding-bottom: var(--space-2);
-  }
-
-  .section-help-text {
-    font-size: 0.8125rem;
-    color: var(--color-text-muted);
-    margin-top: var(--space-1);
-  }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-
-  .custom-select {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-md);
-    background-color: var(--color-bg-surface);
-    color: var(--color-text-main);
-    font-size: 0.875rem;
-    outline: none;
-    transition: border-color var(--transition-fast);
-  }
-
-  .custom-select:focus {
-    border-color: var(--color-primary-500);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-  }
-
-  .custom-select:disabled {
-    background-color: var(--color-bg-subtle);
-    color: var(--color-text-muted);
-    cursor: not-allowed;
-  }
-
-  .loading-bar {
-    font-size: 0.8125rem;
-    color: var(--color-primary-600);
+  .step-pill {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 6px;
+    opacity: 0.9;
   }
 
-  .empty-structure-alert {
-    margin-top: var(--space-3);
-    padding: var(--space-3);
-    background-color: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: var(--radius-md);
-    color: #b45309;
-    font-size: 0.8125rem;
+  .step-pill.active {
+    opacity: 1;
+  }
+
+  .step-number {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #4f46e5;
+    background: #eef2ff;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: var(--radius-md, 6px);
+    padding: 2px 7px;
+  }
+
+  .step-text {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--color-text-main, #1e293b);
+  }
+
+  .step-line {
+    flex: 1;
+    height: 1px;
+    background: var(--color-border-subtle, #e2e8f0);
+    margin: 0 12px;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ERROR BANNER                                                 */
+  /* ------------------------------------------------------------ */
+  .error-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-lg, 10px);
+    padding: 12px 16px;
+    margin-bottom: 1.75rem;
+  }
+
+  .error-icon-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #dc2626;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .error-title {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #991b1b;
+    display: block;
+  }
+
+  .error-desc {
+    font-size: 0.8rem;
+    color: #b91c1c;
+    margin: 2px 0 0 0;
     line-height: 1.4;
   }
 
-  .privacy-box {
-    background-color: var(--color-bg-subtle);
-    border: 1px solid var(--color-border-subtle);
-    padding: var(--space-4);
-    border-radius: var(--radius-md);
+  /* ------------------------------------------------------------ */
+  /* DISTINCT ONBOARDING SECTIONS                                 */
+  /* ------------------------------------------------------------ */
+  .onboarding-journey-wrap {
+    width: 100%;
   }
 
-  .consent-checkbox-row {
+  .onboarding-section {
+    background: #ffffff;
+    border: 1px solid var(--color-border-default, #e2e8f0);
+    border-radius: var(--radius-xl, 14px);
+    box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.03), 0 1px 3px -1px rgba(0, 0, 0, 0.02);
+    padding: 1.5rem 1.75rem; /* Proportional 24px - 28px internal padding */
+  }
+
+  /* 32px to 44px vertical spacing between major sections */
+  .section-divider-line {
+    height: 0;
+    border-top: 1px dashed var(--color-border-subtle, #cbd5e1);
+    margin: 36px 0;
+  }
+
+  .section-badge-header {
     display: flex;
     align-items: flex-start;
+    gap: 12px;
+  }
+
+  .section-number-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md, 7px);
+    background: #eef2ff;
+    color: #4f46e5;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .section-title-group {
+    flex: 1;
+  }
+
+  .section-main-title {
+    font-size: 1.1875rem; /* 18-20px typography scale */
+    font-weight: 700;
+    color: var(--color-text-main, #0f172a);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .section-main-desc {
+    font-size: 0.84rem; /* 13-14px typography scale */
+    color: var(--color-text-muted, #64748b);
+    margin: 3px 0 0 0;
+    line-height: 1.4;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* FORM FIELDS & GRIDS                                          */
+  /* ------------------------------------------------------------ */
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .field-label {
+    font-size: 0.85rem; /* 13-14px typography scale */
+    font-weight: 600;
+    color: var(--color-text-main, #1e293b);
+  }
+
+  .field-required {
+    color: #dc2626;
+  }
+
+  .field-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #64748b);
+    margin-top: 2px;
+  }
+
+  .field-input,
+  .field-select {
+    width: 100%;
+    height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-default, #cbd5e1);
+    border-radius: var(--radius-md, 8px);
+    background-color: var(--color-bg-surface, #ffffff);
+    color: var(--color-text-main, #0f172a);
+    font-size: 0.9375rem; /* 14-16px input text */
+    font-weight: 500;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .field-input:focus,
+  .field-select:focus {
+    border-color: var(--color-primary-600, #4f46e5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .field-select {
+    appearance: none;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    cursor: pointer;
+  }
+
+  .field-select:disabled {
+    background-color: var(--color-bg-subtle, #f8fafc);
+    color: var(--color-text-muted, #94a3b8);
+    cursor: not-allowed;
+    border-color: var(--color-border-subtle, #e2e8f0);
+    opacity: 0.85;
+  }
+
+  /* Password Wrapper & Toggle */
+  .password-input-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  .pwd-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--color-text-muted, #64748b);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease;
+  }
+
+  .pwd-toggle-btn:hover {
+    color: var(--color-primary-600, #4f46e5);
+  }
+
+  .password-reqs-card {
+    background: var(--color-bg-subtle, #f8fafc);
+    border: 1px solid var(--color-border-subtle, #e2e8f0);
+    border-radius: var(--radius-md, 8px);
+    padding: 8px 14px;
+  }
+
+  .reqs-title {
+    font-size: 0.725rem;
+    font-weight: 700;
+    color: var(--color-text-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .reqs-list {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .req-item {
+    font-size: 0.8rem; /* 12-13px typography scale */
+    color: var(--color-text-muted, #94a3b8);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.2s ease;
+  }
+
+  .req-check-icon {
+    font-weight: 800;
+    color: #cbd5e1;
+    transition: color 0.2s ease;
+  }
+
+  .req-item.valid {
+    color: #065f46;
+    font-weight: 600;
+  }
+
+  .req-item.valid .req-check-icon {
+    color: #059669;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ACADEMIC CONFIRMATION SUMMARY CARD                           */
+  /* ------------------------------------------------------------ */
+  .placement-summary-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius-md, 8px);
+    padding: 11px 15px;
+    margin-top: 1.125rem;
+    animation: fadeIn 0.25s ease-out;
+  }
+
+  .summary-check-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #15803d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .summary-badge-text {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #166534;
+    display: block;
+  }
+
+  .summary-detail-main {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #14532d;
+    margin: 1px 0 0 0;
+  }
+
+  .summary-detail-sub {
+    font-size: 0.8rem;
+    color: #15803d;
+    margin: 1px 0 0 0;
+  }
+
+  /* Loading state & alert */
+  .loading-state-box {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #4f46e5;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    padding: 5px 12px;
+    border-radius: var(--radius-md, 6px);
+    margin-top: 8px;
+  }
+
+  .spinner-dot {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(79, 70, 229, 0.25);
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .structure-alert-box {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background-color: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    border-radius: var(--radius-md, 8px);
+  }
+
+  .alert-title {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #b45309;
+    margin: 0;
+  }
+
+  .alert-desc {
+    font-size: 0.8rem;
+    color: #92400e;
+    margin: 2px 0 0 0;
+    line-height: 1.4;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* PRIVACY GUARANTEE CARD & DPDP CONSENT                        */
+  /* ------------------------------------------------------------ */
+  .privacy-guarantee-card {
+    background: linear-gradient(135deg, rgba(240, 253, 250, 0.7) 0%, rgba(238, 242, 255, 0.6) 100%);
+    border: 1px solid rgba(167, 243, 208, 0.85);
+    border-radius: var(--radius-lg, 10px);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .privacy-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0.875rem;
+  }
+
+  .privacy-shield-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md, 6px);
+    background: #d1fae5;
+    color: #059669;
+    flex-shrink: 0;
+  }
+
+  .privacy-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #065f46;
+    margin: 0;
+  }
+
+  .privacy-card-sub {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #047857;
+    margin: 1px 0 0 0;
+  }
+
+  .privacy-commitments-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.875rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .privacy-commitments-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.84rem; /* 13-14px typography scale */
+    color: #1e293b;
+    line-height: 1.45;
+  }
+
+  .check-bullet {
+    color: #059669;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .privacy-link-bar {
+    padding-top: 0.625rem;
+    border-top: 1px dashed rgba(167, 243, 208, 0.8);
+  }
+
+  .privacy-policy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #4338ca;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .privacy-policy-link:hover {
+    color: #312e81;
+    text-decoration: underline;
+  }
+
+  .consent-agreement-box {
+    background: var(--color-bg-subtle, #f8fafc);
+    border: 1px solid var(--color-border-default, #e2e8f0);
+    border-radius: var(--radius-lg, 10px);
+    padding: 14px 18px;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .consent-agreement-box:hover {
+    border-color: #c7d2fe;
+    background-color: #faf5ff;
   }
 
   .consent-label {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-2);
+    gap: 12px;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .consent-input-checkbox {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    margin-top: 2px;
+    accent-color: #4f46e5;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .consent-caption {
+    font-size: 0.84rem; /* 13-14px typography scale */
+    color: var(--color-text-main, #1e293b);
+    line-height: 1.5;
+  }
+
+  .link-inline {
+    color: #4f46e5;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* COMPACT FINAL ACTION AREA                                    */
+  /* ------------------------------------------------------------ */
+  .cta-divider-line {
+    height: 0;
+    border-top: 1px solid var(--color-border-default, #e2e8f0);
+    margin: 32px 0 20px 0;
+  }
+
+  .final-cta-container {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .final-cta-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main, #0f172a);
+    margin: 0;
+  }
+
+  .final-cta-desc {
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+    max-width: 480px;
+    line-height: 1.45;
+  }
+
+  .final-cta-btn-wrap {
+    width: 100%;
+    max-width: 320px; /* 260-340px on desktop */
+    margin-top: 10px;
+  }
+
+  .btn-create-account {
+    width: 100%;
+    height: 50px; /* >=48px height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 8px);
+    border: none;
+    color: #ffffff;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    box-shadow: 0 3px 12px rgba(79, 70, 229, 0.25);
+    transition: all 0.2s ease;
     cursor: pointer;
   }
 
-  .consent-checkbox {
-    margin-top: 3px;
+  .btn-create-account:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 16px rgba(79, 70, 229, 0.35);
+    background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  }
+
+  .btn-create-account:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .btn-create-account:hover:not(:disabled) .btn-arrow {
+    transform: translateX(3px);
+  }
+
+  .btn-spinner {
     width: 16px;
     height: 16px;
-    accent-color: var(--color-primary-600);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 
-  .consent-text {
-    color: var(--color-text-main);
-    line-height: 1.4;
+  .final-signin-row {
+    margin-top: 8px;
   }
 
+  .trust-portal-footer {
+    margin-top: 1.25rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #94a3b8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* DEDICATED SUCCESS EXPERIENCE CARD                            */
+  /* ------------------------------------------------------------ */
+  .success-experience-card {
+    background: #ffffff;
+    border: 1px solid var(--color-border-default, #e2e8f0);
+    border-radius: var(--radius-2xl, 16px);
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 20px 25px -5px rgba(0, 0, 0, 0.02);
+    padding: 3rem 2.5rem;
+    text-align: center;
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .success-icon-badge {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #ecfdf5;
+    border: 2px solid #a7f3d0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.25rem auto;
+  }
+
+  .success-check-icon {
+    color: #059669;
+  }
+
+  .success-title {
+    font-size: 1.875rem;
+    font-weight: 800;
+    color: var(--color-text-main, #0f172a);
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .success-welcome {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #4f46e5;
+    margin: 0.4rem 0 0 0;
+  }
+
+  .success-subtitle {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted, #64748b);
+    margin: 0.4rem 0 2rem 0;
+    line-height: 1.5;
+  }
+
+  .success-summary-box {
+    background: var(--color-bg-subtle, #f8fafc);
+    border: 1px solid var(--color-border-default, #e2e8f0);
+    border-radius: var(--radius-xl, 12px);
+    padding: 1.5rem;
+    text-align: left;
+    margin-bottom: 1.75rem;
+  }
+
+  .summary-section-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted, #64748b);
+    margin: 0 0 0.625rem 0;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 0.875rem;
+  }
+
+  .summary-field-label {
+    color: var(--color-text-muted, #64748b);
+    font-weight: 500;
+  }
+
+  .summary-field-value {
+    color: var(--color-text-main, #0f172a);
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .summary-divider {
+    height: 1px;
+    background: var(--color-border-subtle, #e2e8f0);
+    margin: 0.875rem 0;
+  }
+
+  .summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .next-steps-card {
+    background: #ffffff;
+    border: 1px solid var(--color-border-subtle, #f1f5f9);
+    border-radius: var(--radius-lg, 10px);
+    padding: 1.25rem 1.5rem;
+    text-align: left;
+    margin-bottom: 2rem;
+  }
+
+  .next-steps-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main, #0f172a);
+    margin: 0 0 0.75rem 0;
+  }
+
+  .next-steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .next-steps-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--color-text-main, #1e293b);
+    line-height: 1.45;
+  }
+
+  .step-num-pill {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .success-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-success-primary {
+    width: 100%;
+    max-width: 340px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: var(--radius-md, 8px);
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+    transition: all 0.2s ease;
+  }
+
+  .btn-success-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+    background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  }
+
+  .btn-success-secondary {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .btn-success-secondary:hover {
+    color: var(--color-text-main, #0f172a);
+    text-decoration: underline;
+  }
+
+  .trust-footer-note {
+    margin-top: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #94a3b8);
+  }
+
+  /* ------------------------------------------------------------ */
+  /* COMMON UTILITIES & ANIMATIONS                                */
+  /* ------------------------------------------------------------ */
   .hidden {
     display: none !important;
   }
 
-  .alert {
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    margin-bottom: var(--space-4);
+  .text-emerald {
+    color: #059669;
   }
 
-  .alert-danger {
-    background-color: #fef2f2;
-    border: 1px solid #f87171;
-    color: #991b1b;
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
-  .alert-success {
-    background-color: #f0fdf4;
-    border: 1px solid #4ade80;
-    color: #166534;
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
+  /* ------------------------------------------------------------ */
+  /* RESPONSIVE DESIGN (360px - 768px)                            */
+  /* ------------------------------------------------------------ */
   @media (max-width: 640px) {
-    .form-grid {
+    .signup-page-wrapper {
+      padding: 1.5rem 0.875rem;
+    }
+    .onboarding-section {
+      padding: 1.25rem 1rem;
+    }
+    /* 24px to 32px between sections on mobile */
+    .section-divider-line {
+      margin: 28px 0;
+    }
+    .cta-divider-line {
+      margin: 24px 0 16px 0;
+    }
+    .fields-grid {
       grid-template-columns: 1fr;
+      gap: 0.875rem;
+    }
+    .hero-title {
+      font-size: 1.75rem;
+    }
+    .step-indicator-bar {
+      padding: 8px 10px;
+      margin-bottom: 1.5rem;
+    }
+    .step-pill {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+    .step-number {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+    }
+    .step-text {
+      font-size: 0.6875rem;
+      line-height: 1.2;
+      text-align: center;
+      max-width: 65px;
+      display: block;
+    }
+    .step-line {
+      margin: 0 4px;
+      min-width: 8px;
+    }
+    .final-cta-btn-wrap {
+      max-width: 100%;
+    }
+    .success-experience-card {
+      padding: 2rem 1.125rem;
+    }
+    .summary-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+    .summary-field-value {
+      text-align: left;
     }
   }
 </style>

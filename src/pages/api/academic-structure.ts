@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { createSupabaseAdminClient } from '../../lib/supabase/server';
 import { getInstitutionAcademicStructure } from '../../services/provisioning';
 
 export const GET: APIRoute = async (context) => {
@@ -14,7 +14,7 @@ export const GET: APIRoute = async (context) => {
   }
 
   try {
-    const supabase = createSupabaseServerClient(context);
+    const supabase = createSupabaseAdminClient();
 
     // 1. Verify institution exists and is active
     const { data: inst, error: instErr } = await (supabase.from('institutions') as any)

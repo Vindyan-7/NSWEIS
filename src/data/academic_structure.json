@@ -1,0 +1,100 @@
+{
+  "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4": {
+    "years": [
+      {
+        "id": "y1-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "year_level": 1,
+        "label": "1st Year",
+        "active": true
+      },
+      {
+        "id": "y2-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "year_level": 2,
+        "label": "2nd Year",
+        "active": true
+      },
+      {
+        "id": "y3-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "year_level": 3,
+        "label": "3rd Year",
+        "active": true
+      },
+      {
+        "id": "y4-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "year_level": 4,
+        "label": "4th Year",
+        "active": true
+      }
+    ],
+    "sections": [
+      {
+        "id": "sA-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "A",
+        "active": true
+      },
+      {
+        "id": "sB-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "B",
+        "active": true
+      },
+      {
+        "id": "sC-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "C",
+        "active": true
+      },
+      {
+        "id": "sD-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "D",
+        "active": true
+      },
+      {
+        "id": "sE-4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "E",
+        "active": true,
+        "department_id": null,
+        "year_level": null
+      },
+      {
+        "id": "sec-1788334076156-pzzj",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "F",
+        "department_id": null,
+        "year_level": null,
+        "active": true
+      },
+      {
+        "id": "sec-1788334089370-1r8d",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "G",
+        "department_id": null,
+        "year_level": null,
+        "active": true
+      },
+      {
+        "id": "sec-1788334095901-7gxx",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "H",
+        "department_id": null,
+        "year_level": null,
+        "active": true
+      },
+      {
+        "id": "sec-1788334116582-p6o7",
+        "institution_id": "4eeb6bee-0f6b-49b3-a79f-e4a30bed8fe4",
+        "section_code": "I",
+        "department_id": null,
+        "year_level": null,
+        "active": true
+      }
+    ]
+  }
+}

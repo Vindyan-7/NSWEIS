@@ -16,7 +16,7 @@ import {
   getActiveQuestions,
   deleteOrDeactivateQuestion,
 } from '../../services/clinician';
-import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers } from '@lucide/astro';
+import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers, Pencil, ChevronDown, ListChecks } from '@lucide/astro';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -63,6 +63,9 @@ if (Astro.request.method === 'POST') {
 const url = new URL(Astro.request.url);
 const activeTab = url.searchParams.get('tab') || 'drafts';
 const selectedWeek = url.searchParams.get('week') || 'all';
+if (!message && url.searchParams.get('updated') === '1') {
+  message = 'Question and response options updated successfully.';
+}
 
 const counts = await getClinicianQueueCounts(supabase, user.id);
 
@@ -255,31 +258,100 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
               </div>
 
               <div class="q-list">
-                {questions.map((q) => (
-                  <div class="q-row">
-                    <div class="q-main">
-                      <div class="q-tags">
-                        <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-ACTIVE'}</span>
-                        <span class="q-week-badge">Week {q.week_number || weekNum}</span>
-                        <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
-                        {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
-                        <Badge variant="stable" size="sm">Active</Badge>
+                {questions.map((q) => {
+                  const opts = (q as any).options || [];
+                  return (
+                    <div class="q-card-wrapper" id={`q-card-${q.id}`}>
+                      <div class="q-row">
+                        <div
+                          class="q-main q-clickable"
+                          data-toggle-target={`q-opts-${q.id}`}
+                          role="button"
+                          tabindex="0"
+                          title="Click to view or hide response options"
+                        >
+                          <div class="q-tags">
+                            <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-ACTIVE'}</span>
+                            <span class="q-week-badge">Week {q.week_number || weekNum}</span>
+                            <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                            {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
+                            <Badge variant="stable" size="sm">Active</Badge>
+                            <span class="q-options-badge">
+                              <ListChecks size={13} />
+                              <span>{opts.length} Options</span>
+                            </span>
+                          </div>
+                          <div class="q-text-line">
+                            <p class="q-text">{q.text}</p>
+                            <button
+                              type="button"
+                              class="btn-toggle-options"
+                              data-target={`q-opts-${q.id}`}
+                              aria-expanded="false"
+                              title="Toggle response options"
+                            >
+                              <span class="toggle-label">View Options</span>
+                              <ChevronDown size={15} class="chevron-arrow" />
+                            </button>
+                          </div>
+                          <span class="q-meta">Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} · activated by {q.activator_name || '—'}</span>
+                        </div>
+                        <div class="q-actions">
+                          <a href={`/clinician/questions/edit/${q.id}`} class="btn-edit" title="Edit Question & Options">
+                            <Pencil size={14} />
+                            <span>Edit</span>
+                          </a>
+                          <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this active question from the library?');">
+                            <input type="hidden" name="action_type" value="delete_question" />
+                            <input type="hidden" name="question_id" value={q.id} />
+                            <button type="submit" class="btn-delete" title="Delete Question">
+                              <Trash2 size={15} />
+                              <span>Delete</span>
+                            </button>
+                          </form>
+                        </div>
                       </div>
-                      <p class="q-text">{q.text}</p>
-                      <span class="q-meta">Authored by {q.author_name || '—'} · reviewed by {q.reviewer_name || '—'} · activated by {q.activator_name || '—'}</span>
+
+                      {/* Expandable Options Review Drawer */}
+                      <div class="q-options-drawer hidden" id={`q-opts-${q.id}`}>
+                        <div class="drawer-header">
+                          <div class="drawer-header-info">
+                            <ListChecks size={15} class="text-primary" />
+                            <span class="drawer-title">Response Options & Scoring</span>
+                            <span class="drawer-count">({opts.length} configured choices)</span>
+                          </div>
+                          <a href={`/clinician/questions/edit/${q.id}`} class="drawer-edit-btn">
+                            <Pencil size={13} />
+                            <span>Edit in Full Editor</span>
+                          </a>
+                        </div>
+
+                        {opts.length === 0 ? (
+                          <div class="drawer-empty">
+                            <span>No response options configured for this question yet.</span>
+                          </div>
+                        ) : (
+                          <div class="drawer-options-grid">
+                            {opts.map((opt: any, optIdx: number) => (
+                              <div class="drawer-option-card">
+                                <div class="opt-left">
+                                  <span class="opt-num-badge">{opt.order_index ?? optIdx + 1}</span>
+                                  <span class="opt-code-tag">{opt.option_code || `OPT_${optIdx + 1}`}</span>
+                                  <span class="opt-label-text">{opt.label}</span>
+                                </div>
+                                <div class="opt-right">
+                                  <span class="opt-score-badge" title="Clinical assessment score weight">
+                                    Score: {opt.score ?? opt.signal_value ?? 0}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div class="q-actions">
-                      <form method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this active question from the library?');">
-                        <input type="hidden" name="action_type" value="delete_question" />
-                        <input type="hidden" name="question_id" value={q.id} />
-                        <button type="submit" class="btn-delete" title="Delete Question">
-                          <Trash2 size={15} />
-                          <span>Delete</span>
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           ))}
@@ -542,6 +614,244 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
     color: #dc2626;
   }
 
+  /* Edit Button */
+  .btn-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4f46e5;
+    background-color: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-edit:hover {
+    background-color: #e0e7ff;
+    border-color: #a5b4fc;
+    color: #3730a3;
+  }
+
+  /* Card Wrapper & Options Drawer */
+  .q-card-wrapper {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    transition: all 0.2s ease;
+    overflow: hidden;
+  }
+
+  .q-card-wrapper:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .q-card-wrapper.is-open {
+    border-color: #c7d2fe;
+    box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.08);
+  }
+
+  .q-clickable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .q-text-line {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .btn-toggle-options {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4f46e5;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .btn-toggle-options:hover {
+    background: #e0e7ff;
+    color: #3730a3;
+  }
+
+  .chevron-arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .chevron-arrow.rotated {
+    transform: rotate(180deg);
+  }
+
+  .q-options-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #4338ca;
+    background: #eef2ff;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    padding: 2px 8px;
+    border-radius: var(--radius-full, 9999px);
+  }
+
+  /* Expandable Options Drawer */
+  .q-options-drawer {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    padding: 1rem 1.25rem;
+    animation: drawerFadeIn 0.2s ease-out;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed #e2e8f0;
+  }
+
+  .drawer-header-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .drawer-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .drawer-count {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .drawer-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4f46e5;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .drawer-edit-btn:hover {
+    color: #3730a3;
+    text-decoration: underline;
+  }
+
+  .drawer-options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .drawer-option-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    gap: 12px;
+    transition: border-color 0.15s ease;
+  }
+
+  .drawer-option-card:hover {
+    border-color: #cbd5e1;
+  }
+
+  .opt-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .opt-num-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .opt-code-tag {
+    font-family: monospace;
+    font-size: 0.725rem;
+    font-weight: 600;
+    color: #4338ca;
+    background: #eef2ff;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #c7d2fe;
+  }
+
+  .opt-label-text {
+    font-size: 0.85rem;
+    color: #0f172a;
+    font-weight: 500;
+  }
+
+  .opt-right {
+    flex-shrink: 0;
+  }
+
+  .opt-score-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.725rem;
+    font-weight: 700;
+    color: #047857;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 2px 8px;
+    border-radius: var(--radius-full, 9999px);
+  }
+
+  .drawer-empty {
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  @keyframes drawerFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   @media (max-width: 640px) {
     .q-row {
       flex-direction: column;
@@ -551,5 +861,59 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
       width: 100%;
       justify-content: flex-end;
     }
+    .q-text-line {
+      flex-direction: column;
+    }
+    .btn-toggle-options {
+      align-self: flex-start;
+      margin-top: 4px;
+    }
+    .drawer-option-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
   }
 </style>
+
+<script>
+  function setupOptionToggles() {
+    document.querySelectorAll('.q-clickable').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.btn-edit') || target.closest('.btn-delete') || target.closest('form')) {
+          return;
+        }
+
+        const targetId = el.getAttribute('data-toggle-target');
+        if (!targetId) return;
+
+        const drawer = document.getElementById(targetId);
+        if (!drawer) return;
+
+        const isHidden = drawer.classList.contains('hidden');
+        drawer.classList.toggle('hidden');
+
+        const wrapper = el.closest('.q-card-wrapper');
+        const chevron = wrapper?.querySelector('.chevron-arrow');
+        const toggleBtn = wrapper?.querySelector('.btn-toggle-options');
+        const toggleLabel = wrapper?.querySelector('.toggle-label');
+
+        if (isHidden) {
+          chevron?.classList.add('rotated');
+          toggleBtn?.setAttribute('aria-expanded', 'true');
+          if (toggleLabel) toggleLabel.textContent = 'Hide Options';
+          wrapper?.classList.add('is-open');
+        } else {
+          chevron?.classList.remove('rotated');
+          toggleBtn?.setAttribute('aria-expanded', 'false');
+          if (toggleLabel) toggleLabel.textContent = 'View Options';
+          wrapper?.classList.remove('is-open');
+        }
+      });
+    });
+  }
+
+  setupOptionToggles();
+  document.addEventListener('astro:page-load', setupOptionToggles);
+</script>

@@ -3,6 +3,14 @@ import type { Database } from '../types/database';
 import type { UserRole, UserProfile } from '../types/domain';
 import { createSupabaseAdminClient } from '../lib/supabase/server';
 import { getUserProfile } from './users';
+import {
+  getStoredStructure,
+  addStoredSection,
+  addStoredYear,
+  deleteStoredSection,
+  deleteStoredYear,
+  normalizeSectionCode,
+} from './academicStorage';
 
 export interface RegionItem {
   id: string;
@@ -462,49 +470,19 @@ export async function getInstitutionAcademicStructure(
   supabase: SupabaseClient<Database>,
   institutionId: string
 ): Promise<AcademicStructureDTO> {
-  const { data: deptData } = await (supabase.from('departments') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data: deptData } = await (adminClient.from('departments') as any)
     .select('id, name, code, active')
     .eq('institution_id', institutionId)
     .eq('active', true)
     .order('name');
 
-  const { data: yearData, error: yearErr } = await (supabase.from('academic_years') as any)
-    .select('*')
-    .eq('institution_id', institutionId)
-    .eq('active', true)
-    .order('year_level');
-
-  const { data: secData, error: secErr } = await (supabase.from('academic_sections') as any)
-    .select('*')
-    .eq('institution_id', institutionId)
-    .eq('active', true)
-    .order('section_code');
-
-  let years: AcademicYearItem[] = (yearData || []) as AcademicYearItem[];
-  let sections: AcademicSectionItem[] = (secData || []) as AcademicSectionItem[];
-
-  // If table does not exist in schema cache on remote, provide standard academic structure
-  if (yearErr && (yearErr.message?.includes('schema cache') || yearErr.message?.includes('does not exist'))) {
-    years = [
-      { id: 'y1', institution_id: institutionId, year_level: 1, label: '1st Year', active: true },
-      { id: 'y2', institution_id: institutionId, year_level: 2, label: '2nd Year', active: true },
-      { id: 'y3', institution_id: institutionId, year_level: 3, label: '3rd Year', active: true },
-      { id: 'y4', institution_id: institutionId, year_level: 4, label: '4th Year', active: true },
-    ];
-  }
-
-  if (secErr && (secErr.message?.includes('schema cache') || secErr.message?.includes('does not exist'))) {
-    sections = [
-      { id: 'sA', institution_id: institutionId, section_code: 'A', active: true },
-      { id: 'sB', institution_id: institutionId, section_code: 'B', active: true },
-      { id: 'sC', institution_id: institutionId, section_code: 'C', active: true },
-    ];
-  }
+  const stored = getStoredStructure(institutionId);
 
   return {
     departments: (deptData || []) as any[],
-    years,
-    sections,
+    years: stored.years,
+    sections: stored.sections,
   };
 }
 
@@ -564,29 +542,8 @@ export async function createAcademicYear(
     return { success: false, error: 'Unauthorized: Cannot configure academic years for another institution.' };
   }
 
-  try {
-    const adminClient = createSupabaseAdminClient();
-    const { error } = await (adminClient.from('academic_years') as any).upsert(
-    {
-      institution_id: input.institutionId,
-      year_level: input.yearLevel,
-      label: input.label.trim(),
-      active: true,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'institution_id,year_level' }
-  );
-
-    if (error) {
-      if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
-        return { success: true };
-      }
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  } catch (err: any) {
-    return { success: true };
-  }
+  addStoredYear(input.institutionId, input.yearLevel, input.label);
+  return { success: true };
 }
 
 export async function createAcademicSection(
@@ -603,30 +560,23 @@ export async function createAcademicSection(
     return { success: false, error: 'Unauthorized: Cannot configure academic sections for another institution.' };
   }
 
-  try {
-    const adminClient = createSupabaseAdminClient();
-    const { error } = await (adminClient.from('academic_sections') as any).upsert(
-      {
-        institution_id: input.institutionId,
-        department_id: input.departmentId || null,
-        year_level: input.yearLevel || null,
-        section_code: input.sectionCode.trim().toUpperCase(),
-        active: true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'institution_id,department_id,year_level,section_code' }
-    );
+  addStoredSection(input.institutionId, input.sectionCode, input.departmentId, input.yearLevel);
+  return { success: true };
+}
 
-    if (error) {
-      if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
-        return { success: true };
-      }
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  } catch (err: any) {
-    return { success: true };
+export async function deleteAcademicSection(
+  supabase: SupabaseClient<Database>,
+  callerId: string,
+  institutionId: string,
+  sectionCode: string
+): Promise<{ success: boolean; error?: string }> {
+  const caller = await getUserProfile(supabase, callerId);
+  if (!caller || (caller.role !== 'college_officer' && caller.role !== 'super_admin')) {
+    return { success: false, error: 'Unauthorized: Only College Officers can configure academic sections.' };
   }
+
+  deleteStoredSection(institutionId, sectionCode);
+  return { success: true };
 }
 
 /**
@@ -917,7 +867,8 @@ export async function validateStudentAcademicPlacement(
   }
 
   // 1. Validate Institution exists and is active
-  const { data: inst } = await (supabase.from('institutions') as any)
+  const adminClient = createSupabaseAdminClient();
+  const { data: inst } = await (adminClient.from('institutions') as any)
     .select('id, active')
     .eq('id', institutionId)
     .single();
