@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from '../../../../lib/supabase/server';
 import { getProfile } from '../../../../services/users';
 import { getQuestionDetails, updateQuestionWithOptions } from '../../../../services/question-management';
 import { recordQuestionAuditLog } from '../../../../services/clinician';
+import { CLINICAL_DOMAINS, getDbCategoryForDomain, getClinicalDomainId } from '../../../../services/clinical-domains';
 import type { WellnessCategory } from '../../../../types/domain';
 import { Plus, Trash2, ArrowLeft, Check, ListChecks } from '@lucide/astro';
 
@@ -31,11 +32,6 @@ if (!id) {
   return Astro.redirect('/clinician/dashboard?tab=active');
 }
 
-const CATEGORIES: WellnessCategory[] = [
-  'academic', 'sleep_rest', 'emotional_wellbeing', 'social_connection', 'family_home',
-  'financial', 'career', 'campus_experience', 'physical_wellbeing', 'digital_balance',
-];
-
 let message = '';
 let isError = false;
 
@@ -44,7 +40,9 @@ if (Astro.request.method === 'POST') {
 
   const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
   const text = formData.get('question_text')?.toString().trim() || '';
-  const category = formData.get('category')?.toString() as WellnessCategory;
+  const rawCategory = formData.get('category')?.toString().trim() || '';
+  const category = getDbCategoryForDomain(rawCategory);
+  const adaptive_trigger_group = `clinical_domain:${rawCategory}`;
   const depth_level = formData.get('depth_level')?.toString() as 'light' | 'moderate' | 'deep';
   const target_department = formData.get('target_department')?.toString() || 'ALL';
 
@@ -52,7 +50,7 @@ if (Astro.request.method === 'POST') {
   const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
   const optionScores = formData.getAll('option_score[]').map((v) => parseFloat(v.toString()));
 
-  if (!text || !category || !depth_level) {
+  if (!text || !rawCategory || !depth_level) {
     message = 'Please provide question text, domain, and depth level.';
     isError = true;
   } else if (optionLabels.length < 2) {
@@ -78,6 +76,7 @@ if (Astro.request.method === 'POST') {
         text,
         category,
         target_department,
+        adaptive_trigger_group,
         depth_level,
       },
       optionsData
@@ -105,6 +104,7 @@ if (!question) {
   return Astro.redirect('/clinician/dashboard?tab=active');
 }
 
+const currentDomainId = getClinicalDomainId(question.category, (question as any).adaptive_trigger_group);
 const sortedOptions = (question.options || []).slice().sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 ---
 
@@ -149,10 +149,10 @@ const sortedOptions = (question.options || []).slice().sort((a, b) => (a.order_i
           label="Domain (Category)"
           name="category"
           required
-          value={question.category}
-          options={CATEGORIES.map((c) => ({
-            value: c,
-            label: c.replace(/_/g, ' '),
+          value={currentDomainId}
+          options={CLINICAL_DOMAINS.map((d) => ({
+            value: d.id,
+            label: d.label,
           }))}
         />
 

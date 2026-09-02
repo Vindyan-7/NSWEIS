@@ -11,6 +11,8 @@ import { getProfile } from '../../../services/users';
 import { createQuestionWithOptions } from '../../../services/question-management';
 import type { WellnessCategory } from '../../../types/domain';
 
+import { CLINICAL_DOMAINS, getDbCategoryForDomain } from '../../../services/clinical-domains';
+
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
 
@@ -24,11 +26,6 @@ if (!profile || profile.role !== 'clinician') {
   return Astro.redirect('/no-access');
 }
 
-const CATEGORIES: WellnessCategory[] = [
-  'academic', 'sleep_rest', 'emotional_wellbeing', 'social_connection', 'family_home',
-  'financial', 'career', 'campus_experience', 'physical_wellbeing', 'digital_balance',
-];
-
 let message = '';
 let isError = false;
 
@@ -38,7 +35,9 @@ if (Astro.request.method === 'POST') {
   const question_code = formData.get('question_code')?.toString().trim() || '';
   const week_number = parseInt(formData.get('week_number')?.toString() || '1', 10);
   const text = formData.get('question_text')?.toString().trim() || '';
-  const category = formData.get('category')?.toString() as WellnessCategory;
+  const rawCategory = formData.get('category')?.toString().trim() || '';
+  const category = getDbCategoryForDomain(rawCategory);
+  const adaptive_trigger_group = `clinical_domain:${rawCategory}`;
   const depth_level = formData.get('depth_level')?.toString() as 'light' | 'moderate' | 'deep';
   const target_department = formData.get('target_department')?.toString() || 'ALL';
 
@@ -46,7 +45,7 @@ if (Astro.request.method === 'POST') {
   const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
   const optionScores = formData.getAll('option_score[]').map((v) => parseFloat(v.toString()));
 
-  if (!question_code || !text || !category || !depth_level) {
+  if (!question_code || !text || !rawCategory || !depth_level) {
     message = 'Please provide a question code, text, domain, and depth level.';
     isError = true;
   } else if (optionLabels.some((l) => !l) || optionScores.some((s) => isNaN(s))) {
@@ -69,6 +68,7 @@ if (Astro.request.method === 'POST') {
         text,
         category,
         target_department,
+        adaptive_trigger_group,
         depth_level,
         authored_by: user.id,
         active: false,
@@ -104,7 +104,7 @@ if (Astro.request.method === 'POST') {
           label="Domain (Category)"
           name="category"
           required
-          options={CATEGORIES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') }))}
+          options={CLINICAL_DOMAINS.map((d) => ({ value: d.id, label: d.label }))}
         />
         <Select
           label="Depth Level"

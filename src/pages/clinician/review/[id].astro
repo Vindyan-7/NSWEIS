@@ -17,6 +17,8 @@ import {
 import { updateQuestionWithOptions } from '../../../services/question-management';
 import type { WellnessCategory } from '../../../types/domain';
 
+import { CLINICAL_DOMAINS, getDbCategoryForDomain, getClinicalDomainLabel, getClinicalDomainId } from '../../../services/clinical-domains';
+
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
 
@@ -32,11 +34,6 @@ if (!profile || profile.role !== 'clinician') {
 
 const { id } = Astro.params;
 if (!id) return Astro.redirect('/clinician/dashboard');
-
-const CATEGORIES: WellnessCategory[] = [
-  'academic', 'sleep_rest', 'emotional_wellbeing', 'social_connection', 'family_home',
-  'financial', 'career', 'campus_experience', 'physical_wellbeing', 'digital_balance',
-];
 
 let message = '';
 let isError = false;
@@ -63,19 +60,21 @@ if (Astro.request.method === 'POST') {
     }
   } else if (action === 'save_revision') {
     const text = formData.get('question_text')?.toString().trim() || '';
-    const category = formData.get('category')?.toString() as WellnessCategory;
+    const rawCategory = formData.get('category')?.toString().trim() || '';
+    const category = getDbCategoryForDomain(rawCategory);
+    const adaptive_trigger_group = `clinical_domain:${rawCategory}`;
     const optionLabels = formData.getAll('option_text[]').map((v) => v.toString().trim());
     const optionCodes = formData.getAll('option_code[]').map((v) => v.toString().trim());
     const optionScores = formData.getAll('option_score[]').map((v) => parseFloat(v.toString()));
 
-    if (!text || !category || optionLabels.some((l) => !l) || optionScores.some((s) => isNaN(s))) {
+    if (!text || !rawCategory || optionLabels.some((l) => !l) || optionScores.some((s) => isNaN(s))) {
       message = 'Every field, including each option, is required.';
       isError = true;
     } else {
       const result = await updateQuestionWithOptions(
         supabase,
         id,
-        { text, category, review_notes: null },
+        { text, category, adaptive_trigger_group, review_notes: null },
         optionCodes.map((code, idx) => ({
           option_code: code || `OPT_${idx + 1}`,
           label: optionLabels[idx],
@@ -101,11 +100,12 @@ if (!question) {
 // policy back this up, but the UI should never even offer the option.
 const isOwnItem = question.authored_by === user.id;
 const alreadyReviewed = !!question.clinical_reviewed_at;
+const currentDomainId = getClinicalDomainId(question.category, (question as any).adaptive_trigger_group);
 const sortedOptions = (question.options || []).slice().sort((a, b) => a.order_index - b.order_index);
 ---
 
 <ClinicianLayout title="Peer Review" activePath="/clinician/review">
-  <PageHeader title={isOwnItem ? 'Your Draft' : 'Peer Review'} subtitle={`W${question.week_number ?? '—'} · ${question.category.replace(/_/g, ' ')}`}>
+  <PageHeader title={isOwnItem ? 'Your Draft' : 'Peer Review'} subtitle={`W${question.week_number ?? '—'} · ${getClinicalDomainLabel(question.category, (question as any).adaptive_trigger_group)}`}>
     <a href="/clinician/dashboard?tab=review">
       <Button variant="outline" size="sm">&larr; Back to Queue</Button>
     </a>
@@ -144,8 +144,8 @@ const sortedOptions = (question.options || []).slice().sort((a, b) => a.order_in
             label="Domain (Category)"
             name="category"
             required
-            value={question.category}
-            options={CATEGORIES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') }))}
+            value={currentDomainId}
+            options={CLINICAL_DOMAINS.map((d) => ({ value: d.id, label: d.label }))}
           />
         </div>
 

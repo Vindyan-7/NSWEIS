@@ -17,6 +17,7 @@ import {
   deleteOrDeactivateQuestion,
 } from '../../services/clinician';
 import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers, Pencil, ChevronDown, ListChecks } from '@lucide/astro';
+import { getClinicalDomainLabel } from '../../services/clinical-domains';
 
 const user = Astro.locals.user;
 const supabase = createSupabaseServerClient(Astro);
@@ -81,7 +82,7 @@ if (activeTab === 'drafts') {
   activeQuestions = await getActiveQuestions(supabase);
 }
 
-const categoryLabel = (cat: string) => cat.replace(/_/g, ' ');
+const categoryLabel = (cat: string, trig?: string | null) => getClinicalDomainLabel(cat, trig);
 
 // Distinct week numbers for Active Library filtering
 const weekNumbers = Array.from(new Set(activeQuestions.map((q) => q.week_number || 1))).sort((a, b) => a - b);
@@ -144,7 +145,7 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
                 <div class="q-tags">
                   <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-DRAFT'}</span>
                   <span class="q-week-badge">Week {q.week_number || 1}</span>
-                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category, (q as any).adaptive_trigger_group)}</Badge>
                   {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
                   {q.clinical_reviewed_at ? (
                     <Badge variant="watch" size="sm">Reviewed — awaiting activation</Badge>
@@ -190,7 +191,7 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
                 <div class="q-tags">
                   <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-REVIEW'}</span>
                   <span class="q-week-badge">Week {q.week_number || 1}</span>
-                  <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                  <Badge variant="neutral" size="sm">{categoryLabel(q.category, (q as any).adaptive_trigger_group)}</Badge>
                   {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
                   <span class="q-author">by {q.author_name || 'another clinician'}</span>
                 </div>
@@ -273,7 +274,7 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
                           <div class="q-tags">
                             <span class="q-code-badge">{q.question_code || (q as any).code || 'Q-ACTIVE'}</span>
                             <span class="q-week-badge">Week {q.week_number || weekNum}</span>
-                            <Badge variant="neutral" size="sm">{categoryLabel(q.category)}</Badge>
+                            <Badge variant="neutral" size="sm">{categoryLabel(q.category, (q as any).adaptive_trigger_group)}</Badge>
                             {q.depth_level && <Badge variant="primary" size="sm">{q.depth_level}</Badge>}
                             <Badge variant="stable" size="sm">Active</Badge>
                             <span class="q-options-badge">
