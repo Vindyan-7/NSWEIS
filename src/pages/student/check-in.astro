@@ -146,7 +146,65 @@ if (Astro.request.method === 'POST' && activeCycle && user) {
             console.log(`[CHECKIN START] assignment generation completed: ${genRes.assignments.length} assignments generated`);
           }
         }
+      } else if (assessment && (assessment.status === 'in_progress' || assessment.status === 'not_started')) {
+        // Explicit restart/start of an expired, exited, or not_started assessment:
+        // Transition status to 'in_progress' and update started_at to current timestamp so fresh session timer begins.
+        // Preserves existing assessment ID and question assignments.
+        console.log(`[CHECKIN START] starting assessment session for user: ${user.id}, assessment: ${assessment.id}`);
+        const nowIso = new Date().toISOString();
+        const { data: restartedAssessment, error: restartError } = await (supabase.from('assessments') as any)
+          .update({
+            status: 'in_progress',
+            started_at: nowIso,
+          })
+          .eq('id', assessment.id)
+          .select()
+          .single();
+
+        if (restartError || !restartedAssessment) {
+          console.error('[CHECKIN START] assessment session start/restart failed:', restartError);
+          errorMessage = 'Could not start your weekly reflection session. Please try again.';
+        } else {
+          assessment = restartedAssessment as any;
+          console.log(`[CHECKIN START] assessment session started successfully: ${(restartedAssessment as any).id}`);
+
+          // Ensure question assignments exist (preserving any existing assignments)
+          const existingAssigns = await getStudentQuestionAssignments(supabase, user.id, activeCycle.id);
+          if (existingAssigns.length === 0) {
+            await generateStudentQuestionAssignment(supabase, user.id, activeCycle.id, studentDeptCode);
+          }
+        }
       }
+    } else if (actionType === 'exit_assessment') {
+      // D. Exit Assessment Action (Intentional exit confirmed by student)
+      if (assessment && assessment.status === 'in_progress') {
+        console.log(`[CHECKIN EXIT] student ${user.id} explicitly exiting in-progress assessment ${assessment.id}`);
+
+        // 1. Delete unsubmitted draft responses for this uncompleted assessment attempt only
+        const { error: delErr } = await (supabase.from('assessment_responses') as any)
+          .delete()
+          .eq('assessment_id', assessment.id);
+
+        if (delErr) {
+          console.error('[CHECKIN EXIT] failed to clear draft responses:', delErr);
+        }
+
+        // 2. Transition assessment status to 'not_started'
+        const { error: updErr } = await (supabase.from('assessments') as any)
+          .update({ status: 'not_started' })
+          .eq('id', assessment.id);
+
+        if (updErr) {
+          console.error('[CHECKIN EXIT] failed to update status to not_started:', updErr);
+        }
+      }
+
+      // Safe internal destination redirect (prevent arbitrary open redirect)
+      let dest = formData.get('destination')?.toString() || '/student/dashboard';
+      if (!dest.startsWith('/') || dest.startsWith('//')) {
+        dest = '/student/dashboard';
+      }
+      return Astro.redirect(dest);
     } else if (assessment && (actionType === 'crisis_ack' || actionType === 'crisis_connect')) {
       // C. Crisis interstitial actions — only meaningful on a completed,
       // acute-band assessment. Handled before the completed-redirect below
@@ -334,6 +392,15 @@ const nowMs = Date.now();
 const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
 const remainingSeconds = Math.max(0, REQUIRED_SESSION_SECONDS - elapsedSeconds);
 const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
+
+// Session lifecycle evaluation:
+// 1. NO ASSESSMENT: !assessment
+// 2. NOT STARTED (exited): assessment.status === 'not_started'
+// 3. ACTIVE IN-PROGRESS: assessment.status === 'in_progress' && elapsedSeconds < REQUIRED_SESSION_SECONDS
+// 4. EXPIRED IN-PROGRESS: assessment.status === 'in_progress' && elapsedSeconds >= REQUIRED_SESSION_SECONDS
+// 5. COMPLETED: assessment.status === 'completed'
+const isSessionExpired = assessment?.status === 'in_progress' && elapsedSeconds >= REQUIRED_SESSION_SECONDS;
+const shouldShowStartCard = !assessment || assessment?.status === 'not_started' || isSessionExpired;
 ---
 
 <StudentLayout title="Weekly Check-in" activePath="/student/check-in">
@@ -363,7 +430,7 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
           <div class="crisis-icon"><HeartHandshake size={32} aria-hidden="true" /></div>
           <h2 id="crisis-title">Before you go — some real support, right now</h2>
           <p id="crisis-desc" class="crisis-desc">
-            Some of what you shared suggests things have been genuinely hard lately. NSWEIS
+            Some of what you shared suggests things have been genuinely hard lately. NSWESI
             isn't a crisis service itself, but these are real people who are trained for
             exactly this, available right now, at no cost to you.
           </p>
@@ -446,8 +513,8 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
           </div>
         </div>
       </Card>
-    ) : !assessment ? (
-      /* Clean Week 1 Introduction Card (Shown before student starts session) */
+    ) : shouldShowStartCard ? (
+      /* Clean Week 1 Introduction Card (Shown before student starts session or when session has expired) */
       <Card padding="lg" class="start-session-card">
         <div class="start-session-box">
           <span class="cycle-tag">{activeCycle.name}</span>
@@ -546,11 +613,9 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
             <PrivacyNotice variant="compact" />
 
             <div class="session-nav-actions">
-              <a href="/student/dashboard">
-                <Button variant="outline" type="button">
-                  &larr; Leave Reflection
-                </Button>
-              </a>
+              <Button variant="outline" type="button" id="leave-reflection-trigger">
+                &larr; Leave Reflection
+              </Button>
               
               <div class="submit-action-group">
                 <Button
@@ -586,6 +651,30 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
             </div>
           </form>
         </Card>
+
+        {/* Hidden Exit Assessment Form */}
+        <form id="exit-reflection-form" method="POST" style="display: none;">
+          <input type="hidden" name="action_type" value="exit_assessment" />
+          <input type="hidden" name="destination" id="exit-destination-input" value="/student/dashboard" />
+        </form>
+
+        {/* Exit Confirmation Dialog */}
+        <div id="exit-dialog-overlay" class="exit-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="exit-modal-title" aria-describedby="exit-modal-desc" style="display: none;">
+          <div class="exit-modal-card">
+            <h3 id="exit-modal-title" class="exit-modal-title">Leave this reflection?</h3>
+            <p id="exit-modal-desc" class="exit-modal-desc">
+              Your answers won't be saved if you leave now. You can start a fresh reflection when you return.
+            </p>
+            <div class="exit-modal-actions">
+              <button type="button" id="exit-modal-stay-btn" class="exit-btn-stay">
+                Stay & Continue
+              </button>
+              <button type="button" id="exit-modal-exit-btn" class="exit-btn-confirm">
+                Exit Reflection
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     )}
   </div>
@@ -670,6 +759,103 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
     }
 
     updateState();
+
+    // --- Navigation Interception & Exit Confirmation ---
+    var overlay = document.getElementById('exit-dialog-overlay');
+    var stayBtn = document.getElementById('exit-modal-stay-btn');
+    var exitBtn = document.getElementById('exit-modal-exit-btn');
+    var exitForm = document.getElementById('exit-reflection-form');
+    var destInput = document.getElementById('exit-destination-input');
+    var leaveTrigger = document.getElementById('leave-reflection-trigger');
+
+    var pendingDestination = '/student/dashboard';
+    var isSubmittingAssessment = false;
+    var isExiting = false;
+
+    function openExitModal(destination) {
+      if (destination) pendingDestination = destination;
+      if (destInput) destInput.value = pendingDestination;
+      if (overlay) {
+        overlay.style.display = 'flex';
+        if (stayBtn) stayBtn.focus();
+      }
+    }
+
+    function closeExitModal() {
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+
+    if (stayBtn) {
+      stayBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        closeExitModal();
+      });
+    }
+
+    if (exitBtn && exitForm) {
+      exitBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        isExiting = true;
+        exitForm.submit();
+      });
+    }
+
+    if (leaveTrigger) {
+      leaveTrigger.addEventListener('click', function (e) {
+        e.preventDefault();
+        openExitModal('/student/dashboard');
+      });
+    }
+
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+          closeExitModal();
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.style.display === 'flex') {
+          closeExitModal();
+        }
+      });
+    }
+
+    if (form) {
+      form.addEventListener('submit', function () {
+        isSubmittingAssessment = true;
+      });
+    }
+
+    // Intercept internal student portal navigation link clicks
+    document.addEventListener('click', function (e) {
+      if (isSubmittingAssessment || isExiting) return;
+      var link = e.target.closest('a');
+      if (!link) return;
+
+      var href = link.getAttribute('href');
+      if (!href) return;
+      if (href.startsWith('#') || href.startsWith('javascript:')) return;
+
+      var currentPath = window.location.pathname;
+      if (href === currentPath || href === '/student/check-in') return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      openExitModal(href);
+    }, true);
+
+    // Browser / Mobile Back navigation handling via popstate
+    if (window.history && window.history.pushState) {
+      window.history.pushState({ inAssessment: true }, '', window.location.href);
+
+      window.addEventListener('popstate', function () {
+        if (isSubmittingAssessment || isExiting) return;
+        window.history.pushState({ inAssessment: true }, '', window.location.href);
+        openExitModal('/student/dashboard');
+      });
+    }
   })();
 </script>
 
@@ -1128,5 +1314,115 @@ const isTimerCompleteOnServer = elapsedSeconds >= REQUIRED_SESSION_SECONDS;
   .crisis-consent-note {
     font-size: 0.75rem;
     color: var(--color-text-muted);
+  }
+
+  /* Exit Confirmation Modal */
+  .exit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4, 1rem);
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .exit-modal-card {
+    background: var(--color-bg-card, #ffffff);
+    border-radius: var(--radius-lg, 1rem);
+    padding: var(--space-6, 1.5rem);
+    max-width: 26rem;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+    border: 1px solid var(--color-border-subtle, #e2e8f0);
+    text-align: center;
+    animation: exitModalIn 0.15s ease-out;
+  }
+
+  @keyframes exitModalIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .exit-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main, #0f172a);
+    margin: 0 0 var(--space-3, 0.75rem) 0;
+  }
+
+  .exit-modal-desc {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--color-text-muted, #64748b);
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .exit-modal-actions {
+    display: flex;
+    gap: var(--space-3, 0.75rem);
+    justify-content: center;
+  }
+
+  .exit-btn-stay {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    background: var(--color-primary-600, #00A896);
+    color: #ffffff;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .exit-btn-stay:hover {
+    background: var(--color-primary-700, #008f80);
+  }
+
+  .exit-btn-confirm {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    background: transparent;
+    color: var(--color-text-muted, #64748b);
+    border: 1px solid var(--color-border-default, #cbd5e1);
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .exit-btn-confirm:hover {
+    background: var(--color-bg-subtle, #f8fafc);
+    color: var(--color-text-main, #0f172a);
+    border-color: var(--color-border-strong, #94a3b8);
+  }
+
+  @media (max-width: 480px) {
+    .exit-modal-actions {
+      flex-direction: column-reverse;
+      width: 100%;
+    }
+    .exit-btn-stay,
+    .exit-btn-confirm {
+      width: 100%;
+    }
   }
 </style>

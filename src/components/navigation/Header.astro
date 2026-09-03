@@ -1,5 +1,6 @@
 ---
 import Avatar from '../ui/Avatar.astro';
+import NSWESILogo from '../brand/NSWESILogo.astro';
 
 interface Props {
   userName?: string;
@@ -14,8 +15,7 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
   <div class="header-content">
     <div class="header-left">
       <div class="mobile-brand-mark">
-        <div class="brand-logo-badge font-bold">NS</div>
-        <span class="brand-app-name font-bold">NSWEIS</span>
+        <NSWESILogo variant="compact" size="xs" href="/" />
       </div>
       <slot name="left" />
     </div>
@@ -69,26 +69,6 @@ const { userName = 'Guest', userRole = 'User', avatarUrl } = Astro.props;
     display: none;
     align-items: center;
     gap: 0.5rem;
-  }
-
-  .brand-logo-badge {
-    width: 2rem;
-    height: 2rem;
-    background-color: var(--color-primary-600);
-    color: #ffffff;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 800;
-  }
-
-  .brand-app-name {
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-    letter-spacing: -0.01em;
   }
 
   .header-right {

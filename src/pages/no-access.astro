@@ -2,12 +2,16 @@
 import PublicLayout from '../layouts/PublicLayout.astro';
 import Card from '../components/ui/Card.astro';
 import Button from '../components/ui/Button.astro';
+import NSWESILogo from '../components/brand/NSWESILogo.astro';
 import { ShieldAlert } from '@lucide/astro';
 ---
 
-<PublicLayout title="Access not configured — NSWEIS">
+<PublicLayout title="Access not configured — NSWESI">
   <main class="na-wrap">
     <Card padding="lg" class="na-card">
+      <div class="na-brand-header">
+        <NSWESILogo variant="compact" size="sm" href="/" />
+      </div>
       <div class="na-icon"><ShieldAlert size={28} aria-hidden="true" /></div>
       <h1>Your account isn't set up yet</h1>
       <p>
@@ -16,7 +20,7 @@ import { ShieldAlert } from '@lucide/astro';
       </p>
       <p class="na-help">
         If you're a student, ask your college's well-being coordinator. If you're
-        staff, contact whoever set up NSWEIS at your institution.
+        staff, contact whoever set up NSWESI at your institution.
       </p>
       <form action="/logout" method="POST">
         <Button type="submit" variant="secondary">Sign out</Button>
@@ -28,6 +32,7 @@ import { ShieldAlert } from '@lucide/astro';
 <style>
   .na-wrap { display: grid; place-items: center; min-height: 70vh; padding: var(--space-6, 1.5rem); }
   .na-card { max-width: 34rem; text-align: center; }
+  .na-brand-header { display: flex; justify-content: center; margin-bottom: var(--space-4); }
   .na-icon {
     display: inline-grid; place-items: center;
     width: 3.5rem; height: 3.5rem; border-radius: 999px;

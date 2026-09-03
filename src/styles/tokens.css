@@ -1,4 +1,19 @@
 :root {
+  /* NSWESI Official Brand Palette (Source: Brand Board) */
+  --brand-navy: #0D1B3D;
+  --brand-blue: #0A6680;
+  --brand-teal: #00A896;
+  --brand-teal-light: #2EC4B6;
+  --brand-purple: #6A4C93;
+  --brand-purple-light: #B388FF;
+  --brand-neutral: #F2F4F7;
+
+  /* Semantic Brand Tokens */
+  --brand-primary: var(--brand-teal);
+  --brand-secondary: var(--brand-navy);
+  --brand-accent: var(--brand-purple);
+  --surface-neutral: var(--brand-neutral);
+
   /* Colors - Core */
   --color-primary-50: #eef2ff;
   --color-primary-100: #e0e7ff;

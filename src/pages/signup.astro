@@ -10,6 +10,7 @@ import {
   EyeOff,
   Check,
 } from '@lucide/astro';
+import NSWESILogo from '../components/brand/NSWESILogo.astro';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '../lib/supabase/server';
 import { updateStudentConsent } from '../services/privacy';
 import {
@@ -244,6 +245,9 @@ if (Astro.request.method === 'POST') {
         /* DEDICATED SUCCESS EXPERIENCE (PHASE 20.1)                    */
         /* ============================================================ */
         <div class="success-experience-card" role="region" aria-label="Account Created Successfully">
+          <div class="success-brand-header">
+            <NSWESILogo variant="compact" size="sm" />
+          </div>
           <div class="success-icon-badge" aria-hidden="true">
             <CheckCircle2 size={38} class="success-check-icon" />
           </div>
@@ -335,6 +339,9 @@ if (Astro.request.method === 'POST') {
         /* ============================================================ */
         <>
           <header class="onboarding-hero text-center">
+            <div class="onboarding-brand-wrap">
+              <NSWESILogo variant="compact" size="md" href="/" />
+            </div>
             <div class="privacy-pill">
               <Lock size={12} class="privacy-pill-icon" aria-hidden="true" />
               <span>Private student onboarding</span>
@@ -1023,6 +1030,18 @@ if (Astro.request.method === 'POST') {
   /* ------------------------------------------------------------ */
   .onboarding-hero {
     margin-bottom: 1.75rem;
+  }
+
+  .onboarding-brand-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .success-brand-header {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
   }
 
   .privacy-pill {

@@ -59,7 +59,14 @@ const credits = user ? await getStudentCreditBalance(supabase, user.id) : { curr
 const userRecs = user ? await getStudentRecommendations(supabase, user.id) : [];
 const topRecommendation = userRecs.length > 0 ? userRecs[0] : null;
 
-const checkInStatus = currentAssessment ? currentAssessment.status : 'not_started';
+const sessionDurationMins = (activeCycle as any)?.session_duration_minutes || 10;
+const isCurrentAssessmentExpired = currentAssessment?.status === 'in_progress' &&
+  currentAssessment.started_at &&
+  (Date.now() - new Date(currentAssessment.started_at).getTime()) >= sessionDurationMins * 60 * 1000;
+
+const checkInStatus = (!currentAssessment || isCurrentAssessmentExpired)
+  ? 'not_started'
+  : currentAssessment.status;
 
 const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
   week: `Week ${idx + 1}`,

@@ -4,6 +4,7 @@ import Card from '../components/ui/Card.astro';
 import Input from '../components/ui/Input.astro';
 import Button from '../components/ui/Button.astro';
 import Alert from '../components/ui/Alert.astro';
+import NSWESILogo from '../components/brand/NSWESILogo.astro';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '../lib/supabase/server';
 import { validateLoginInput } from '../lib/validation/schemas';
 import { getDashboardForRole } from '../lib/permissions/roles';
@@ -71,9 +72,11 @@ if (Astro.request.method === 'POST') {
   <div class="login-container">
     <Card padding="lg" class="login-card glass-panel">
       <div class="login-header">
-        <div class="brand-wordmark">NSWESI</div>
-        <h1 class="login-title">Welcome back</h1>
-        <p class="login-sub">Sign in to your NSWESI account to access your portal</p>
+        <div class="login-brand-wrap">
+          <NSWESILogo variant="full" size="md" showSubtitle={true} showTagline={false} />
+        </div>
+        <h1 class="login-title">Account Portal Sign In</h1>
+        <p class="login-sub">Sign in to access your confidential wellbeing dashboard</p>
       </div>
 
       {errorMessage && <Alert type="error" title="Sign In Failed">{errorMessage}</Alert>}
@@ -151,12 +154,8 @@ if (Astro.request.method === 'POST') {
     gap: var(--space-2);
   }
 
-  .brand-wordmark {
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--color-primary-600);
-    margin-bottom: var(--space-1);
+  .login-brand-wrap {
+    margin-bottom: var(--space-3);
   }
 
   .login-title {

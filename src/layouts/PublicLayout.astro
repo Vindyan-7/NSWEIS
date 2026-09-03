@@ -1,6 +1,7 @@
 ---
 import '../styles/globals.css';
 import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+import NSWESILogo from '../components/brand/NSWESILogo.astro';
 
 interface Props {
   title: string;
@@ -11,7 +12,6 @@ interface Props {
 
 const {
   title,
-  brandName = 'NSWESI',
   minimalNav = false,
   navRightAction,
 } = Astro.props;
@@ -23,6 +23,10 @@ const {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} — NSWESI</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0D1B3D" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -34,9 +38,7 @@ const {
     <div class="public-layout">
       <header class="public-nav glass-panel">
         <div class="container nav-content">
-          <a href="/" class="nav-brand" aria-label="NSWESI Home">
-            <span class="brand-title">{brandName}</span>
-          </a>
+          <NSWESILogo variant="compact" size="sm" href="/" />
           <div class="nav-links">
             {navRightAction ? (
               <div class="nav-auth-switch">
@@ -61,7 +63,7 @@ const {
       <footer class="public-footer">
         <div class="container footer-content">
           <PrivacyNotice variant="compact" />
-          <p class="footer-copy">&copy; 2026 National Student Well-being Early Intervention System (NSWEIS). Non-clinical early-intervention ecosystem.</p>
+          <p class="footer-copy">&copy; 2026 National Student Wellbeing & Emotional Support Intelligence (NSWESI). Non-clinical early-intervention ecosystem.</p>
         </div>
       </footer>
     </div>

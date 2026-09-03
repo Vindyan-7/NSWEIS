@@ -1,0 +1,415 @@
+---
+interface Props {
+  variant?: 'full' | 'horizontal' | 'compact' | 'symbol' | 'wordmark' | 'favicon';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
+  theme?: 'auto' | 'light' | 'dark';
+  showSubtitle?: boolean;
+  showTagline?: boolean;
+  href?: string;
+  class?: string;
+  alt?: string;
+}
+
+const {
+  variant = 'compact',
+  size = 'md',
+  theme = 'auto',
+  showSubtitle = variant === 'full' || variant === 'horizontal',
+  showTagline = variant === 'full',
+  href,
+  class: className = '',
+  alt = 'NSWESI - National Student Wellbeing & Emotional Support Intelligence',
+} = Astro.props;
+
+// Size map for symbol dimensions
+const sizeMap: Record<string, { symbol: number; wordmark: string; subtitle: string }> = {
+  xs: { symbol: 24, wordmark: '1.1rem', subtitle: '0.55rem' },
+  sm: { symbol: 32, wordmark: '1.35rem', subtitle: '0.625rem' },
+  md: { symbol: 40, wordmark: '1.65rem', subtitle: '0.7rem' },
+  lg: { symbol: 56, wordmark: '2.1rem', subtitle: '0.8rem' },
+  xl: { symbol: 80, wordmark: '2.75rem', subtitle: '0.925rem' },
+};
+
+const dimensions = typeof size === 'number'
+  ? { symbol: size, wordmark: `${size * 0.045}rem`, subtitle: `${size * 0.02}rem` }
+  : (sizeMap[size] || sizeMap.md);
+
+const isDark = theme === 'dark';
+const symbolSrc = isDark ? '/brand/nswesi-dark-lockup.png' : '/brand/nswesi-symbol.png';
+---
+
+{href ? (
+  <a
+    href={href}
+    class={`nswesi-brand-root nswesi-variant-${variant} nswesi-theme-${theme} ${className}`}
+    aria-label={alt}
+  >
+    {/* Favicon / App Icon Variant */}
+    {variant === 'favicon' && (
+      <img
+        src="/brand/nswesi-app-icon.png"
+        alt={alt}
+        width={dimensions.symbol}
+        height={dimensions.symbol}
+        class="nswesi-app-icon-img"
+      />
+    )}
+
+    {/* Symbol Only */}
+    {variant === 'symbol' && (
+      <img
+        src={symbolSrc}
+        alt={alt}
+        width={dimensions.symbol}
+        height={dimensions.symbol}
+        class="nswesi-symbol-img"
+      />
+    )}
+
+    {/* Wordmark Only */}
+    {variant === 'wordmark' && (
+      <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+        NSWESI
+      </span>
+    )}
+
+    {/* Compact (Symbol + Wordmark) */}
+    {variant === 'compact' && (
+      <div class="nswesi-lockup-horizontal">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol}
+          height={dimensions.symbol}
+          class="nswesi-symbol-img"
+        />
+        <div class="nswesi-text-col">
+          <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+            NSWESI
+          </span>
+          {showSubtitle && (
+            <span class="nswesi-subtitle-text" style={`font-size: ${dimensions.subtitle};`}>
+              National Student Wellbeing
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Horizontal (Symbol + NSWESI + Subtitle) */}
+    {variant === 'horizontal' && (
+      <div class="nswesi-lockup-horizontal">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol}
+          height={dimensions.symbol}
+          class="nswesi-symbol-img"
+        />
+        <div class="nswesi-divider-bar" aria-hidden="true"></div>
+        <div class="nswesi-text-col">
+          <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+            NSWESI
+          </span>
+          {showSubtitle && (
+            <span class="nswesi-subtitle-text" style={`font-size: ${dimensions.subtitle};`}>
+              NATIONAL STUDENT WELLBEING &amp; EMOTIONAL SUPPORT INTELLIGENCE
+            </span>
+          )}
+          {showTagline && (
+            <span class="nswesi-tagline-text">
+              Student <span class="text-teal">Wellbeing</span>. Stronger <span class="text-purple">Institutions</span>. Better <span class="text-blue">Tomorrow</span>.
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Full Stacked */}
+    {variant === 'full' && (
+      <div class="nswesi-lockup-stacked">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol * 1.5}
+          height={dimensions.symbol * 1.5}
+          class="nswesi-symbol-img"
+        />
+        <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+          NSWESI
+        </span>
+        {showSubtitle && (
+          <span class="nswesi-subtitle-text text-center" style={`font-size: ${dimensions.subtitle};`}>
+            NATIONAL STUDENT WELLBEING &amp; EMOTIONAL SUPPORT INTELLIGENCE
+          </span>
+        )}
+        {showTagline && (
+          <div class="nswesi-tagline-wrap">
+            <div class="nswesi-heart-divider">
+              <span class="divider-line"></span>
+              <span class="divider-heart">♥</span>
+              <span class="divider-line"></span>
+            </div>
+            <span class="nswesi-tagline-text text-center">
+              Student <span class="text-teal">Wellbeing</span>. Stronger <span class="text-purple">Institutions</span>. Better <span class="text-blue">Tomorrow</span>.
+            </span>
+          </div>
+        )}
+      </div>
+    )}
+  </a>
+) : (
+  <div
+    class={`nswesi-brand-root nswesi-variant-${variant} nswesi-theme-${theme} ${className}`}
+    role="img"
+    aria-label={alt}
+  >
+    {/* Favicon / App Icon Variant */}
+    {variant === 'favicon' && (
+      <img
+        src="/brand/nswesi-app-icon.png"
+        alt={alt}
+        width={dimensions.symbol}
+        height={dimensions.symbol}
+        class="nswesi-app-icon-img"
+      />
+    )}
+
+    {/* Symbol Only */}
+    {variant === 'symbol' && (
+      <img
+        src={symbolSrc}
+        alt={alt}
+        width={dimensions.symbol}
+        height={dimensions.symbol}
+        class="nswesi-symbol-img"
+      />
+    )}
+
+    {/* Wordmark Only */}
+    {variant === 'wordmark' && (
+      <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+        NSWESI
+      </span>
+    )}
+
+    {/* Compact (Symbol + Wordmark) */}
+    {variant === 'compact' && (
+      <div class="nswesi-lockup-horizontal">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol}
+          height={dimensions.symbol}
+          class="nswesi-symbol-img"
+        />
+        <div class="nswesi-text-col">
+          <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+            NSWESI
+          </span>
+          {showSubtitle && (
+            <span class="nswesi-subtitle-text" style={`font-size: ${dimensions.subtitle};`}>
+              National Student Wellbeing
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Horizontal (Symbol + NSWESI + Subtitle) */}
+    {variant === 'horizontal' && (
+      <div class="nswesi-lockup-horizontal">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol}
+          height={dimensions.symbol}
+          class="nswesi-symbol-img"
+        />
+        <div class="nswesi-divider-bar" aria-hidden="true"></div>
+        <div class="nswesi-text-col">
+          <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+            NSWESI
+          </span>
+          {showSubtitle && (
+            <span class="nswesi-subtitle-text" style={`font-size: ${dimensions.subtitle};`}>
+              NATIONAL STUDENT WELLBEING &amp; EMOTIONAL SUPPORT INTELLIGENCE
+            </span>
+          )}
+          {showTagline && (
+            <span class="nswesi-tagline-text">
+              Student <span class="text-teal">Wellbeing</span>. Stronger <span class="text-purple">Institutions</span>. Better <span class="text-blue">Tomorrow</span>.
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Full Stacked */}
+    {variant === 'full' && (
+      <div class="nswesi-lockup-stacked">
+        <img
+          src={symbolSrc}
+          alt=""
+          aria-hidden="true"
+          width={dimensions.symbol * 1.5}
+          height={dimensions.symbol * 1.5}
+          class="nswesi-symbol-img"
+        />
+        <span class="nswesi-wordmark-text" style={`font-size: ${dimensions.wordmark};`}>
+          NSWESI
+        </span>
+        {showSubtitle && (
+          <span class="nswesi-subtitle-text text-center" style={`font-size: ${dimensions.subtitle};`}>
+            NATIONAL STUDENT WELLBEING &amp; EMOTIONAL SUPPORT INTELLIGENCE
+          </span>
+        )}
+        {showTagline && (
+          <div class="nswesi-tagline-wrap">
+            <div class="nswesi-heart-divider">
+              <span class="divider-line"></span>
+              <span class="divider-heart">♥</span>
+              <span class="divider-line"></span>
+            </div>
+            <span class="nswesi-tagline-text text-center">
+              Student <span class="text-teal">Wellbeing</span>. Stronger <span class="text-purple">Institutions</span>. Better <span class="text-blue">Tomorrow</span>.
+            </span>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+)}
+
+<style>
+  .nswesi-brand-root {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    line-height: 1;
+    color: inherit;
+  }
+
+  .nswesi-symbol-img,
+  .nswesi-app-icon-img {
+    display: block;
+    object-fit: contain;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .nswesi-brand-root:hover .nswesi-symbol-img {
+    transform: scale(1.02);
+  }
+
+  .nswesi-lockup-horizontal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .nswesi-lockup-stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .nswesi-divider-bar {
+    width: 1.5px;
+    height: 38px;
+    background: #cbd5e1;
+    border-radius: 1px;
+    flex-shrink: 0;
+    margin: 0 0.15rem;
+  }
+
+  .nswesi-text-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+  }
+
+  .nswesi-wordmark-text {
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--brand-navy, #0D1B3D);
+    line-height: 1;
+  }
+
+  .nswesi-theme-dark .nswesi-wordmark-text {
+    color: #ffffff;
+  }
+
+  .nswesi-subtitle-text {
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--brand-blue, #0A6680);
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .nswesi-theme-dark .nswesi-subtitle-text {
+    color: #93c5fd;
+  }
+
+  .nswesi-tagline-text {
+    font-size: 0.725rem;
+    font-weight: 500;
+    color: #475569;
+    margin-top: 0.25rem;
+    letter-spacing: 0.02em;
+  }
+
+  .nswesi-theme-dark .nswesi-tagline-text {
+    color: #cbd5e1;
+  }
+
+  .nswesi-heart-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0.35rem 0;
+  }
+
+  .divider-line {
+    flex: 1;
+    max-width: 80px;
+    height: 1px;
+    background: #cbd5e1;
+  }
+
+  .divider-heart {
+    color: var(--brand-teal, #00A896);
+    font-size: 0.75rem;
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .text-teal {
+    color: var(--brand-teal, #00A896);
+    font-weight: 600;
+  }
+
+  .text-purple {
+    color: var(--brand-purple, #6A4C93);
+    font-weight: 600;
+  }
+
+  .text-blue {
+    color: var(--brand-blue, #0A6680);
+    font-weight: 600;
+  }
+</style>

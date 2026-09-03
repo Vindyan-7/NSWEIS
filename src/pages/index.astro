@@ -4,6 +4,7 @@ import Button from '../components/ui/Button.astro';
 import Card from '../components/ui/Card.astro';
 import Badge from '../components/ui/Badge.astro';
 import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
+import NSWESILogo from '../components/brand/NSWESILogo.astro';
 import {
   ClipboardCheck,
   Sparkles,
@@ -17,16 +18,19 @@ import {
 } from '@lucide/astro';
 ---
 
-<PublicLayout title="National Student Well-being Early Intervention System">
+<PublicLayout title="National Student Wellbeing & Emotional Support Intelligence">
   {/* Hero Section */}
   <section class="hero-section">
     <div class="container hero-content">
       <div class="hero-text">
+        <div class="hero-brand-header">
+          <NSWESILogo variant="full" size="lg" showSubtitle={true} showTagline={true} />
+        </div>
         <div class="hero-badge-group">
-          <span class="hero-badge">Civic Policy Infrastructure</span>
+          <span class="hero-badge">Civic Wellbeing Infrastructure</span>
           <Badge variant="stable" size="sm">Non-Clinical & Privacy-First</Badge>
         </div>
-        <h1 class="hero-title">National Student Well-being Early Intervention System</h1>
+        <h1 class="hero-title">National Student Wellbeing & Emotional Support Intelligence</h1>
         <p class="hero-desc">
           A privacy-first civic platform connecting confidential student self-reflection with anonymous institutional intelligence and evidence-informed government policy.
         </p>
@@ -57,7 +61,7 @@ import {
         <span class="section-eyebrow">System Workflow</span>
         <h2 class="section-title">5-Stage Early Intervention Architecture</h2>
         <p class="section-subtitle">
-          How NSWEIS converts confidential student reflection into proactive campus interventions and regional policy coordination.
+          How NSWESI converts confidential student reflection into proactive campus interventions and regional policy coordination.
         </p>
       </div>
 
@@ -200,7 +204,7 @@ import {
   {/* Final Call To Action & Privacy Notice */}
   <section class="container cta-section">
     <Card padding="lg" class="cta-card text-center">
-      <h2>Ready to Explore the NSWEIS Ecosystem?</h2>
+      <h2>Ready to Explore the NSWESI Ecosystem?</h2>
       <p>Log in with role-based demo credentials to experience the multi-tenant workflow.</p>
       <div class="cta-actions">
         <a href="/login">
@@ -237,6 +241,10 @@ import {
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
+  }
+
+  .hero-brand-header {
+    margin-bottom: var(--space-2);
   }
 
   .hero-badge-group {
