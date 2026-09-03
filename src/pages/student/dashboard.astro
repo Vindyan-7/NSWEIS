@@ -22,7 +22,7 @@ import {
   getStudentCreditBalance,
 } from '../../services/student-tasks';
 import { getStudentRecommendations } from '../../services/recommendations';
-import { ListChecks, Coins, CheckCircle2, ArrowRight, Sparkles } from '@lucide/astro';
+import { ListChecks, Coins, CheckCircle2, ArrowRight, Sparkles, PhoneCall } from '@lucide/astro';
 
 import { createPrivacyRequest } from '../../services/privacy';
 
@@ -166,26 +166,55 @@ const initialSupportivePhrase = SUPPORTIVE_PHRASES[Math.abs(serverDaySeed) % SUP
       </div>
     </Card>
 
-    {/* Contact College Counsellor Card */}
-    <Card padding="md" class="counsellor-card p-4 bg-primary-50 border border-primary-200 rounded-xl">
-      <div class="flex justify-between items-center gap-4 flex-wrap">
-        <div>
-          <h4 class="font-bold text-primary-900 text-sm">Need to speak with someone on campus?</h4>
-          <p class="text-xs text-primary-700 mt-0.5">
-            Contact your College Officer to coordinate confidential human support. Your private check-in answers remain confidential.
-          </p>
+    {/* Support Channels: Campus Counsellor & Tele-MANAS */}
+    <div class="support-channels-grid">
+      {/* Contact College Counsellor Card */}
+      <Card padding="md" class="support-channel-card counsellor-card p-4 bg-primary-50 border border-primary-200 rounded-xl">
+        <div class="support-card-inner">
+          <div class="support-card-content">
+            <span class="support-card-tag">Campus Support</span>
+            <h4 class="font-bold text-primary-900 text-sm">Need to speak with someone on campus?</h4>
+            <p class="text-xs text-primary-700 mt-1">
+              Contact your College Officer to coordinate confidential human support. Your private check-in answers remain confidential.
+            </p>
+          </div>
+          <div class="support-card-action">
+            <form method="POST">
+              <input type="hidden" name="action_type" value="contact_counsellor" />
+              <Button type="submit" variant="primary" size="sm">Contact Counsellor</Button>
+            </form>
+          </div>
         </div>
-        <form method="POST">
-          <input type="hidden" name="action_type" value="contact_counsellor" />
-          <Button type="submit" variant="primary" size="sm">Contact Counsellor</Button>
-        </form>
-      </div>
-      {supportMessage && (
-        <p class="text-xs text-success font-semibold mt-2 pt-2 border-t border-primary-200">
-          ✓ {supportMessage}
-        </p>
-      )}
-    </Card>
+        {supportMessage && (
+          <p class="text-xs text-success font-semibold mt-2 pt-2 border-t border-primary-200">
+            ✓ {supportMessage}
+          </p>
+        )}
+      </Card>
+
+      {/* Tele-MANAS Support Card */}
+      <Card padding="md" class="support-channel-card telemanas-card p-4 bg-teal-50 border border-teal-200 rounded-xl">
+        <div class="support-card-inner">
+          <div class="support-card-content">
+            <span class="support-card-tag telemanas-tag">National Support &bull; Toll-Free</span>
+            <h4 class="font-bold text-primary-900 text-sm">Need someone to talk to?</h4>
+            <div class="telemanas-subline">
+              <span class="telemanas-brand">Tele-MANAS</span>
+              <span class="telemanas-service">&bull; Free mental-health support available by phone.</span>
+            </div>
+            <p class="text-xs text-primary-700 mt-1">
+              Confidential, round-the-clock supportive listening provided by trained national counsellors.
+            </p>
+          </div>
+          <div class="support-card-action">
+            <a href="tel:14416" class="telemanas-call-btn" aria-label="Call Tele-MANAS free helpline at 14416">
+              <PhoneCall size={14} aria-hidden="true" />
+              <span>Call Tele-MANAS — 14416</span>
+            </a>
+          </div>
+        </div>
+      </Card>
+    </div>
 
     {/* Your Week Activity & Progress Widget */}
     <Card padding="lg">
@@ -449,6 +478,95 @@ const initialSupportivePhrase = SUPPORTIVE_PHRASES[Math.abs(serverDaySeed) % SUP
   .highlighted-rec-desc {
     font-size: 0.8125rem;
     color: var(--color-text-muted);
+  }
+
+  /* Support Channels Grid (Counsellor + Tele-MANAS) */
+  .support-channels-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .support-channel-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  .support-card-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .support-card-tag {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-primary-700);
+    margin-bottom: var(--space-1);
+  }
+
+  .support-card-tag.telemanas-tag {
+    color: #0d9488;
+  }
+
+  .telemanas-subline {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    margin-top: 2px;
+    flex-wrap: wrap;
+  }
+
+  .telemanas-brand {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #0f766e;
+  }
+
+  .telemanas-service {
+    font-size: 0.75rem;
+    color: #115e59;
+  }
+
+  .telemanas-card {
+    background-color: #f0fdfa !important;
+    border-color: #ccfbf1 !important;
+  }
+
+  .telemanas-call-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: #0d9488;
+    color: #ffffff;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: background-color var(--transition-fast, 0.15s ease);
+    white-space: nowrap;
+    min-height: 38px;
+  }
+
+  .telemanas-call-btn:hover {
+    background-color: #0f766e;
+    color: #ffffff;
+  }
+
+  @media (max-width: 900px) {
+    .support-channels-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 767px) {

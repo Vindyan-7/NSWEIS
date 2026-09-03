@@ -3,7 +3,7 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
-import { LayoutDashboard, FilePlus2, ClipboardCheck, Flag } from '@lucide/astro';
+import { LayoutDashboard, FilePlus2, ClipboardCheck, Flag, TrendingUp } from '@lucide/astro';
 
 interface Props {
   title: string;
@@ -16,6 +16,7 @@ const profile = Astro.locals.profile;
 
 const clinicianNav = [
   { label: 'Dashboard', href: '/clinician/dashboard', icon: LayoutDashboard, active: activePath === '/clinician/dashboard' },
+  { label: 'Wellbeing Insights', href: '/clinician/insights', icon: TrendingUp, active: activePath === '/clinician/insights' },
   { label: 'Author Question', href: '/clinician/questions/new', icon: FilePlus2, active: activePath === '/clinician/questions/new' },
   { label: 'Peer Review', href: '/clinician/dashboard?tab=review', icon: ClipboardCheck, active: activePath === '/clinician/review' },
   { label: 'Flags', href: '/clinician/flags', icon: Flag, active: activePath === '/clinician/flags' },
@@ -45,9 +46,15 @@ const clinicianNav = [
       <div class="app-main-area">
         <Header userName={profile?.full_name || user?.email || 'Clinician'} userRole="Clinician" />
         <main class="app-content container">
-          <div class="scope-banner">
-            You see the instrument only — no student data, cohort counts, or campus names appear anywhere in this portal.
-          </div>
+          {activePath === '/clinician/insights' ? (
+            <div class="scope-banner">
+              Aggregate statistical view — strictly de-identified. Individual student responses, reflections, and groups under 10 students are privacy-protected.
+            </div>
+          ) : (
+            <div class="scope-banner">
+              You see the instrument only — no student data, cohort counts, or campus names appear anywhere in this portal.
+            </div>
+          )}
           <slot />
         </main>
       </div>

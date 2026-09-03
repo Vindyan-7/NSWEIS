@@ -16,7 +16,7 @@ import {
   getActiveQuestions,
   deleteOrDeactivateQuestion,
 } from '../../services/clinician';
-import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers, Pencil, ChevronDown, ListChecks } from '@lucide/astro';
+import { FilePlus2, ClipboardCheck, Flag, CheckCircle2, ArrowRight, Trash2, Layers, Pencil, ChevronDown, ListChecks, TrendingUp } from '@lucide/astro';
 import { getClinicalDomainLabel } from '../../services/clinical-domains';
 
 const user = Astro.locals.user;
@@ -104,11 +104,18 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
 
 <ClinicianLayout title="Clinician Dashboard" activePath={layoutActivePath}>
   <PageHeader title="Question Bank" subtitle="Author, review, and maintain the instrument.">
-    <a href="/clinician/questions/new">
-      <Button variant="primary" size="md">
-        <FilePlus2 size={16} aria-hidden="true" /> Author a Question
-      </Button>
-    </a>
+    <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+      <a href="/clinician/insights">
+        <Button variant="outline" size="md">
+          <TrendingUp size={16} aria-hidden="true" /> Wellbeing Insights
+        </Button>
+      </a>
+      <a href="/clinician/questions/new">
+        <Button variant="primary" size="md">
+          <FilePlus2 size={16} aria-hidden="true" /> Author a Question
+        </Button>
+      </a>
+    </div>
   </PageHeader>
 
   {message && (
@@ -131,6 +138,9 @@ const layoutActivePath = activeTab === 'review' ? '/clinician/review' : '/clinic
       Flags {counts.flagged > 0 && <span class="tab-count">{counts.flagged}</span>}
     </a>
     <a href="?tab=active" class={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}>Active Library</a>
+    <a href="/clinician/insights" class="tab-btn" style="color: var(--color-primary-700); font-weight: 600;">
+      <TrendingUp size={14} aria-hidden="true" style="margin-right: 4px;" /> Wellbeing Insights &rarr;
+    </a>
   </div>
 
   {activeTab === 'drafts' && (

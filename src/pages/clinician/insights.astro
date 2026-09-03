@@ -1,0 +1,864 @@
+---
+import ClinicianLayout from '../../layouts/ClinicianLayout.astro';
+import PageHeader from '../../components/navigation/PageHeader.astro';
+import Card from '../../components/ui/Card.astro';
+import MetricCard from '../../components/ui/MetricCard.astro';
+import Badge from '../../components/ui/Badge.astro';
+import Button from '../../components/ui/Button.astro';
+import { createSupabaseServerClient } from '../../lib/supabase/server';
+import { getProfile } from '../../services/users';
+import { getClinicalWellbeingInsights } from '../../services/clinical-analytics';
+import {
+  TrendingUp,
+  ShieldCheck,
+  AlertCircle,
+  Users,
+  Calendar,
+  Layers,
+  ArrowRight,
+  Info,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+} from '@lucide/astro';
+
+const user = Astro.locals.user;
+const supabase = createSupabaseServerClient(Astro);
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getProfile(supabase, user.id);
+
+if (!profile || profile.role !== 'clinician') {
+  return Astro.redirect('/no-access');
+}
+
+const insights = await getClinicalWellbeingInsights(supabase, profile);
+
+const bandBadgeVariant = (band: string | null): any => {
+  if (band === 'stable') return 'stable';
+  if (band === 'watch') return 'watch';
+  if (band === 'needs_attention') return 'needs_attention';
+  if (band === 'elevated') return 'elevated';
+  return 'neutral';
+};
+---
+
+<ClinicianLayout title="Student Wellbeing Insights" activePath="/clinician/insights">
+  <PageHeader
+    title="Student Wellbeing Insights"
+    subtitle={`De-identified aggregate patterns & indicator distributions for ${insights.cycle?.name || 'Active Cycle'}`}
+  >
+    <a href="/clinician/dashboard">
+      <Button variant="outline" size="sm">&larr; Back to Question Bank</Button>
+    </a>
+  </PageHeader>
+
+  <div class="clinical-insights-page">
+    {/* Non-Clinical Advisory Disclaimer */}
+    <div class="clinical-disclaimer-banner" role="note">
+      <div class="disclaimer-icon-wrap">
+        <Info size={18} class="text-primary-600" aria-hidden="true" />
+      </div>
+      <div class="disclaimer-text">
+        <strong>Non-Clinical Early Awareness Notice:</strong> {insights.disclaimer}
+      </div>
+    </div>
+
+    {/* Section 1: Overview Cards */}
+    <div class="metrics-grid">
+      <MetricCard
+        title="Students Assessed"
+        value={insights.overview.is_suppressed ? 'Privacy Protected (N < 10)' : String(insights.overview.completed_assessments_count ?? 0)}
+        change={insights.overview.is_suppressed ? 'Withheld (<10 students)' : `Eligible pool: ${insights.overview.total_eligible_students}`}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Participation Rate"
+        value={insights.overview.is_suppressed ? 'Privacy Protected (N < 10)' : `${(insights.overview.participation_rate ?? 0).toFixed(1)}%`}
+        change={insights.overview.is_suppressed ? 'Withheld (<10 students)' : 'Completed active cycle'}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Current Wellbeing Signal"
+        value={insights.weekly_trends.is_suppressed || !insights.weekly_trends.cycles[0]?.dominant_band ? 'Privacy Protected (N < 10)' : (
+          insights.weekly_trends.cycles[0].dominant_band === 'stable' ? 'Positive / Stable' :
+          insights.weekly_trends.cycles[0].dominant_band === 'watch' ? 'Watch / Mild' :
+          insights.weekly_trends.cycles[0].dominant_band === 'needs_attention' ? 'Needs Attention' : 'Higher Attention'
+        )}
+        change={insights.weekly_trends.cycles[0]?.average_overall_score !== null ? `Average score: ${insights.weekly_trends.cycles[0].average_overall_score}/10` : 'Aggregate pattern'}
+        changeType="neutral"
+      />
+      <MetricCard
+        title="Areas to Review"
+        value={insights.overview.is_suppressed ? 'Privacy Protected (N < 10)' : `${insights.areas_to_review.length} Categories`}
+        change={insights.overview.is_suppressed ? 'Withheld' : 'Showing increased attention'}
+        changeType="neutral"
+      />
+    </div>
+
+    {/* Section 2: Wellbeing Distribution */}
+    <Card padding="lg" class="section-card">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">Wellbeing Distribution</h3>
+          <p class="section-subtitle">
+            Aggregate student distribution across established NSWESI wellbeing indicator bands.
+          </p>
+        </div>
+        <div class="privacy-badge-pill">
+          <ShieldCheck size={14} aria-hidden="true" />
+          <span>{insights.privacy.rule}</span>
+        </div>
+      </div>
+
+      {insights.wellbeing_distribution.is_suppressed ? (
+        <div class="suppression-callout">
+          <ShieldCheck size={20} class="text-teal" aria-hidden="true" />
+          <div>
+            <strong>Privacy Protected (N &lt; 10):</strong>
+            <p>
+              Aggregate group participation is below the mandatory anonymity threshold. Exact band distributions are withheld to protect student privacy.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div class="bands-distribution-grid">
+          {insights.wellbeing_distribution.bands.map((b) => (
+            <div class={`band-stat-card band-${b.band}`}>
+              <div class="band-card-header">
+                <span class="band-name">{b.label}</span>
+                <Badge variant={bandBadgeVariant(b.band)} size="sm">{b.band.replace('_', ' ')}</Badge>
+              </div>
+
+              {b.is_suppressed ? (
+                <div class="band-protected-val">
+                  <span class="protected-label">Privacy Protected (N &lt; 10)</span>
+                </div>
+              ) : (
+                <div class="band-values-wrap">
+                  <div class="band-main-number">
+                    <span class="band-percent">{b.percentage}%</span>
+                    <span class="band-raw">({b.count} reflections)</span>
+                  </div>
+                  <div class="band-meter-bar">
+                    <div class={`band-meter-fill fill-${b.band}`} style={`width: ${Math.max(b.percentage || 0, 4)}%`}></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
+    {/* Section 3: Category Insights */}
+    <Card padding="lg" class="section-card">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">Category Insights</h3>
+          <p class="section-subtitle">
+            Average indicator scores across the 10 wellness domains configured in the assessment instrument.
+          </p>
+        </div>
+        <span class="domain-scale-note">Score Scale: 0.0 (High strain) &rarr; 10.0 (High vitality)</span>
+      </div>
+
+      <div class="table-responsive-container">
+        <table class="clinical-data-table">
+          <thead>
+            <tr>
+              <th>Wellness Domain</th>
+              <th>Current Average</th>
+              <th>Dominant Band</th>
+              <th>Previous Period Comparison</th>
+              <th>Status Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {insights.category_insights.map((ci) => (
+              <tr>
+                <td class="category-name-cell">
+                  <span class="category-title">{ci.displayName}</span>
+                  <span class="category-code">{ci.category}</span>
+                </td>
+
+                <td class="score-cell">
+                  {ci.is_suppressed ? (
+                    <span class="protected-text">Privacy Protected (N &lt; 10)</span>
+                  ) : (
+                    <div class="score-display">
+                      <span class="score-bold">{ci.average_score?.toFixed(1)}</span>
+                      <span class="score-out-of">/10</span>
+                    </div>
+                  )}
+                </td>
+
+                <td>
+                  {ci.is_suppressed ? (
+                    <span class="protected-text">Privacy Protected (N &lt; 10)</span>
+                  ) : (
+                    <Badge variant={bandBadgeVariant(ci.dominant_band)} size="sm">
+                      {ci.dominant_band?.replace('_', ' ') || 'Unassigned'}
+                    </Badge>
+                  )}
+                </td>
+
+                <td class="comparison-cell">
+                  <span class="historical-note">
+                    <Clock size={12} aria-hidden="true" />
+                    {ci.previous_period_comparison}
+                  </span>
+                </td>
+
+                <td>
+                  {ci.is_suppressed ? (
+                    <span class="signal-tag neutral">Protected</span>
+                  ) : (ci.average_score !== null && ci.average_score < 4.0) ? (
+                    <span class="signal-tag attention">Increased Attention</span>
+                  ) : (ci.average_score !== null && ci.average_score < 6.0) ? (
+                    <span class="signal-tag watch">Review Trend</span>
+                  ) : (
+                    <span class="signal-tag stable">Balanced Pattern</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Section 4: Areas to Review */}
+    <Card padding="lg" class="section-card">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">Areas to Review</h3>
+          <p class="section-subtitle">
+            Descriptive aggregate patterns that differ from campus baselines and may warrant clinician attention.
+          </p>
+        </div>
+        <span class="areas-badge">{insights.areas_to_review.length} Patterns Identified</span>
+      </div>
+
+      {insights.areas_to_review.length === 0 ? (
+        <div class="empty-review-state">
+          <CheckCircle2 size={32} class="text-success" aria-hidden="true" />
+          <h4>No Aggregate Elevation Patterns Detected</h4>
+          <p>All unsuppressed category indicators are currently balanced within expected baseline parameters.</p>
+        </div>
+      ) : (
+        <div class="areas-grid">
+          {insights.areas_to_review.map((area) => (
+            <div class="area-review-card">
+              <div class="area-card-header">
+                <span class="area-signal-badge">
+                  <AlertCircle size={14} aria-hidden="true" />
+                  {area.attention_signal}
+                </span>
+                <Badge variant={bandBadgeVariant(area.dominant_band)} size="sm">
+                  {area.dominant_band?.replace('_', ' ')}
+                </Badge>
+              </div>
+
+              <h4 class="area-title">{area.pattern_title}</h4>
+              <p class="area-description">{area.pattern_description}</p>
+
+              <div class="area-footer">
+                <div class="area-score-wrap">
+                  <span class="area-score-lbl">Aggregate Score:</span>
+                  <span class="area-score-val">{area.average_score?.toFixed(1)}/10</span>
+                </div>
+                <span class="review-hint">Descriptive pattern for support planning</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+
+    {/* Section 5: Weekly Trends */}
+    <Card padding="lg" class="section-card">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">Weekly Trends</h3>
+          <p class="section-subtitle">
+            Tracking longitudinal wellbeing shifts across active academic check-in cycles.
+          </p>
+        </div>
+        <span class="cycle-pill">
+          <Calendar size={14} aria-hidden="true" />
+          {insights.cycle?.name || 'Cycle 1'}
+        </span>
+      </div>
+
+      <div class="weekly-cycles-track">
+        {insights.weekly_trends.cycles.map((cyc) => (
+          <div class="cycle-trend-card">
+            <div class="cycle-card-top">
+              <span class="cycle-num">Week {cyc.week_number}</span>
+              <span class="cycle-status-tag">Active Period</span>
+            </div>
+            <h4 class="cycle-name">{cyc.name}</h4>
+
+            {cyc.is_suppressed ? (
+              <div class="cycle-protected-box">
+                <span class="protected-text">Privacy Protected (N &lt; 10)</span>
+              </div>
+            ) : (
+              <div class="cycle-stats-list">
+                <div class="cycle-stat-item">
+                  <span class="stat-lbl">Reflections Completed</span>
+                  <span class="stat-val">{cyc.completed_count}</span>
+                </div>
+                <div class="cycle-stat-item">
+                  <span class="stat-lbl">Overall Indicator</span>
+                  <span class="stat-val">{cyc.average_overall_score?.toFixed(1)}/10</span>
+                </div>
+                <div class="cycle-stat-item">
+                  <span class="stat-lbl">Dominant Band</span>
+                  <span class="stat-val">
+                    <Badge variant={bandBadgeVariant(cyc.dominant_band)} size="sm">
+                      {cyc.dominant_band?.replace('_', ' ') || 'Stable'}
+                    </Badge>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Honest Historical Placeholder */}
+        <div class="cycle-trend-card historical-empty-card">
+          <div class="historical-empty-inner">
+            <Clock size={24} class="text-muted" aria-hidden="true" />
+            <h4 class="hist-title">Prior Periods</h4>
+            <p class="hist-desc">
+              {insights.weekly_trends.historical_status}. As future weekly check-in cycles close, longitudinal comparative lines will populate here.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  </div>
+</ClinicianLayout>
+
+<style>
+  .clinical-insights-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    margin-top: var(--space-4);
+  }
+
+  /* Non-Clinical Disclaimer Banner */
+  .clinical-disclaimer-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--radius-md);
+  }
+
+  .disclaimer-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .disclaimer-text {
+    font-size: 0.8125rem;
+    color: var(--color-primary-900);
+    line-height: 1.5;
+  }
+
+  /* Metrics Grid */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+
+  /* Section Card */
+  .section-card {
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-4);
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0;
+  }
+
+  .section-subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    margin-bottom: 0;
+  }
+
+  .privacy-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: #f0fdfa;
+    color: #0d9488;
+    border: 1px solid #ccfbf1;
+    border-radius: var(--radius-full);
+  }
+
+  .domain-scale-note, .areas-badge, .cycle-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-subtle);
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  /* Suppression Callout */
+  .suppression-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  .suppression-callout p {
+    margin: var(--space-1) 0 0 0;
+    font-size: 0.8125rem;
+  }
+
+  /* Bands Distribution Grid */
+  .bands-distribution-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+
+  .band-stat-card {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-subtle);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .band-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+
+  .band-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .band-main-number {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .band-percent {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+  }
+
+  .band-raw {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .band-meter-bar {
+    width: 100%;
+    height: 6px;
+    background-color: rgba(0, 0, 0, 0.06);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+
+  .band-meter-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+  }
+
+  .band-meter-fill.fill-stable { background-color: var(--color-band-stable, #10b981); }
+  .band-meter-fill.fill-watch { background-color: var(--color-band-improving, #06b6d4); }
+  .band-meter-fill.fill-needs_attention { background-color: var(--color-band-attention, #f59e0b); }
+  .band-meter-fill.fill-elevated { background-color: var(--color-band-elevated, #f43f5e); }
+
+  .band-protected-val {
+    padding: var(--space-2) 0;
+  }
+
+  .protected-text, .protected-label {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--color-text-muted);
+  }
+
+  /* Table */
+  .table-responsive-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .clinical-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+
+  .clinical-data-table th {
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    border-bottom: 2px solid var(--color-border-subtle);
+    white-space: nowrap;
+  }
+
+  .clinical-data-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: middle;
+  }
+
+  .category-name-cell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .category-title {
+    font-weight: 600;
+    color: var(--color-text-main);
+  }
+
+  .category-code {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .score-display {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+
+  .score-bold {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .score-out-of {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .historical-note {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .signal-tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-sm);
+  }
+
+  .signal-tag.attention {
+    background-color: #fff1f2;
+    color: #e11d48;
+    border: 1px solid #ffe4e6;
+  }
+
+  .signal-tag.watch {
+    background-color: #fefce8;
+    color: #ca8a04;
+    border: 1px solid #fef08a;
+  }
+
+  .signal-tag.stable {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+
+  .signal-tag.neutral {
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+  }
+
+  /* Areas to Review */
+  .areas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
+
+  .area-review-card {
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-subtle);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .area-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .area-signal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #b91c1c;
+  }
+
+  .area-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0 0 var(--space-2) 0;
+  }
+
+  .area-description {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    margin: 0 0 var(--space-4) 0;
+  }
+
+  .area-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border-subtle);
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .area-score-wrap {
+    display: flex;
+    gap: var(--space-1);
+    align-items: baseline;
+  }
+
+  .area-score-lbl {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+  }
+
+  .area-score-val {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .review-hint {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+  }
+
+  .empty-review-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-8) var(--space-4);
+    gap: var(--space-2);
+  }
+
+  .empty-review-state h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--color-text-main);
+  }
+
+  .empty-review-state p {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  /* Weekly Trends */
+  .weekly-cycles-track {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
+
+  .cycle-trend-card {
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-subtle);
+  }
+
+  .cycle-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+  }
+
+  .cycle-num {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-primary-700);
+    letter-spacing: 0.05em;
+  }
+
+  .cycle-status-tag {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    background-color: #dcfce7;
+    color: #15803d;
+  }
+
+  .cycle-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .cycle-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .cycle-stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8125rem;
+  }
+
+  .stat-lbl {
+    color: var(--color-text-muted);
+  }
+
+  .stat-val {
+    font-weight: 700;
+    color: var(--color-text-main);
+  }
+
+  .historical-empty-card {
+    border-style: dashed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .historical-empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-4);
+    gap: var(--space-2);
+  }
+
+  .hist-title {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-main);
+  }
+
+  .hist-desc {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  /* Responsive Breakdown */
+  @media (max-width: 1024px) {
+    .metrics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bands-distribution-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .areas-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .weekly-cycles-track {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .metrics-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .bands-distribution-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
