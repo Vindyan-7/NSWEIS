@@ -244,4 +244,14 @@ const institutions = await getAllInstitutions(supabase);
   .capitalize {
     text-transform: capitalize;
   }
+
+  @media (max-width: 640px) {
+    .admin-modules-grid {
+      grid-template-columns: 1fr;
+    }
+    .module-actions a,
+    .module-actions button {
+      width: 100%;
+    }
+  }
 </style>

@@ -1,0 +1,977 @@
+---
+import NSWESILogo from '../brand/NSWESILogo.astro';
+import {
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  ShieldCheck,
+  Compass,
+  Heart,
+  Lock,
+  BookOpen,
+  Moon
+} from '@lucide/astro';
+
+interface Props {
+  activePath?: string;
+  isDev?: boolean;
+}
+
+const { activePath = '/student/dashboard', isDev = import.meta.env.DEV } = Astro.props;
+
+// Only mount on the student dashboard
+const shouldRender = activePath === '/student/dashboard';
+---
+
+{shouldRender && (
+  <div
+    id="student-onboarding-modal"
+    class="onboarding-overlay is-hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="onboarding-slide-title"
+    data-is-dev={isDev ? 'true' : 'false'}
+    tabindex="-1"
+  >
+    <div class="onboarding-card" id="onboarding-card">
+      <!-- Top Utility Header -->
+      <header class="onboarding-top-bar">
+        <div class="onboarding-brand">
+          <NSWESILogo variant="compact" size="sm" showSubtitle={false} showTagline={false} />
+        </div>
+
+        <div class="onboarding-top-right">
+          <span class="dev-preview-badge is-hidden" id="dev-preview-badge" title="Development preview mode (?onboarding_preview=1)">
+            Onboarding preview
+          </span>
+          <button
+            type="button"
+            class="btn-skip-onboarding"
+            id="btn-skip-onboarding"
+            aria-label="Skip onboarding and enter dashboard"
+          >
+            Skip for now
+          </button>
+        </div>
+      </header>
+
+      <!-- Slides Viewport -->
+      <div class="onboarding-slides-viewport" id="onboarding-viewport">
+        <div class="onboarding-slides-track" id="onboarding-track">
+          
+          <!-- SLIDE 1: WELCOME -->
+          <section
+            class="onboarding-slide is-active"
+            data-slide-index="0"
+            aria-label="Slide 1 of 4: Welcome"
+          >
+            <div class="slide-visual-canvas">
+              <div class="visual-glow-rings">
+                <span class="glow-ring ring-1"></span>
+                <span class="glow-ring ring-2"></span>
+              </div>
+              <div class="visual-symbol-node">
+                <Compass size={36} class="symbol-icon text-teal" aria-hidden="true" />
+              </div>
+              <div class="visual-floating-badge badge-welcome">
+                <Heart size={14} class="text-teal" aria-hidden="true" />
+                <span>Wellbeing Space</span>
+              </div>
+            </div>
+
+            <div class="slide-content">
+              <h2 class="slide-title" id="onboarding-slide-title">Welcome to NSWESI</h2>
+              <p class="slide-desc">
+                A simple space to pause, reflect, and understand your wellbeing over time.
+              </p>
+            </div>
+          </section>
+
+          <!-- SLIDE 2: WEEKLY REFLECTION -->
+          <section
+            class="onboarding-slide"
+            data-slide-index="1"
+            aria-label="Slide 2 of 4: Weekly Reflection"
+          >
+            <div class="slide-visual-canvas">
+              <div class="reflection-trajectory">
+                <div class="trajectory-node">
+                  <span class="node-pill">Reflect</span>
+                </div>
+                <div class="trajectory-arrow">&rarr;</div>
+                <div class="trajectory-node">
+                  <span class="node-pill">Understand</span>
+                </div>
+                <div class="trajectory-arrow">&rarr;</div>
+                <div class="trajectory-node">
+                  <span class="node-pill highlight">Grow</span>
+                </div>
+              </div>
+              <div class="visual-floating-badge badge-reflection">
+                <CheckCircle2 size={14} class="text-teal" aria-hidden="true" />
+                <span>~10 Mins Weekly</span>
+              </div>
+            </div>
+
+            <div class="slide-content">
+              <h2 class="slide-title">Take a few minutes to check in</h2>
+              <p class="slide-desc">
+                Your weekly reflection gives you a regular moment to think about how things are going and notice patterns over time.
+              </p>
+            </div>
+          </section>
+
+          <!-- SLIDE 3: PERSONAL SUPPORT -->
+          <section
+            class="onboarding-slide"
+            data-slide-index="2"
+            aria-label="Slide 3 of 4: Personal Support"
+          >
+            <div class="slide-visual-canvas">
+              <div class="guidance-cards-preview">
+                <div class="preview-mini-card card-sleep">
+                  <Moon size={15} class="preview-icon text-indigo" aria-hidden="true" />
+                  <div class="preview-text">
+                    <span class="preview-title">Sleep & Rest</span>
+                    <span class="preview-sub">Calm evening routine</span>
+                  </div>
+                </div>
+                <div class="preview-mini-card card-academic">
+                  <BookOpen size={15} class="preview-icon text-teal" aria-hidden="true" />
+                  <div class="preview-text">
+                    <span class="preview-title">Study Rhythm</span>
+                    <span class="preview-sub">Focused pacing</span>
+                  </div>
+                </div>
+              </div>
+              <div class="visual-floating-badge badge-guidance">
+                <Sparkles size={14} class="text-amber" aria-hidden="true" />
+                <span>Non-Clinical Guidance</span>
+              </div>
+            </div>
+
+            <div class="slide-content">
+              <h2 class="slide-title">Get guidance made for your journey</h2>
+              <p class="slide-desc">
+                After your reflection, NSWESI can provide personalized, non-clinical wellbeing suggestions and small actions you can explore.
+              </p>
+            </div>
+          </section>
+
+          <!-- SLIDE 4: PRIVACY -->
+          <section
+            class="onboarding-slide"
+            data-slide-index="3"
+            aria-label="Slide 4 of 4: Privacy"
+          >
+            <div class="slide-visual-canvas">
+              <div class="privacy-shield-cluster">
+                <div class="shield-badge-main">
+                  <ShieldCheck size={38} class="shield-icon text-teal" aria-hidden="true" />
+                </div>
+                <div class="privacy-tag-pill">
+                  <Lock size={12} class="text-teal" aria-hidden="true" />
+                  <span>Anonymized Group Aggregates Only</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="slide-content">
+              <h2 class="slide-title">Your reflection is private</h2>
+              <p class="slide-desc">
+                Your individual responses are kept separate from institutional insights. Colleges and government staff see protected aggregate patterns, not your personal answers.
+              </p>
+              <p class="slide-notice">
+                Small groups are protected to preserve privacy.
+              </p>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Navigation & Progress Footer -->
+      <footer class="onboarding-footer">
+        <div class="footer-nav-left">
+          <button
+            type="button"
+            class="btn-nav btn-back is-hidden"
+            id="btn-onboarding-back"
+            aria-label="Previous slide"
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Back</span>
+          </button>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div class="onboarding-indicators" role="tablist" aria-label="Slide indicators">
+          <button type="button" class="dot-indicator is-active" data-index="0" role="tab" aria-selected="true" aria-label="Go to slide 1"></button>
+          <button type="button" class="dot-indicator" data-index="1" role="tab" aria-selected="false" aria-label="Go to slide 2"></button>
+          <button type="button" class="dot-indicator" data-index="2" role="tab" aria-selected="false" aria-label="Go to slide 3"></button>
+          <button type="button" class="dot-indicator" data-index="3" role="tab" aria-selected="false" aria-label="Go to slide 4"></button>
+        </div>
+
+        <div class="footer-nav-right">
+          <button
+            type="button"
+            class="btn-nav btn-next"
+            id="btn-onboarding-next"
+            aria-label="Next slide"
+          >
+            <span>Next</span>
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            class="btn-nav btn-start is-hidden"
+            id="btn-onboarding-start"
+            aria-label="Complete onboarding and enter dashboard"
+          >
+            <span>Let's get started</span>
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+)}
+
+<script>
+  function setupStudentOnboarding() {
+    const modal = document.getElementById('student-onboarding-modal');
+    if (!modal) return;
+
+    const isDev = modal.getAttribute('data-is-dev') === 'true';
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPreview = isDev && urlParams.get('onboarding_preview') === '1';
+
+    const STORAGE_KEY = 'nswesi_student_onboarding_completed';
+    const isCompleted = localStorage.getItem(STORAGE_KEY) === 'true';
+
+    // In preview mode or if not completed, show the onboarding
+    if (isPreview) {
+      const devBadge = document.getElementById('dev-preview-badge');
+      if (devBadge) devBadge.classList.remove('is-hidden');
+      openModal();
+    } else if (!isCompleted) {
+      openModal();
+    } else {
+      // Already completed and not in preview
+      modal.classList.add('is-hidden');
+      return;
+    }
+
+    // Modal state
+    let currentSlide = 0;
+    const totalSlides = 4;
+
+    const track = document.getElementById('onboarding-track');
+    const slides = modal.querySelectorAll<HTMLElement>('.onboarding-slide');
+    const dots = modal.querySelectorAll<HTMLElement>('.dot-indicator');
+    const btnBack = document.getElementById('btn-onboarding-back') as HTMLButtonElement | null;
+    const btnNext = document.getElementById('btn-onboarding-next') as HTMLButtonElement | null;
+    const btnStart = document.getElementById('btn-onboarding-start') as HTMLButtonElement | null;
+    const btnSkip = document.getElementById('btn-skip-onboarding') as HTMLButtonElement | null;
+    const viewport = document.getElementById('onboarding-viewport');
+
+    function openModal() {
+      modal?.classList.remove('is-hidden');
+      document.body.style.overflow = 'hidden';
+      // Focus modal for accessibility
+      modal?.focus();
+    }
+
+    function closeModal(markCompleted = true) {
+      if (markCompleted && !isPreview) {
+        try {
+          localStorage.setItem(STORAGE_KEY, 'true');
+        } catch (e) {
+          console.warn('[Onboarding] localStorage access error:', e);
+        }
+      }
+      modal?.classList.add('fade-out');
+      setTimeout(() => {
+        modal?.classList.add('is-hidden');
+        modal?.classList.remove('fade-out');
+        document.body.style.overflow = '';
+      }, 200);
+    }
+
+    function goToSlide(index: number) {
+      if (index < 0 || index >= totalSlides) return;
+      currentSlide = index;
+
+      // Move track
+      if (track) {
+        track.style.transform = `translateX(-${currentSlide * 100}%)`;
+      }
+
+      // Update slide active classes
+      slides.forEach((slide, idx) => {
+        if (idx === currentSlide) {
+          slide.classList.add('is-active');
+        } else {
+          slide.classList.remove('is-active');
+        }
+      });
+
+      // Update dots
+      dots.forEach((dot, idx) => {
+        const isActive = idx === currentSlide;
+        dot.classList.toggle('is-active', isActive);
+        dot.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+
+      // Update Back button
+      if (btnBack) {
+        if (currentSlide === 0) {
+          btnBack.classList.add('is-hidden');
+        } else {
+          btnBack.classList.remove('is-hidden');
+        }
+      }
+
+      // Update Next vs Start button
+      if (currentSlide === totalSlides - 1) {
+        btnNext?.classList.add('is-hidden');
+        btnStart?.classList.remove('is-hidden');
+        btnStart?.focus();
+      } else {
+        btnNext?.classList.remove('is-hidden');
+        btnStart?.classList.add('is-hidden');
+      }
+    }
+
+    // Event listeners
+    btnNext?.addEventListener('click', () => {
+      goToSlide(currentSlide + 1);
+    });
+
+    btnBack?.addEventListener('click', () => {
+      goToSlide(currentSlide - 1);
+    });
+
+    btnStart?.addEventListener('click', () => {
+      closeModal(true);
+    });
+
+    btnSkip?.addEventListener('click', () => {
+      closeModal(true);
+    });
+
+    // Dot navigation
+    dots.forEach((dot) => {
+      dot.addEventListener('click', () => {
+        const targetIndex = parseInt(dot.getAttribute('data-index') || '0', 10);
+        goToSlide(targetIndex);
+      });
+    });
+
+    // Keyboard navigation
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        if (currentSlide < totalSlides - 1) {
+          goToSlide(currentSlide + 1);
+        } else {
+          closeModal(true);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentSlide > 0) {
+          goToSlide(currentSlide - 1);
+        }
+      } else if (e.key === 'Escape') {
+        closeModal(true);
+      }
+    });
+
+    // Lightweight Mobile Swipe Gestures
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    viewport?.addEventListener('touchstart', (e: TouchEvent) => {
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    viewport?.addEventListener('touchend', (e: TouchEvent) => {
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipeGesture();
+    }, { passive: true });
+
+    function handleSwipeGesture() {
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      const minSwipeDistance = 45;
+
+      // Ensure horizontal swipe is dominant
+      if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX < 0) {
+          // Swipe Left -> Next
+          if (currentSlide < totalSlides - 1) {
+            goToSlide(currentSlide + 1);
+          }
+        } else {
+          // Swipe Right -> Back
+          if (currentSlide > 0) {
+            goToSlide(currentSlide - 1);
+          }
+        }
+      }
+    }
+  }
+
+  // Run on first load and Astro view transitions
+  setupStudentOnboarding();
+  document.addEventListener('astro:page-load', setupStudentOnboarding);
+</script>
+
+<style>
+  /* ------------------------------------------------------------ */
+  /* OVERLAY & MODAL BACKDROP                                     */
+  /* ------------------------------------------------------------ */
+  .onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 27, 61, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: var(--space-4, 1rem);
+    opacity: 1;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  .onboarding-overlay.is-hidden {
+    display: none !important;
+  }
+
+  .onboarding-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* ONBOARDING CARD CONTAINER                                    */
+  /* ------------------------------------------------------------ */
+  .onboarding-card {
+    background: #ffffff;
+    border-radius: var(--radius-2xl, 1.25rem);
+    width: 100%;
+    max-width: 500px;
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(13, 27, 61, 0.35);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    position: relative;
+    overflow: hidden;
+    animation: cardScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes cardScaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* TOP BAR                                                      */
+  /* ------------------------------------------------------------ */
+  .onboarding-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+    flex-shrink: 0;
+  }
+
+  .onboarding-top-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .dev-preview-badge {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #4338ca;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-skip-onboarding {
+    background: transparent;
+    border: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-md, 6px);
+    transition: color 0.15s ease, background 0.15s ease;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .btn-skip-onboarding:hover {
+    color: #0f172a;
+    background: #f1f5f9;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* SLIDES VIEWPORT & TRACK                                      */
+  /* ------------------------------------------------------------ */
+  .onboarding-slides-viewport {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    touch-action: pan-y;
+  }
+
+  .onboarding-slides-track {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.32s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .onboarding-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    padding: 1.5rem 1.75rem 1rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* SLIDE VISUALS                                                */
+  /* ------------------------------------------------------------ */
+  .slide-visual-canvas {
+    width: 100%;
+    height: 170px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .visual-glow-rings {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .glow-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(0, 168, 150, 0.25);
+  }
+
+  .glow-ring.ring-1 {
+    width: 110px;
+    height: 110px;
+  }
+
+  .glow-ring.ring-2 {
+    width: 154px;
+    height: 154px;
+    border-color: rgba(10, 102, 128, 0.15);
+  }
+
+  .visual-symbol-node {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0, 168, 150, 0.12) 0%, rgba(46, 196, 182, 0.18) 100%);
+    border: 2px solid rgba(0, 168, 150, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 8px 24px -4px rgba(0, 168, 150, 0.2);
+  }
+
+  .visual-floating-badge {
+    position: absolute;
+    bottom: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(13, 27, 61, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    z-index: 3;
+    color: #0D1B3D;
+  }
+
+  /* Slide 2 Visual: Trajectory */
+  .reflection-trajectory {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8fafc;
+    padding: 12px 18px;
+    border-radius: var(--radius-xl, 12px);
+    border: 1px solid #e2e8f0;
+  }
+
+  .node-pill {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #0D1B3D;
+    background: #ffffff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md, 6px);
+    border: 1px solid #cbd5e1;
+  }
+
+  .node-pill.highlight {
+    color: #ffffff;
+    background: #00A896;
+    border-color: #00A896;
+    box-shadow: 0 3px 10px rgba(0, 168, 150, 0.3);
+  }
+
+  .trajectory-arrow {
+    color: #94a3b8;
+    font-size: 1rem;
+    font-weight: bold;
+  }
+
+  /* Slide 3 Visual: Guidance Cards */
+  .guidance-cards-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 240px;
+  }
+
+  .preview-mini-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    border-radius: var(--radius-md, 8px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    text-align: left;
+  }
+
+  .preview-title {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #0D1B3D;
+  }
+
+  .preview-sub {
+    display: block;
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  /* Slide 4 Visual: Privacy Cluster */
+  .privacy-shield-cluster {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .shield-badge-main {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #ecfdf5;
+    border: 2px solid #a7f3d0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.15);
+  }
+
+  .privacy-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #065f46;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    padding: 4px 12px;
+    border-radius: 9999px;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* SLIDE TYPOGRAPHY                                             */
+  /* ------------------------------------------------------------ */
+  .slide-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: 400px;
+  }
+
+  .slide-title {
+    font-size: 1.375rem;
+    font-weight: 800;
+    color: #0D1B3D;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .slide-desc {
+    font-size: 0.9375rem;
+    color: #475569;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .slide-notice {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #00A896;
+    margin: 0.25rem 0 0 0;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* FOOTER & BUTTONS                                             */
+  /* ------------------------------------------------------------ */
+  .onboarding-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+    border-top: 1px solid rgba(241, 245, 249, 0.9);
+    flex-shrink: 0;
+    background: #ffffff;
+  }
+
+  .footer-nav-left {
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+  }
+
+  .footer-nav-right {
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .btn-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: var(--radius-lg, 8px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+  }
+
+  .btn-back {
+    color: #64748b;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  .btn-back:hover {
+    color: #0f172a;
+    background: #f1f5f9;
+  }
+
+  .btn-next {
+    color: #ffffff;
+    background: #00A896;
+    box-shadow: 0 3px 10px rgba(0, 168, 150, 0.25);
+  }
+
+  .btn-next:hover {
+    background: #008f80;
+    transform: translateY(-1px);
+  }
+
+  .btn-start {
+    color: #ffffff;
+    background: linear-gradient(135deg, #0A6680 0%, #00A896 100%);
+    box-shadow: 0 4px 14px rgba(0, 168, 150, 0.35);
+    padding: 0.5rem 1.25rem;
+  }
+
+  .btn-start:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 168, 150, 0.45);
+  }
+
+  /* ------------------------------------------------------------ */
+  /* PROGRESS INDICATOR DOTS                                      */
+  /* ------------------------------------------------------------ */
+  .onboarding-indicators {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .dot-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .dot-indicator:hover {
+    background: #94a3b8;
+  }
+
+  .dot-indicator.is-active {
+    width: 22px;
+    border-radius: 9999px;
+    background: #00A896;
+  }
+
+  /* Helper */
+  .is-hidden {
+    display: none !important;
+  }
+
+  .text-teal {
+    color: #00A896;
+  }
+
+  .text-indigo {
+    color: #4f46e5;
+  }
+
+  .text-amber {
+    color: #f59e0b;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* MOBILE RESPONSIVE (360px - 640px)                            */
+  /* ------------------------------------------------------------ */
+  @media (max-width: 640px) {
+    .onboarding-overlay {
+      padding: 0;
+      align-items: flex-end;
+    }
+
+    .onboarding-card {
+      max-width: 100%;
+      height: 100%;
+      max-height: 100dvh;
+      border-radius: 0;
+      border: none;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .onboarding-slide {
+      padding: 1.25rem 1.25rem 1rem 1.25rem;
+      justify-content: center;
+    }
+
+    .slide-visual-canvas {
+      height: 140px;
+      margin-bottom: 1rem;
+    }
+
+    .slide-title {
+      font-size: 1.25rem;
+    }
+
+    .slide-desc {
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .onboarding-footer {
+      padding: 0.875rem 1rem calc(0.875rem + env(safe-area-inset-bottom, 0px)) 1rem;
+    }
+
+    .btn-nav {
+      min-height: 48px; /* Touch target */
+    }
+
+    .btn-start {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .slide-visual-canvas {
+      height: 120px;
+    }
+
+    .reflection-trajectory {
+      padding: 8px 12px;
+      gap: 5px;
+    }
+
+    .node-pill {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+    }
+  }
+
+  /* Accessibility: Respect Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-card,
+    .onboarding-slides-track,
+    .btn-nav,
+    .dot-indicator {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>

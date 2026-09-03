@@ -70,4 +70,16 @@ import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
     color: var(--color-text-muted);
     line-height: 1.6;
   }
+
+  @media (max-width: 640px) {
+    .policy-card a,
+    .policy-card a :global(button) {
+      width: 100%;
+      white-space: normal;
+      height: auto;
+      min-height: 48px;
+      padding: var(--space-3) var(--space-4);
+      text-align: center;
+    }
+  }
 </style>

@@ -103,7 +103,7 @@ button, input, select, textarea {
     padding-right: 1rem;
   }
 
-  h1, .page-title, .hero-title {
+  h1, .page-title {
     font-size: clamp(1.5rem, 6vw, 2.25rem) !important;
     overflow-wrap: break-word;
     word-break: normal;

@@ -405,7 +405,7 @@ const { status_distribution } = participation;
   /* Two Column Dashboard Grid */
   .two-col-dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: var(--space-6);
   }
 
@@ -643,6 +643,21 @@ const { status_distribution } = participation;
   }
 
   @media (max-width: 767px) {
+    .two-col-dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card-title-row,
+    .section-header-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+    }
+
+    .status-boxes-grid {
+      grid-template-columns: 1fr;
+    }
+
     .table-container {
       width: 100%;
       overflow-x: auto;

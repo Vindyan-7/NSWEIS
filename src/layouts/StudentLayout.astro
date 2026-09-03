@@ -3,6 +3,7 @@ import '../styles/globals.css';
 import Header from '../components/navigation/Header.astro';
 import Sidebar from '../components/navigation/Sidebar.astro';
 import MobileNav from '../components/navigation/MobileNav.astro';
+import StudentOnboarding from '../components/student/StudentOnboarding.astro';
 
 import { LayoutDashboard, ClipboardCheck, ListChecks, TrendingUp, HeartPulse, History as HistoryIcon, User, ShieldCheck } from '@lucide/astro';
 
@@ -54,6 +55,7 @@ const studentNav = [
         </main>
       </div>
       <MobileNav items={studentNav} />
+      <StudentOnboarding activePath={activePath} />
     </div>
   </body>
 </html>
@@ -75,5 +77,11 @@ const studentNav = [
     flex: 1;
     padding-top: var(--space-6);
     padding-bottom: var(--space-16);
+  }
+
+  @media (max-width: 1023px) {
+    .app-content {
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
   }
 </style>

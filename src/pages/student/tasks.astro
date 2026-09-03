@@ -48,7 +48,7 @@ if (Astro.request.method === 'POST') {
       } else if (res.alreadyCompleted) {
         successMessage = 'Activity was already completed.';
       } else {
-        successMessage = `Activity completed! +${res.creditsAwarded || 10} well-being credits earned.`;
+        successMessage = `Activity completed! +${res.creditsAwarded || 10} well-being points earned.`;
       }
     }
   } catch (err: any) {
@@ -119,7 +119,7 @@ const progressSummary = await getStudentProgress(supabase, user.id);
             <Coins size={20} aria-hidden="true" />
           </div>
           <div>
-            <span class="metric-label">This Week's Credits</span>
+            <span class="metric-label">This Week's Points</span>
             <span class="metric-value">+{creditBalance.thisWeekEarned}</span>
           </div>
         </div>
@@ -138,15 +138,15 @@ const progressSummary = await getStudentProgress(supabase, user.id);
       </Card>
     </div>
 
-    {/* Well-being Credits Ledger Card */}
+    {/* Well-being Points Ledger Card */}
     <Card padding="lg">
       <div class="credits-card-header">
         <div>
-          <h3 class="section-title">Well-being Credits</h3>
-          <p class="section-subtitle">Earn credits by completing recommended reflection activities.</p>
+          <h3 class="section-title">Well-being Points</h3>
+          <p class="section-subtitle">Earn points by completing recommended reflection activities.</p>
         </div>
         <Badge variant="primary" size="md">
-          <Coins size={14} aria-hidden="true" /> {creditBalance.currentBalance} Total Balance
+          <Coins size={14} aria-hidden="true" /> {creditBalance.currentBalance} Points Balance
         </Badge>
       </div>
 
@@ -161,7 +161,7 @@ const progressSummary = await getStudentProgress(supabase, user.id);
         </div>
         <div class="credit-stat-box">
           <span class="stat-num">+{creditBalance.totalEarned}</span>
-          <span class="stat-text">Total Earned</span>
+          <span class="stat-text">Total Points Earned</span>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ const progressSummary = await getStudentProgress(supabase, user.id);
                   {task.category.replace('_', ' ')}
                 </Badge>
                 <span class="credit-pill">
-                  <Coins size={12} aria-hidden="true" /> +{task.credits_awarded} Credits
+                  <Coins size={12} aria-hidden="true" /> +{task.credits_awarded} Points
                 </span>
               </div>
 
@@ -247,7 +247,7 @@ const progressSummary = await getStudentProgress(supabase, user.id);
                   <th>Activity</th>
                   <th>Category</th>
                   <th>Completed Date</th>
-                  <th>Credits</th>
+                  <th>Points</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,7 +269,7 @@ const progressSummary = await getStudentProgress(supabase, user.id);
                         : 'Completed'}
                     </td>
                     <td>
-                      <span class="credit-text">+{task.credits_awarded} Credits</span>
+                      <span class="credit-text">+{task.credits_awarded} Points</span>
                     </td>
                   </tr>
                 ))}

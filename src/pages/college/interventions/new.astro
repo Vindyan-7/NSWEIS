@@ -253,4 +253,17 @@ if (Astro.request.method === 'POST') {
     gap: var(--space-3);
     margin-top: var(--space-4);
   }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    .form-actions {
+      flex-direction: column-reverse;
+    }
+    .form-actions a,
+    .form-actions button {
+      width: 100%;
+    }
+  }
 </style>

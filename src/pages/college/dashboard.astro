@@ -379,7 +379,7 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
         <h3 class="card-section-title">Activity & Task Completion Metrics</h3>
         <ListChecks size={20} class="text-primary" aria-hidden="true" />
       </div>
-      <p class="section-subtext">Campus-wide tracking of voluntary well-being task completion and credits awarded.</p>
+      <p class="section-subtext">Campus-wide tracking of voluntary well-being task completion and points awarded.</p>
 
       <div class="task-activity-grid">
         <div class="activity-metric-box">
@@ -396,7 +396,7 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
         </div>
         <div class="activity-metric-box">
           <span class="act-val font-bold text-primary">+{task_activity.total_credits_earned}</span>
-          <span class="act-lbl">Credits Awarded</span>
+          <span class="act-lbl">Points Awarded</span>
         </div>
       </div>
     </Card>
@@ -659,7 +659,8 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
   .banner-left {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .inst-pill-tag {
@@ -669,6 +670,8 @@ const completedInterventions = interventions.filter((i) => i.status === 'complet
     background: var(--color-bg-secondary);
     padding: 2px 10px;
     border-radius: var(--radius-sm);
+    word-break: break-word;
+    max-width: 100%;
   }
 
   .banner-right {

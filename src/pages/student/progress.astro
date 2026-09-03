@@ -105,7 +105,7 @@ const journey = await getStudentJourney(supabase, user.id);
             <Coins size={20} aria-hidden="true" />
           </div>
           <div>
-            <span class="label">Total Credits Earned</span>
+            <span class="label">Total Points Earned</span>
             <span class="value">+{journey.totalCreditsEarned}</span>
           </div>
         </div>
@@ -145,7 +145,7 @@ const journey = await getStudentJourney(supabase, user.id);
                 <th>Cycle Week</th>
                 <th>Weekly Reflection</th>
                 <th>Activities Completed</th>
-                <th>Credits Earned</th>
+                <th>Points Earned</th>
                 <th>Weekly Focus</th>
               </tr>
             </thead>
@@ -164,7 +164,7 @@ const journey = await getStudentJourney(supabase, user.id);
                   </td>
                   <td>{week.completedTasksCount} activities</td>
                   <td>
-                    <span class="credit-highlight">+{week.creditsEarned} Credits</span>
+                    <span class="credit-highlight">+{week.creditsEarned} Points</span>
                   </td>
                   <td class="text-subtle font-sm">
                     {week.focusTitle || 'Self-Reflection'}

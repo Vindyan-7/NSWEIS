@@ -72,13 +72,54 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
   week: `Week ${idx + 1}`,
   completed: h.status === 'completed',
 }));
+
+const studentName = profile?.full_name || 'Alex';
+
+const SUPPORTIVE_PHRASES = [
+  "Take a moment for yourself.",
+  "A little reflection can go a long way.",
+  "Your wellbeing matters.",
+  "Check in with yourself today.",
+  "One moment at a time.",
+  "Make space to reflect.",
+  "Your journey matters.",
+  "Small steps still count.",
+  "Take a breath and check in.",
+  "Today is a good day to reflect.",
+  "Keep building healthy habits.",
+  "Give yourself a moment.",
+  "Your wellbeing is worth the time.",
+  "Reflect. Understand. Grow.",
+  "Be kind to yourself today.",
+  "A few minutes for yourself can matter.",
+  "Notice how you're doing today.",
+  "Start where you are.",
+  "Make a little space for yourself.",
+  "Take a moment to pause and reflect."
+];
+
+// Fallback initial greeting
+const nowServer = new Date();
+const serverHour = nowServer.getHours();
+let serverGreeting = 'Good morning';
+if (serverHour >= 5 && serverHour < 12) serverGreeting = 'Good morning';
+else if (serverHour >= 12 && serverHour < 17) serverGreeting = 'Good afternoon';
+else if (serverHour >= 17 && serverHour < 21) serverGreeting = 'Good evening';
+else serverGreeting = 'Good night';
+
+const serverDaySeed = nowServer.getFullYear() * 366 + (nowServer.getMonth() + 1) * 31 + nowServer.getDate();
+const initialSupportivePhrase = SUPPORTIVE_PHRASES[Math.abs(serverDaySeed) % SUPPORTIVE_PHRASES.length];
 ---
 
 <StudentLayout title="Student Dashboard" activePath="/student/dashboard">
-  <PageHeader
-    title={`Good morning, ${profile?.full_name || 'Alex'}`}
-    subtitle="Your personal, non-clinical wellness check-in dashboard."
-  />
+  <div id="student-header-wrapper" data-student-name={studentName}>
+    <PageHeader
+      title={`${serverGreeting}, ${studentName}`}
+      subtitle={initialSupportivePhrase}
+    >
+      <Badge variant="primary" size="sm">Student</Badge>
+    </PageHeader>
+  </div>
 
   <div class="dashboard-grid">
     {/* Weekly Check-in Status Card */}
@@ -151,7 +192,7 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
       <div class="your-week-header">
         <div>
           <h3 class="widget-title">This Week</h3>
-          <p class="widget-sub">Active tasks, completion progress, and well-being credits.</p>
+          <p class="widget-sub">Active tasks, completion progress, and well-being points.</p>
         </div>
         <div class="widget-actions">
           <a href="/student/progress">
@@ -183,7 +224,7 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
           <span class="stat-icon accent"><Coins size={18} aria-hidden="true" /></span>
           <div>
             <span class="week-stat-val">+{credits.currentBalance}</span>
-            <span class="week-stat-lbl">Credits Balance</span>
+            <span class="week-stat-lbl">Points Balance</span>
           </div>
         </div>
       </div>
@@ -453,3 +494,68 @@ const trendPoints = history.slice(0, 4).reverse().map((h, idx) => ({
     }
   }
 </style>
+
+<script>
+  const SUPPORTIVE_PHRASES = [
+    "Take a moment for yourself.",
+    "A little reflection can go a long way.",
+    "Your wellbeing matters.",
+    "Check in with yourself today.",
+    "One moment at a time.",
+    "Make space to reflect.",
+    "Your journey matters.",
+    "Small steps still count.",
+    "Take a breath and check in.",
+    "Today is a good day to reflect.",
+    "Keep building healthy habits.",
+    "Give yourself a moment.",
+    "Your wellbeing is worth the time.",
+    "Reflect. Understand. Grow.",
+    "Be kind to yourself today.",
+    "A few minutes for yourself can matter.",
+    "Notice how you're doing today.",
+    "Start where you are.",
+    "Make a little space for yourself.",
+    "Take a moment to pause and reflect."
+  ];
+
+  function updateStudentGreeting() {
+    const wrapper = document.getElementById('student-header-wrapper');
+    if (!wrapper) return;
+
+    const studentName = wrapper.getAttribute('data-student-name') || 'Student';
+    const now = new Date();
+    const hour = now.getHours();
+
+    // 05:00–11:59 "Good morning"
+    // 12:00–16:59 "Good afternoon"
+    // 17:00–20:59 "Good evening"
+    // 21:00–04:59 "Good night"
+    let greeting = 'Good morning';
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      greeting = 'Good afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      greeting = 'Good evening';
+    } else {
+      greeting = 'Good night';
+    }
+
+    const titleEl = wrapper.querySelector('.page-title');
+    if (titleEl) {
+      titleEl.textContent = `${greeting}, ${studentName}`;
+    }
+
+    // Deterministic daily rotation for supportive phrase based on local date
+    const daySeed = now.getFullYear() * 366 + (now.getMonth() + 1) * 31 + now.getDate();
+    const phraseIndex = Math.abs(daySeed) % SUPPORTIVE_PHRASES.length;
+    const subtitleEl = wrapper.querySelector('.page-subtitle');
+    if (subtitleEl) {
+      subtitleEl.textContent = SUPPORTIVE_PHRASES[phraseIndex];
+    }
+  }
+
+  updateStudentGreeting();
+  document.addEventListener('astro:page-load', updateStudentGreeting);
+</script>

@@ -621,6 +621,16 @@ const sortedOptions = (question.options || []).slice().sort((a, b) => (a.order_i
   }
 
   @media (max-width: 640px) {
+    .options-header-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .btn-add-option {
+      justify-content: center;
+      width: 100%;
+      height: 40px;
+    }
     .option-fields {
       grid-template-columns: 1fr;
       gap: 8px;

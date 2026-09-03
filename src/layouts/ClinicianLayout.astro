@@ -75,6 +75,12 @@ const clinicianNav = [
     padding-bottom: var(--space-16);
   }
 
+  @media (max-width: 1023px) {
+    .app-content {
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+
   .scope-banner {
     font-size: 0.8125rem;
     color: var(--color-text-muted);

@@ -78,4 +78,10 @@ const superAdminNav = [
     padding-top: var(--space-6);
     padding-bottom: var(--space-16);
   }
+
+  @media (max-width: 1023px) {
+    .app-content {
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
 </style>

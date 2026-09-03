@@ -1,540 +1,2146 @@
 ---
 import PublicLayout from '../layouts/PublicLayout.astro';
-import Button from '../components/ui/Button.astro';
-import Card from '../components/ui/Card.astro';
-import Badge from '../components/ui/Badge.astro';
-import PrivacyNotice from '../components/privacy/PrivacyNotice.astro';
-import NSWESILogo from '../components/brand/NSWESILogo.astro';
 import {
-  ClipboardCheck,
-  Sparkles,
-  Building2,
-  CalendarCheck,
-  Landmark,
-  LockKeyhole,
-  ShieldCheck,
-  User,
   ArrowRight,
+  ShieldCheck,
+  Lock,
+  User,
+  Building2,
+  Landmark,
+  Sparkles,
+  Heart,
+  Compass,
+  CheckCircle2,
+  TrendingUp,
+  ArrowDown,
+  ShieldAlert
 } from '@lucide/astro';
 ---
 
 <PublicLayout title="National Student Wellbeing & Emotional Support Intelligence">
-  {/* Hero Section */}
-  <section class="hero-section">
-    <div class="container hero-content">
-      <div class="hero-text">
-        <div class="hero-brand-header">
-          <NSWESILogo variant="full" size="lg" showSubtitle={true} showTagline={true} />
+  {/* SECTION 1: HERO */}
+  <section class="hero-section" aria-labelledby="hero-heading">
+    <div class="container hero-container">
+      <div class="hero-content">
+        <div class="hero-eyebrow">
+          <span class="eyebrow-pill">National Student Wellbeing Platform</span>
         </div>
-        <div class="hero-badge-group">
-          <span class="hero-badge">Civic Wellbeing Infrastructure</span>
-          <Badge variant="stable" size="sm">Non-Clinical & Privacy-First</Badge>
-        </div>
-        <h1 class="hero-title">National Student Wellbeing & Emotional Support Intelligence</h1>
-        <p class="hero-desc">
-          A privacy-first civic platform connecting confidential student self-reflection with anonymous institutional intelligence and evidence-informed government policy.
+
+        <h1 id="hero-heading" class="hero-title">
+          A healthier campus<br class="hero-mobile-break" /> starts with being<br class="hero-mobile-break" /> <span class="text-gradient">heard.</span>
+        </h1>
+
+        <p class="hero-lead">
+          NSWESI gives students a private space for regular self-reflection, while helping institutions understand wellbeing trends and respond with the right support — without exposing individual student responses.
         </p>
+
+        <div class="hero-cta-group">
+          <a href="/login" class="hero-primary-btn">
+            Get Started <ArrowRight size={18} aria-hidden="true" />
+          </a>
+          <a href="#how-it-works" class="hero-secondary-btn">
+            How NSWESI Works
+          </a>
+        </div>
+
+        <div class="hero-trust-subtext">
+          <span>Private for students</span>
+          <span class="trust-sep-dot" aria-hidden="true">&bull;</span>
+          <span>Anonymous for institutions</span>
+          <span class="trust-sep-dot" aria-hidden="true">&bull;</span>
+          <span>Actionable for support</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="hero-art-canvas">
+          {/* Subtle Ambient Halo */}
+          <div class="ambient-glow glow-halo"></div>
+
+          {/* SVG Metaphor: Glowing Central Heart + Concentric Dashed Rings + Journey Curve + 4 Nodes */}
+          <svg class="hero-metaphor-svg" viewBox="0 0 540 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Path Gradient -->
+              <linearGradient id="journeyGrad" x1="60" y1="380" x2="440" y2="200" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#00A896" />
+                <stop offset="35%" stop-color="#0A6680" />
+                <stop offset="68%" stop-color="#5E4B8B" />
+                <stop offset="100%" stop-color="#00A896" />
+              </linearGradient>
+
+              <!-- Heart Gradient -->
+              <linearGradient id="heartGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#2EC4B6" />
+                <stop offset="100%" stop-color="#00A896" />
+              </linearGradient>
+
+              <!-- Heart Shadow Filter -->
+              <filter id="heartGlowShadow" x="-40%" y="-40%" width="180%" height="180%">
+                <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#00A896" flood-opacity="0.32" />
+              </filter>
+            </defs>
+
+            <!-- Concentric Dashed Rings (radiating out from the heart) -->
+            <g class="concentric-rings">
+              <circle cx="245" cy="245" r="48" stroke="#00A896" stroke-width="1.2" stroke-dasharray="3 4" stroke-opacity="0.55" />
+              <circle cx="245" cy="245" r="72" stroke="#00A896" stroke-width="1.2" stroke-dasharray="3 5" stroke-opacity="0.45" />
+              <circle cx="245" cy="245" r="96" stroke="#00A896" stroke-width="1.2" stroke-dasharray="3 5" stroke-opacity="0.32" />
+              <circle cx="245" cy="245" r="120" stroke="#00A896" stroke-width="1.2" stroke-dasharray="4 6" stroke-opacity="0.22" />
+              <circle cx="245" cy="245" r="144" stroke="#00A896" stroke-width="1.2" stroke-dasharray="4 6" stroke-opacity="0.12" />
+            </g>
+
+            <!-- Continuous Flow Journey Path Arc -->
+            <path
+              d="M 65,375 C 110,325 160,320 220,345 C 248,355 240,305 245,275 C 255,220 290,185 335,185 C 375,185 395,198 425,205"
+              fill="none"
+              stroke="url(#journeyGrad)"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="journey-path"
+            />
+
+            <!-- Floating Central Heart -->
+            <g class="heart-container" filter="url(#heartGlowShadow)">
+              <g transform="translate(245, 245) scale(2.6) translate(-12, -12)">
+                <path
+                  d="M 12,21.35 l -1.45,-1.32 C 5.4,15.36 2,12.28 2,8.5 C 2,5.42 4.42,3 7.5,3 c 1.74,0 3.41,0.81 4.5,2.09 C 13.09,3.81 14.76,3 16.5,3 C 19.58,3 22,5.42 22,8.5 c 0,3.78 -3.4,6.86 -8.55,11.54 L 12,21.35 Z"
+                  fill="url(#heartGrad)"
+                />
+              </g>
+            </g>
+
+            <!-- Node 1: Person -->
+            <circle cx="65" cy="375" r="15" fill="#0D1B3D" stroke="#00A896" stroke-width="3.5" class="node-glow" />
+            <circle cx="65" cy="375" r="5" fill="#00A896" />
+
+            <!-- Node 2: Reflection -->
+            <circle cx="220" cy="345" r="14" fill="#0D1B3D" stroke="#00A896" stroke-width="3.5" class="node-glow" />
+            <circle cx="220" cy="345" r="4.5" fill="#00A896" />
+
+            <!-- Node 3: Understanding -->
+            <circle cx="335" cy="185" r="14" fill="#0D1B3D" stroke="#6A4C93" stroke-width="3.5" class="node-glow" />
+            <circle cx="335" cy="185" r="4.5" fill="#B388FF" />
+
+            <!-- Node 4: Support -->
+            <circle cx="425" cy="205" r="15" fill="#0D1B3D" stroke="#00A896" stroke-width="3.5" class="node-glow" />
+            <circle cx="425" cy="205" r="5" fill="#00A896" />
+          </svg>
+
+          <!-- Floating Badges Matching Reference Board -->
+          <div class="hero-floating-pill pill-person">
+            <span class="pill-dot teal"></span>
+            <span>Person</span>
+          </div>
+
+          <div class="hero-floating-pill pill-reflection">
+            <span class="pill-dot teal"></span>
+            <span>Reflection</span>
+          </div>
+
+          <div class="hero-floating-pill pill-understanding">
+            <span class="pill-dot purple"></span>
+            <span>Understanding</span>
+          </div>
+
+          <div class="hero-floating-pill pill-support">
+            <span class="pill-dot teal"></span>
+            <span>Support</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* SECTION 2: TRUST STRIP */}
+  <section class="trust-strip" aria-label="Core Capabilities">
+    <div class="container trust-strip-inner">
+      <div class="trust-item"><span class="trust-label">Private Reflection</span></div>
+      <span class="trust-sep" aria-hidden="true">&bull;</span>
+      <div class="trust-item"><span class="trust-label">Anonymous Insights</span></div>
+      <span class="trust-sep" aria-hidden="true">&bull;</span>
+      <div class="trust-item"><span class="trust-label">Proactive Support</span></div>
+      <span class="trust-sep" aria-hidden="true">&bull;</span>
+      <div class="trust-item"><span class="trust-label">National Perspective</span></div>
+    </div>
+  </section>
+
+  {/* SECTION 3: THE PROBLEM / WHY NSWESI (EDITORIAL) */}
+  <section class="editorial-section" aria-labelledby="why-heading">
+    <div class="container editorial-grid">
+      <div class="editorial-statement">
+        <span class="section-eyebrow">Why NSWESI</span>
+        <h2 id="why-heading" class="editorial-title">
+          Student wellbeing doesn't change overnight.
+        </h2>
+        <p class="editorial-body">
+          Small changes in wellbeing can be easy to miss when support only begins after a crisis. NSWESI creates a regular, structured space for students to reflect — helping support systems notice broader patterns earlier.
+        </p>
+        <div class="editorial-callout">
+          <div class="callout-line"></div>
+          <p class="callout-text">
+            Early signals allow campuses to respond weeks before examination periods or isolation peaks.
+          </p>
+        </div>
+      </div>
+
+      <div class="editorial-signals" aria-label="Progressive Wellbeing Signals">
+        <div class="signal-flow-line" aria-hidden="true"></div>
         
-        <div class="hero-cta">
-          <a href="/login">
-            <Button variant="primary" size="lg">
-              Access Ecosystem <ArrowRight size={18} aria-hidden="true" />
-            </Button>
-          </a>
-          <a href="/privacy">
-            <Button variant="outline" size="lg">Privacy Principles</Button>
-          </a>
+        {/* Signal 01 */}
+        <div class="signal-step">
+          <div class="signal-marker">01</div>
+          <div class="signal-info">
+            <span class="signal-watermark" aria-hidden="true">REFLECT</span>
+            <h3 class="signal-name">Reflect</h3>
+            <p class="signal-desc">
+              Weekly private self-reflection builds emotional awareness before strain compounds into academic burnout.
+            </p>
+          </div>
         </div>
 
-        <div class="nonclinical-hero-banner">
-          <ShieldCheck size={18} class="banner-icon" aria-hidden="true" />
-          <span><strong>Non-Clinical Boundary:</strong> Designed for early awareness and preventive well-being support — not clinical diagnosis or medical treatment.</span>
+        {/* Signal 02 */}
+        <div class="signal-step">
+          <div class="signal-marker">02</div>
+          <div class="signal-info">
+            <span class="signal-watermark" aria-hidden="true">UNDERSTAND</span>
+            <h3 class="signal-name">Understand</h3>
+            <p class="signal-desc">
+              Non-clinical insights help students recognize personal habits in workload, rest, sleep, and connection.
+            </p>
+          </div>
+        </div>
+
+        {/* Signal 03 */}
+        <div class="signal-step">
+          <div class="signal-marker">03</div>
+          <div class="signal-info">
+            <span class="signal-watermark" aria-hidden="true">SUPPORT</span>
+            <h3 class="signal-name">Support</h3>
+            <p class="signal-desc">
+              Campuses identify aggregate strain patterns and mobilize workshops, guidance, and resources proactively.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  {/* 5-Stage Policy Architecture Flow */}
-  <section class="section-container architecture-section">
+  {/* SECTION 4: HOW NSWESI WORKS (CONNECTED JOURNEY) */}
+  <section id="how-it-works" class="workflow-section" aria-labelledby="how-heading">
     <div class="container">
-      <div class="section-header text-center">
-        <span class="section-eyebrow">System Workflow</span>
-        <h2 class="section-title">5-Stage Early Intervention Architecture</h2>
-        <p class="section-subtitle">
-          How NSWESI converts confidential student reflection into proactive campus interventions and regional policy coordination.
+      <div class="section-lead-center">
+        <span class="section-eyebrow">How It Works</span>
+        <h2 id="how-heading" class="section-headline">From reflection to meaningful support.</h2>
+        <p class="section-subtext">
+          A continuous four-stage journey designed to bridge individual privacy with proactive campus responsiveness.
         </p>
       </div>
 
-      <div class="flow-grid">
-        <Card padding="md" class="flow-card">
-          <div class="step-num">01</div>
-          <div class="flow-icon-box">
-            <ClipboardCheck size={24} aria-hidden="true" />
-          </div>
-          <h4>Student Self-Reflection</h4>
-          <p>Confidential weekly check-ins empowering students through structured, non-clinical self-reflection.</p>
-        </Card>
+      <div class="continuum-wrapper">
+        {/* Horizontal Track Line */}
+        <div class="continuum-track-line" aria-hidden="true"></div>
 
-        <Card padding="md" class="flow-card">
-          <div class="step-num">02</div>
-          <div class="flow-icon-box">
-            <Sparkles size={24} aria-hidden="true" />
+        <div class="continuum-track">
+          {/* Stage 1 */}
+          <div class="continuum-node">
+            <div class="node-milestone">
+              <span class="node-num">01</span>
+              <div class="node-icon-wrap"><Compass size={20} /></div>
+            </div>
+            <h3 class="node-title">Reflect</h3>
+            <p class="node-desc">Students complete regular private wellbeing reflections in a quiet, dedicated digital space.</p>
           </div>
-          <h4>Personal Insight</h4>
-          <p>Instant personalized wellness snapshots and actionable self-care recommendations for the student.</p>
-        </Card>
 
-        <Card padding="md" class="flow-card">
-          <div class="step-num">03</div>
-          <div class="flow-icon-box">
-            <Building2 size={24} aria-hidden="true" />
+          {/* Stage 2 */}
+          <div class="continuum-node">
+            <div class="node-milestone">
+              <span class="node-num">02</span>
+              <div class="node-icon-wrap"><Sparkles size={20} /></div>
+            </div>
+            <h3 class="node-title">Understand</h3>
+            <p class="node-desc">Students receive personalized, non-clinical wellbeing insights and supportive self-care suggestions.</p>
           </div>
-          <h4>Anonymous Intelligence</h4>
-          <p>Campus-level patterns only. Groups too small to stay anonymous are withheld.</p>
-        </Card>
 
-        <Card padding="md" class="flow-card">
-          <div class="step-num">04</div>
-          <div class="flow-icon-box">
-            <CalendarCheck size={24} aria-hidden="true" />
+          {/* Stage 3 */}
+          <div class="continuum-node">
+            <div class="node-milestone">
+              <span class="node-num">03</span>
+              <div class="node-icon-wrap"><Building2 size={20} /></div>
+            </div>
+            <h3 class="node-title">Support</h3>
+            <p class="node-desc">Institutions use anonymous, group-level signals to plan and schedule targeted campus support.</p>
           </div>
-          <h4>Targeted Intervention</h4>
-          <p>Proactive wellness workshops and mentorship programs scheduled directly from aggregate stress signals.</p>
-        </Card>
 
-        <Card padding="md" class="flow-card">
-          <div class="step-num">05</div>
-          <div class="flow-icon-box">
-            <Landmark size={24} aria-hidden="true" />
+          {/* Stage 4 */}
+          <div class="continuum-node">
+            <div class="node-milestone">
+              <span class="node-num">04</span>
+              <div class="node-icon-wrap"><TrendingUp size={20} /></div>
+            </div>
+            <h3 class="node-title">Improve</h3>
+            <p class="node-desc">Patterns over time inform proactive institutional programs, academic pacing, and regional policy.</p>
           </div>
-          <h4>Government Oversight</h4>
-          <p>Scoped regional trend monitoring empowering evidence-informed educational policy without accessing student PII.</p>
-        </Card>
+        </div>
       </div>
     </div>
   </section>
 
-  {/* Privacy-First Architecture Section */}
-  <section class="section-container privacy-arch-section">
+  {/* SECTION 5: STUDENT EXPERIENCE (GENUINE PRODUCT SHOWCASE) */}
+  <section class="experience-section" aria-labelledby="student-exp-heading">
+    <div class="container experience-grid">
+      <div class="experience-showcase" aria-label="Student Interface Preview">
+        <div class="mockup-wrapper">
+          <div class="contextual-label-bar">
+            <span class="contextual-mockup-label">A private weekly check-in</span>
+          </div>
+
+          <div class="device-mockup">
+            <div class="device-screen">
+              {/* Header of student portal preview */}
+              <div class="mock-topbar">
+                <span class="mock-pill">Week 1 Reflection &bull; Confidential</span>
+                <span class="mock-badge">Active</span>
+              </div>
+
+              {/* Reflection question card preview */}
+              <div class="mock-card mock-question">
+                <span class="mock-q-meta">Academic Balance &bull; Required</span>
+                <p class="mock-q-text">How manageable has your daily routine and coursework felt over the past week?</p>
+                <div class="mock-options">
+                  <div class="mock-opt selected">
+                    <div class="mock-radio checked"></div>
+                    <span>Fairly manageable — pacing is balanced</span>
+                  </div>
+                  <div class="mock-opt">
+                    <div class="mock-radio"></div>
+                    <span>Somewhat pressured by upcoming deadlines</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Personalized insight snapshot */}
+              <div class="mock-card mock-insight">
+                <div class="mock-insight-header">
+                  <Sparkles size={16} class="text-teal" />
+                  <span class="mock-insight-title">Your Weekly Wellness Focus</span>
+                </div>
+                <p class="mock-insight-body">
+                  Consistent sleep patterns support academic resilience. Consider taking a 30-minute screen-free recharge tonight.
+                </p>
+              </div>
+
+              {/* Task action card */}
+              <div class="mock-card mock-task">
+                <div class="mock-task-left">
+                  <CheckCircle2 size={16} class="text-mint" />
+                  <span>30-Minute Screen-Free Recharge</span>
+                </div>
+                <span class="mock-credits">+10 Points</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="experience-content">
+        <span class="section-eyebrow">For Students</span>
+        <h2 id="student-exp-heading" class="section-headline">
+          Your wellbeing journey starts with a moment to reflect.
+        </h2>
+        <p class="experience-tagline">Private by design.</p>
+        
+        <ul class="experience-points">
+          <li>
+            <div class="point-icon"><ShieldCheck size={20} /></div>
+            <div>
+              <strong class="point-title">Your reflections are personal.</strong>
+              <p class="point-desc">Individual questions, notes, and scores are never shared with college or government staff.</p>
+            </div>
+          </li>
+          <li>
+            <div class="point-icon"><Heart size={20} /></div>
+            <div>
+              <strong class="point-title">Recommendations are designed for self-care and awareness.</strong>
+              <p class="point-desc">Practical, non-clinical exercises designed to nurture mindfulness, restful routines, and peer balance.</p>
+            </div>
+          </li>
+          <li>
+            <div class="point-icon"><User size={20} /></div>
+            <div>
+              <strong class="point-title">You decide how you engage with your wellbeing journey.</strong>
+              <p class="point-desc">Participate confidentially on your own schedule, build reflective streaks, and earn activity points.</p>
+            </div>
+          </li>
+        </ul>
+
+        <div class="experience-cta">
+          <a href="/login" class="inline-link-cta">
+            Explore the student experience &rarr;
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* SECTION 6: PRIVACY SECTION — SIGNATURE ARCHITECTURE */}
+  <section class="privacy-flow-section" aria-labelledby="privacy-heading">
     <div class="container">
-      <div class="section-header text-center">
-        <span class="section-eyebrow">Data Governance</span>
-        <h2 class="section-title">Architectural Privacy & Safety Guarantees</h2>
-        <p class="section-subtitle">
-          Built so that no one can be identified from what they share.
+      <div class="section-lead-center">
+        <span class="section-eyebrow">Privacy by Design</span>
+        <h2 id="privacy-heading" class="section-headline">What you share stays yours.</h2>
+        <p class="section-subtext">
+          NSWESI strictly separates individual student reflection from institutional insight through architectural boundaries.
         </p>
       </div>
 
-      <div class="privacy-features-grid">
-        <Card padding="lg" class="privacy-feature-card">
-          <div class="feature-icon"><LockKeyhole size={22} aria-hidden="true" /></div>
-          <h3>Confidential Student Tier</h3>
-          <p>Your answers and your written reflection stay yours. Nobody at your college — no officer, no administrator, no faculty member — can open an individual check-in.</p>
-        </Card>
-
-        <Card padding="lg" class="privacy-feature-card">
-          <div class="feature-icon"><Building2 size={22} aria-hidden="true" /></div>
-          <h3>Anonymous College Tier</h3>
-          <p>Colleges see patterns across a campus — never a name, never a roll number, never one person's answers.</p>
-        </Card>
-
-        <Card padding="lg" class="privacy-feature-card">
-          <div class="feature-icon"><Landmark size={22} aria-hidden="true" /></div>
-          <h3>Scoped Government Tier</h3>
-          <p>Oversight sees regional trends across institutions, within an authorised scope. It never reaches an individual student.</p>
-        </Card>
-
-        <Card padding="lg" class="privacy-feature-card">
-          <div class="feature-icon"><ShieldCheck size={22} aria-hidden="true" /></div>
-          <h3>Small Groups Stay Hidden</h3>
-          <p>When too few people in a group have checked in, that group's results are withheld entirely — so no result can ever be traced back to one person.</p>
-        </Card>
-      </div>
-    </div>
-  </section>
-
-  {/* Stakeholder Value Section */}
-  <section class="section-container stakeholders-section">
-    <div class="container">
-      <div class="section-header text-center">
-        <span class="section-eyebrow">Multi-Tenant Ecosystem</span>
-        <h2 class="section-title">Designed for Every Higher Education Stakeholder</h2>
-      </div>
-
-      <div class="stakeholder-grid">
-        <Card padding="lg" class="stakeholder-card">
-          <div class="stakeholder-header">
-            <User size={24} class="stakeholder-icon" aria-hidden="true" />
-            <h3>Students</h3>
+      {/* Signature Architectural Visualization */}
+      <div class="privacy-architecture-canvas" aria-label="Privacy Boundary Architecture">
+        {/* TIER 1: PROTECTED STUDENT TIER */}
+        <div class="arch-layer student-vault-layer">
+          <div class="vault-boundary-badge">
+            <Lock size={14} /> Protected Student Boundary
           </div>
-          <ul class="stakeholder-list">
-            <li>Private weekly self-reflection space</li>
-            <li>Instant personal wellness snapshot & trend tracking</li>
-            <li>Actionable non-clinical self-care recommendations</li>
-          </ul>
-        </Card>
-
-        <Card padding="lg" class="stakeholder-card">
-          <div class="stakeholder-header">
-            <Building2 size={24} class="stakeholder-icon" aria-hidden="true" />
-            <h3>Colleges</h3>
+          <div class="layer-main">
+            <div class="layer-header-group">
+              <span class="layer-role-pill">Student Tier</span>
+              <h3 class="layer-heading">Private Reflection</h3>
+            </div>
+            <p class="layer-summary">
+              Personal check-ins, written reflections, and wellness habit tracking are stored within an isolated student vault.
+            </p>
           </div>
-          <ul class="stakeholder-list">
-            <li>Anonymous aggregate well-being signals</li>
-            <li>Department-level patterns, with small groups withheld</li>
-            <li>Proactive intervention planning and scheduling</li>
-          </ul>
-        </Card>
-
-        <Card padding="lg" class="stakeholder-card">
-          <div class="stakeholder-header">
-            <Landmark size={24} class="stakeholder-icon" aria-hidden="true" />
-            <h3>Government</h3>
+          <div class="privacy-highlight-box">
+            <span class="highlight-lead">Strict Separation:</span> Individual student responses are not exposed to college or government staff.
           </div>
-          <ul class="stakeholder-list">
-            <li>Authorized institutional scope oversight</li>
-            <li>Regional wellness trend analysis</li>
-            <li>Evidence-informed policy and resource allocation</li>
-          </ul>
-        </Card>
+        </div>
+
+        {/* TRANSITION GATE: PROTECTED PROCESSING & K-ANONYMITY */}
+        <div class="arch-transmission-gate" aria-hidden="true">
+          <div class="gate-line"></div>
+          <div class="gate-core">
+            <div class="gate-token">
+              <span class="gate-dot"></span>
+              <span class="gate-title">Protected Processing Gate</span>
+            </div>
+            <span class="gate-desc">Encrypted Ingestion &bull; Irreversible Aggregation &bull; k-Anonymity (N &ge; 10)</span>
+          </div>
+          <div class="gate-line"></div>
+        </div>
+
+        {/* TIER 2: INSTITUTIONAL & GOVERNMENT AGGREGATE TIER */}
+        <div class="arch-layer aggregate-layer">
+          <div class="layer-main">
+            <div class="layer-header-group">
+              <span class="layer-role-pill neutral">Campus &amp; Government Tier</span>
+              <h3 class="layer-heading">Anonymous Aggregate Patterns</h3>
+            </div>
+            <p class="layer-summary">
+              Campus administrators see department-level stress distributions. Authorized government oversight analyzes macro educational trends across regions.
+            </p>
+          </div>
+          <div class="protection-threshold-callout">
+            <ShieldCheck size={18} class="text-teal" />
+            <span><strong>Small-Group Protection Principle:</strong> Small groups remain protected. Aggregate results are strictly withheld whenever participation is too small (N &lt; 10) to preserve total anonymity.</span>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
 
-  {/* Final Call To Action & Privacy Notice */}
-  <section class="container cta-section">
-    <Card padding="lg" class="cta-card text-center">
-      <h2>Ready to Explore the NSWESI Ecosystem?</h2>
-      <p>Log in with role-based demo credentials to experience the multi-tenant workflow.</p>
-      <div class="cta-actions">
-        <a href="/login">
-          <Button variant="primary" size="lg">
-            Sign In to Demo <ArrowRight size={18} aria-hidden="true" />
-          </Button>
+      <div class="privacy-footer-link">
+        <p class="privacy-note">
+          Designed with privacy-first principles and strong data protection boundaries.
+        </p>
+        <a href="/privacy" class="inline-link-cta">
+          Read our privacy principles &rarr;
         </a>
       </div>
-    </Card>
+    </div>
+  </section>
 
-    <div class="privacy-footer-notice">
-      <PrivacyNotice variant="full" />
+  {/* SECTION 7: ONE ECOSYSTEM, THREE PERSPECTIVES (EDITORIAL COLUMNS) */}
+  <section class="ecosystem-section" aria-labelledby="ecosystem-heading">
+    <div class="container">
+      <div class="section-lead-center">
+        <span class="section-eyebrow">One Ecosystem</span>
+        <h2 id="ecosystem-heading" class="section-headline">Different perspectives. One shared goal.</h2>
+        <p class="section-subtext">
+          Dedicated, role-governed views crafted specifically for each participant in the educational community.
+        </p>
+      </div>
+
+      <div class="perspectives-columns">
+        {/* Column 1: Student */}
+        <div class="perspective-column">
+          <div class="col-header">
+            <span class="col-role">Student</span>
+            <div class="col-icon"><User size={20} /></div>
+          </div>
+          <h3 class="col-question">&ldquo;How am I doing?&rdquo;</h3>
+          <p class="col-desc">A confidential personal sanctuary for weekly mindfulness and restorative habit cultivation.</p>
+          <ul class="col-capabilities">
+            <li>Private weekly self-reflection</li>
+            <li>Personal insight &amp; wellness trend tracking</li>
+            <li>Actionable, restorative wellbeing support</li>
+          </ul>
+        </div>
+
+        {/* Column 2: Institution */}
+        <div class="perspective-column">
+          <div class="col-header">
+            <span class="col-role">Institution</span>
+            <div class="col-icon"><Building2 size={20} /></div>
+          </div>
+          <h3 class="col-question">&ldquo;Where does our campus need support?&rdquo;</h3>
+          <p class="col-desc">Actionable cohort-level visibility to schedule guidance workshops before midterms overwhelm students.</p>
+          <ul class="col-capabilities">
+            <li>Anonymous campus wellness trends</li>
+            <li>Aggregate departmental stress signals</li>
+            <li>Proactive intervention planning</li>
+          </ul>
+        </div>
+
+        {/* Column 3: Government */}
+        <div class="perspective-column">
+          <div class="col-header">
+            <span class="col-role">Government</span>
+            <div class="col-icon"><Landmark size={20} /></div>
+          </div>
+          <h3 class="col-question">&ldquo;Where are broader patterns emerging?&rdquo;</h3>
+          <p class="col-desc">High-level systemic perspective to support evidence-informed educational wellbeing policy.</p>
+          <ul class="col-capabilities">
+            <li>Scoped regional trend monitoring</li>
+            <li>Evidence-informed educational planning</li>
+            <li>System-level wellbeing perspective</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* SECTION 8: SYSTEM ARCHITECTURE (CLOSED LOOP ECOSYSTEM) */}
+  <section class="architecture-loop-section" aria-labelledby="arch-heading">
+    <div class="container">
+      <div class="section-lead-center">
+        <span class="section-eyebrow">Built for Scale</span>
+        <h2 id="arch-heading" class="section-headline">Designed to connect wellbeing with action.</h2>
+        <p class="section-subtext">
+          More than a check-in. A closed loop for wellbeing support.
+        </p>
+      </div>
+
+      <div class="ecosystem-circuit" aria-label="Closed Loop Architecture">
+        <div class="circuit-node">
+          <span class="circuit-step">01</span>
+          <span class="circuit-name">Student</span>
+        </div>
+        <div class="circuit-arrow" aria-hidden="true">&rarr;</div>
+
+        <div class="circuit-node">
+          <span class="circuit-step">02</span>
+          <span class="circuit-name">Reflection</span>
+        </div>
+        <div class="circuit-arrow" aria-hidden="true">&rarr;</div>
+
+        <div class="circuit-node">
+          <span class="circuit-step">03</span>
+          <span class="circuit-name">Personal Insight</span>
+        </div>
+        <div class="circuit-arrow" aria-hidden="true">&rarr;</div>
+
+        <div class="circuit-node">
+          <span class="circuit-step">04</span>
+          <span class="circuit-name">Anonymous Insight</span>
+        </div>
+        <div class="circuit-arrow" aria-hidden="true">&rarr;</div>
+
+        <div class="circuit-node">
+          <span class="circuit-step">05</span>
+          <span class="circuit-name">Targeted Support</span>
+        </div>
+        <div class="circuit-arrow" aria-hidden="true">&rarr;</div>
+
+        <div class="circuit-node">
+          <span class="circuit-step">06</span>
+          <span class="circuit-name">Regional Perspective</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* SECTION 9: NON-CLINICAL BOUNDARY */}
+  <section class="boundary-band" aria-label="Non-Clinical Boundary Notice">
+    <div class="container boundary-inner">
+      <ShieldCheck size={18} class="boundary-icon" aria-hidden="true" />
+      <p class="boundary-text">
+        <strong>Non-Clinical Boundary:</strong> NSWESI is designed for early awareness and preventive wellbeing support — not clinical diagnosis or medical treatment.
+      </p>
+    </div>
+  </section>
+
+  {/* SECTION 10: FINAL CTA */}
+  <section class="final-cta-section" aria-labelledby="cta-heading">
+    <div class="container final-cta-container">
+      <div class="cta-inner-card">
+        {/* Subtle Watermark Brand Contour */}
+        <div class="cta-watermark" aria-hidden="true">
+          <svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="120" cy="120" r="110" stroke="#00A896" stroke-width="2" stroke-opacity="0.16" />
+            <path d="M 80,120 C 80,95 105,75 125,90 C 145,75 170,95 170,120 C 170,150 125,175 125,175 C 125,175 80,150 80,120 Z" fill="#00A896" fill-opacity="0.14" />
+          </svg>
+        </div>
+
+        <h2 id="cta-heading" class="cta-title">Better support starts earlier.</h2>
+        <p class="cta-body">
+          Create space for reflection. Understand broader needs. Build a more responsive wellbeing ecosystem.
+        </p>
+
+        <div class="cta-buttons">
+          <a href="/login" class="cta-btn-primary">
+            Explore NSWESI <ArrowRight size={18} aria-hidden="true" />
+          </a>
+          <a href="/privacy" class="cta-btn-secondary">
+            Privacy Principles
+          </a>
+        </div>
+      </div>
     </div>
   </section>
 </PublicLayout>
 
 <style>
-  /* Hero Section */
-  .hero-section {
-    padding: var(--space-12) 0 var(--space-12);
-    background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-bg-app) 100%);
-  }
-
-  .hero-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .hero-text {
-    text-align: center;
-    max-width: 840px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .hero-brand-header {
-    margin-bottom: var(--space-2);
-  }
-
-  .hero-badge-group {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .hero-badge {
-    background-color: var(--color-primary-100);
-    color: var(--color-primary-800);
-    padding: var(--space-1) var(--space-4);
-    border-radius: var(--radius-full);
-    font-size: 0.8125rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  .hero-title {
-    font-size: 2.5rem;
-    font-weight: 800;
-    color: var(--color-text-main);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-  }
-
-  .hero-desc {
-    font-size: 1.125rem;
-    color: var(--color-text-muted);
-    line-height: 1.6;
-    max-width: 720px;
-  }
-
-  .hero-cta {
-    display: flex;
-    gap: var(--space-4);
-    margin-top: var(--space-2);
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .nonclinical-hero-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-5);
-    background-color: var(--color-bg-surface);
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    font-size: 0.84375rem;
-    color: var(--color-text-muted);
-    margin-top: var(--space-4);
-    box-shadow: var(--shadow-sm);
-    text-align: left;
-  }
-
-  .nonclinical-hero-banner strong {
-    color: var(--color-text-main);
-  }
-
-  .banner-icon {
-    color: var(--color-primary-600);
-    flex-shrink: 0;
-  }
-
-  /* Section Containers */
-  .section-container {
-    padding: var(--space-12) 0;
-  }
-
-  .section-header {
-    margin-bottom: var(--space-8);
-  }
-
-  .text-center {
-    text-align: center;
+  /* ============================================================
+     GLOBAL TYPOGRAPHY & FOUNDATION
+     ============================================================ */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--brand-teal, #00A896) 0%, var(--brand-blue, #0A6680) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .section-eyebrow {
+    display: inline-block;
+    font-family: var(--font-display, 'Sora', sans-serif);
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-primary-600);
-    display: block;
-    margin-bottom: var(--space-1);
+    letter-spacing: 0.12em;
+    color: var(--brand-teal, #00A896);
+    margin-bottom: var(--space-3, 0.75rem);
   }
 
-  .section-title {
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: var(--color-text-main);
-    letter-spacing: -0.01em;
+  .section-headline {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: clamp(1.875rem, 3.5vw, 2.625rem);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 var(--space-4, 1rem) 0;
   }
 
-  .section-subtitle {
+  .section-subtext {
+    font-size: clamp(1.0625rem, 1.6vw, 1.1875rem);
+    line-height: 1.65;
+    color: var(--color-text-muted, #64748b);
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+
+  .section-lead-center {
+    text-align: center;
+    max-width: 48rem;
+    margin: 0 auto var(--space-12, 3rem) auto;
+  }
+
+  .inline-link-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
     font-size: 1rem;
-    color: var(--color-text-muted);
-    margin-top: var(--space-2);
-    max-width: 640px;
-    margin-left: auto;
-    margin-right: auto;
+    font-weight: 600;
+    color: var(--brand-teal, #00A896);
+    text-decoration: none;
+    transition: color var(--transition-fast, 0.15s ease), transform var(--transition-fast, 0.15s ease);
   }
 
-  /* 5-Stage Flow Grid */
-  .flow-grid {
+  .inline-link-cta:hover {
+    color: #008f80;
+    transform: translateX(3px);
+  }
+
+  /* ============================================================
+     SECTION 1: HERO
+     ============================================================ */
+  .hero-section {
+    padding: clamp(3rem, 6vw, 5.5rem) 0 clamp(2.5rem, 5vw, 4.5rem);
+    background: radial-gradient(circle at 82% 24%, rgba(46, 196, 182, 0.09) 0%, transparent 45%),
+                radial-gradient(circle at 18% 75%, rgba(13, 27, 61, 0.04) 0%, transparent 55%),
+                #ffffff;
+    overflow: hidden;
+  }
+
+  @media (min-width: 1024px) {
+    .hero-section {
+      min-height: calc(86vh - 4.25rem);
+      display: flex;
+      align-items: center;
+    }
+  }
+
+  .hero-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-4);
+    grid-template-columns: 1fr;
+    gap: var(--space-10, 2.5rem);
+    align-items: center;
   }
 
-  .flow-card {
+  @media (min-width: 960px) {
+    .hero-container {
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: var(--space-12, 3rem);
+    }
+  }
+
+  .hero-eyebrow {
+    margin-bottom: var(--space-4, 1rem);
+  }
+
+  .eyebrow-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(0, 168, 150, 0.08);
+    color: var(--brand-teal, #00A896);
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(0, 168, 150, 0.2);
+  }
+
+  .hero-title {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: clamp(2.25rem, 4.5vw, 3.625rem);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .hero-mobile-break {
+    display: none;
+  }
+
+  .hero-lead {
+    font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+    line-height: 1.65;
+    color: #475569;
+    margin: 0 0 var(--space-8, 2rem) 0;
+    max-width: 37rem;
+  }
+
+  .hero-cta-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4, 1rem);
+    margin-bottom: var(--space-6, 1.5rem);
+  }
+
+  .hero-primary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.75rem;
+    background: var(--brand-teal, #00A896);
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(0, 168, 150, 0.25);
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .hero-primary-btn:hover {
+    background: #008f80;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+  }
+
+  .hero-secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 1.5rem;
+    background: transparent;
+    color: var(--brand-navy, #0D1B3D);
+    border: 1px solid #cbd5e1;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    text-decoration: none;
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .hero-secondary-btn:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  .hero-trust-subtext {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-text-muted, #64748b);
+  }
+
+  .trust-sep-dot {
+    color: #cbd5e1;
+    user-select: none;
+  }
+
+  /* Hero Visual Art Canvas Matching Reference System */
+  .hero-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    width: 100%;
+  }
+
+  .hero-art-canvas {
+    position: relative;
+    width: 100%;
+    max-width: 540px;
+    height: 480px;
+  }
+
+  .ambient-glow.glow-halo {
+    position: absolute;
+    left: 45%;
+    top: 51%;
+    transform: translate(-50%, -50%);
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(46, 196, 182, 0.22) 0%, rgba(0, 168, 150, 0.05) 55%, transparent 75%);
+    filter: blur(40px);
+    pointer-events: none;
+  }
+
+  .hero-metaphor-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Floating Pill Badges */
+  .hero-floating-pill {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.15rem;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    border-radius: var(--radius-full, 9999px);
+    box-shadow: 0 12px 28px -4px rgba(13, 27, 61, 0.08), 0 4px 10px -2px rgba(13, 27, 61, 0.03);
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-navy, #0D1B3D);
+    user-select: none;
+    z-index: 10;
+    transition: transform var(--transition-fast, 0.15s ease), box-shadow var(--transition-fast, 0.15s ease);
+  }
+
+  .hero-floating-pill:hover {
+    box-shadow: 0 16px 36px -4px rgba(13, 27, 61, 0.14);
+    transform: translateY(-2px);
+  }
+
+  .pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .pill-dot.teal {
+    background: var(--brand-teal, #00A896);
+    box-shadow: 0 0 8px rgba(0, 168, 150, 0.5);
+  }
+
+  .pill-dot.purple {
+    background: var(--brand-purple, #6A4C93);
+    box-shadow: 0 0 8px rgba(106, 76, 147, 0.5);
+  }
+
+  /* Pill Placement & Independent Floating Animations */
+  .pill-person {
+    left: 4%;
+    top: 86%;
+    animation: float-pill-1 4.6s ease-in-out infinite alternate;
+  }
+
+  .pill-reflection {
+    left: 48%;
+    top: 70%;
+    animation: float-pill-2 5.2s ease-in-out infinite alternate;
+  }
+
+  .pill-understanding {
+    left: 48%;
+    top: 20%;
+    animation: float-pill-3 4.8s ease-in-out infinite alternate;
+  }
+
+  .pill-support {
+    left: 74%;
+    top: 48%;
+    animation: float-pill-4 5.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes float-pill-1 {
+    0% { transform: translateY(0px) rotate(0deg); }
+    100% { transform: translateY(-7px) rotate(-0.5deg); }
+  }
+
+  @keyframes float-pill-2 {
+    0% { transform: translateY(0px) translateX(0px); }
+    100% { transform: translateY(-6px) translateX(3px); }
+  }
+
+  @keyframes float-pill-3 {
+    0% { transform: translateY(0px) rotate(0deg); }
+    100% { transform: translateY(-8px) rotate(0.6deg); }
+  }
+
+  @keyframes float-pill-4 {
+    0% { transform: translateY(0px) translateX(0px); }
+    100% { transform: translateY(-7px) translateX(-2px); }
+  }
+
+  /* Central Heart Floating & Concentric Circles Breathing */
+  .heart-container {
+    transform-origin: 245px 245px;
+    animation: float-heart 5.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes float-heart {
+    0% { transform: translateY(0px) scale(1); }
+    100% { transform: translateY(-5px) scale(1.03); }
+  }
+
+  .concentric-rings {
+    transform-origin: 245px 245px;
+    animation: pulse-rings 7.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes pulse-rings {
+    0% { opacity: 0.8; transform: scale(0.99); }
+    100% { opacity: 1; transform: scale(1.02); }
+  }
+
+  @media (max-width: 640px) {
+    .hero-mobile-break {
+      display: block;
+    }
+
+    .hero-section {
+      padding: 42px 0 42px;
+    }
+
+    .hero-container {
+      gap: 1.75rem; /* ~28px gap between trust statement and visual */
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      margin-bottom: 0.75rem;
+    }
+
+    .eyebrow-pill {
+      font-size: 0.6875rem; /* 11px */
+      padding: 0.25rem 0.6875rem;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 8.5vw, 2.375rem); /* ~32-38px */
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+      margin: 0 0 0.875rem 0;
+      max-width: 340px;
+    }
+
+    .hero-lead {
+      font-size: 0.9375rem; /* 15px */
+      line-height: 1.55;
+      margin: 0 0 1.25rem 0;
+      max-width: 340px;
+      color: #475569;
+    }
+
+    .hero-cta-group {
+      flex-direction: column;
+      width: 100%;
+      max-width: 320px;
+      gap: 0.625rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-primary-btn,
+    .hero-secondary-btn {
+      width: 100%;
+      min-height: 48px;
+      justify-content: center;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.9375rem;
+      box-sizing: border-box;
+    }
+
+    .hero-trust-subtext {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3125rem;
+      font-size: 0.875rem; /* 14px */
+      line-height: 1.4;
+      text-align: center;
+      margin-bottom: 0;
+    }
+
+    .hero-trust-subtext .trust-sep-dot {
+      display: none;
+    }
+
+    .hero-visual {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .hero-art-canvas {
+      width: min(100%, 330px);
+      height: 290px;
+      max-width: 330px;
+    }
+
+    .ambient-glow.glow-halo {
+      width: 220px;
+      height: 220px;
+      filter: blur(30px);
+    }
+
+    .hero-floating-pill {
+      font-size: 0.6875rem; /* 11px */
+      padding: 0.3125rem 0.625rem;
+      gap: 0.375rem;
+      box-shadow: 0 6px 16px -2px rgba(13, 27, 61, 0.08);
+    }
+
+    .pill-dot {
+      width: 5px;
+      height: 5px;
+    }
+
+    .pill-person {
+      left: 1%;
+      top: 84%;
+    }
+
+    .pill-reflection {
+      left: 44%;
+      top: 68%;
+    }
+
+    .pill-understanding {
+      left: 42%;
+      top: 14%;
+    }
+
+    .pill-support {
+      right: 1%;
+      left: auto;
+      top: 48%;
+    }
+  }
+
+  @media (max-width: 370px) {
+    .hero-art-canvas {
+      width: min(100%, 300px);
+      height: 265px;
+      max-width: 300px;
+    }
+
+    .hero-floating-pill {
+      font-size: 0.625rem; /* 10px */
+      padding: 0.25rem 0.5rem;
+    }
+
+    .pill-person {
+      left: 0%;
+      top: 84%;
+    }
+
+    .pill-reflection {
+      left: 42%;
+      top: 68%;
+    }
+
+    .pill-understanding {
+      left: 38%;
+      top: 14%;
+    }
+
+    .pill-support {
+      right: 0%;
+      left: auto;
+      top: 48%;
+    }
+  }
+
+  /* ============================================================
+     SECTION 2: TRUST STRIP
+     ============================================================ */
+  .trust-strip {
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    background: #f8fafc;
+    padding: var(--space-5, 1.25rem) 0;
+  }
+
+  .trust-strip-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-4, 1rem) var(--space-6, 1.5rem);
+  }
+
+  .trust-item {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .trust-label {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand-navy, #0D1B3D);
+  }
+
+  .trust-sep {
+    color: #cbd5e1;
+    user-select: none;
+  }
+
+  @media (max-width: 640px) {
+    .trust-sep {
+      display: none;
+    }
+    .trust-strip-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.875rem;
+      text-align: center;
+    }
+  }
+
+  /* ============================================================
+     SECTION 3: THE PROBLEM / EDITORIAL (CARD-REDUCED)
+     ============================================================ */
+  .editorial-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #ffffff;
+  }
+
+  .editorial-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-10, 2.5rem);
+    align-items: center;
+  }
+
+  @media (min-width: 960px) {
+    .editorial-grid {
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: var(--space-16, 4rem);
+    }
+  }
+
+  .editorial-title {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: clamp(2rem, 3.5vw, 2.875rem);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .editorial-body {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: #475569;
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .editorial-callout {
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+    background: rgba(0, 168, 150, 0.04);
+    border-radius: var(--radius-md, 0.5rem);
+    padding: 1rem 1.25rem;
+  }
+
+  .callout-line {
+    width: 3px;
+    background: var(--brand-teal, #00A896);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .callout-text {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--brand-navy, #0D1B3D);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .editorial-signals {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    height: 100%;
+    gap: var(--space-8, 2rem);
+    padding-left: var(--space-4, 1rem);
   }
 
-  .step-num {
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: var(--color-primary-600);
-    background-color: var(--color-primary-50);
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    width: fit-content;
+  .signal-flow-line {
+    position: absolute;
+    left: 2rem;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    width: 2px;
+    background: linear-gradient(180deg, var(--brand-teal, #00A896) 0%, var(--brand-blue, #0A6680) 50%, var(--brand-purple, #6A4C93) 100%);
   }
 
-  .flow-icon-box {
-    color: var(--color-primary-600);
-    margin-top: var(--space-1);
-  }
-
-  .flow-card h4 {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-  }
-
-  .flow-card p {
-    font-size: 0.84375rem;
-    color: var(--color-text-muted);
-    line-height: 1.5;
-  }
-
-  /* Privacy Features Grid */
-  .privacy-arch-section {
-    background-color: var(--color-bg-subtle);
-  }
-
-  .privacy-features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: var(--space-5);
-  }
-
-  .privacy-feature-card {
+  .signal-step {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-5, 1.25rem);
+    align-items: flex-start;
   }
 
-  .feature-icon {
+  .signal-marker {
     width: 2.5rem;
     height: 2.5rem;
-    border-radius: var(--radius-md);
-    background-color: var(--color-primary-100);
-    color: var(--color-primary-700);
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid var(--brand-teal, #00A896);
+    color: var(--brand-teal, #00A896);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    z-index: 2;
+    box-shadow: 0 0 0 5px #ffffff;
+  }
+
+  .signal-info {
+    position: relative;
+  }
+
+  .signal-watermark {
+    position: absolute;
+    top: -0.625rem;
+    left: 0;
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: rgba(13, 27, 61, 0.035);
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .signal-name {
+    position: relative;
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 0.375rem 0;
+  }
+
+  .signal-desc {
+    position: relative;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+  }
+
+  /* ============================================================
+     SECTION 4: HOW NSWESI WORKS (CONNECTED CONTINUUM)
+     ============================================================ */
+  .workflow-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #f8fafc;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  }
+
+  .continuum-wrapper {
+    position: relative;
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+
+  .continuum-track-line {
+    position: absolute;
+    top: 2.25rem;
+    left: 4rem;
+    right: 4rem;
+    height: 2px;
+    background: linear-gradient(90deg, var(--brand-teal, #00A896) 0%, var(--brand-blue, #0A6680) 50%, #10b981 100%);
+    display: none;
+  }
+
+  @media (min-width: 960px) {
+    .continuum-track-line {
+      display: block;
+    }
+  }
+
+  .continuum-track {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-6, 1.5rem);
+    position: relative;
+    z-index: 2;
+  }
+
+  @media (min-width: 768px) {
+    .continuum-track {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 960px) {
+    .continuum-track {
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-5, 1.25rem);
+    }
+  }
+
+  .continuum-node {
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    border-radius: var(--radius-lg, 0.75rem);
+    padding: var(--space-6, 1.5rem);
+    display: flex;
+    flex-direction: column;
+    transition: transform var(--transition-fast, 0.15s ease), box-shadow var(--transition-fast, 0.15s ease);
+  }
+
+  .continuum-node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+  }
+
+  .node-milestone {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4, 1rem);
+  }
+
+  .node-num {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.625rem;
+    font-weight: 800;
+    color: #cbd5e1;
+  }
+
+  .node-icon-wrap {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-md, 0.5rem);
+    background: rgba(0, 168, 150, 0.08);
+    color: var(--brand-teal, #00A896);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .privacy-feature-card h3 {
-    font-size: 1.0625rem;
+  .node-title {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.25rem;
     font-weight: 700;
-    color: var(--color-text-main);
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 0.5rem 0;
   }
 
-  .privacy-feature-card p {
+  .node-desc {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+  }
+
+  /* ============================================================
+     SECTION 5: STUDENT EXPERIENCE (PRODUCT SHOWCASE)
+     ============================================================ */
+  .experience-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #ffffff;
+  }
+
+  .experience-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-10, 2.5rem);
+    align-items: center;
+  }
+
+  @media (min-width: 960px) {
+    .experience-grid {
+      grid-template-columns: 0.45fr 0.55fr;
+      gap: var(--space-16, 4rem);
+    }
+  }
+
+  .mockup-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .contextual-label-bar {
+    margin-bottom: 0.75rem;
+  }
+
+  .contextual-mockup-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    border-radius: var(--radius-full, 9999px);
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .experience-showcase {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .device-mockup {
+    width: 100%;
+    max-width: 440px;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    box-shadow: 0 24px 50px rgba(13, 27, 61, 0.09), 0 2px 8px rgba(13, 27, 61, 0.04);
+    border: 1px solid #e2e8f0;
+  }
+
+  .device-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .mock-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .mock-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+  }
+
+  .mock-badge {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-full, 9999px);
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  .mock-card {
+    background: #f8fafc;
+    border-radius: var(--radius-md, 0.5rem);
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+  }
+
+  .mock-q-meta {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--brand-teal, #00A896);
+    margin-bottom: 0.375rem;
+  }
+
+  .mock-q-text {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 0.75rem 0;
+    line-height: 1.4;
+  }
+
+  .mock-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mock-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #ffffff;
+    border-radius: var(--radius-sm, 0.375rem);
+    border: 1px solid #cbd5e1;
+    font-size: 0.8125rem;
+    color: #334155;
+  }
+
+  .mock-opt.selected {
+    border-color: var(--brand-teal, #00A896);
+    background: rgba(0, 168, 150, 0.04);
+  }
+
+  .mock-radio {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid #94a3b8;
+    flex-shrink: 0;
+  }
+
+  .mock-radio.checked {
+    border-color: var(--brand-teal, #00A896);
+    background: var(--brand-teal, #00A896);
+  }
+
+  .mock-insight-header {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .mock-insight-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--brand-navy, #0D1B3D);
+  }
+
+  .mock-insight-body {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: #475569;
+    margin: 0;
+  }
+
+  .mock-task {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+  }
+
+  .mock-task-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--brand-navy, #0D1B3D);
+  }
+
+  .mock-credits {
+    font-weight: 700;
+    color: var(--brand-teal, #00A896);
+  }
+
+  .experience-tagline {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--brand-teal, #00A896);
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .experience-points {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-8, 2rem) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5, 1.25rem);
+  }
+
+  .experience-points li {
+    display: flex;
+    gap: var(--space-4, 1rem);
+    align-items: flex-start;
+  }
+
+  .point-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: rgba(0, 168, 150, 0.08);
+    color: var(--brand-teal, #00A896);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .point-title {
+    display: block;
+    font-size: 1.0625rem;
+    color: var(--brand-navy, #0D1B3D);
+    margin-bottom: 0.25rem;
+  }
+
+  .point-desc {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+  }
+
+  .text-teal { color: var(--brand-teal, #00A896); }
+  .text-mint { color: #10b981; }
+
+  /* ============================================================
+     SECTION 6: PRIVACY ARCHITECTURE VISUALIZATION
+     ============================================================ */
+  .privacy-flow-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #f8fafc;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+  }
+
+  .privacy-architecture-canvas {
+    max-width: 54rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .arch-layer {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-xl, 1rem);
+    padding: var(--space-8, 2rem);
+    position: relative;
+  }
+
+  .student-vault-layer {
+    border: 2px solid rgba(0, 168, 150, 0.5);
+    box-shadow: 0 6px 24px rgba(0, 168, 150, 0.08);
+  }
+
+  .vault-boundary-badge {
+    position: absolute;
+    top: -0.8125rem;
+    right: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3rem 0.875rem;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--brand-teal, #00A896);
+    color: #ffffff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .layer-role-pill {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brand-teal, #00A896);
+    margin-bottom: 0.25rem;
+  }
+
+  .layer-role-pill.neutral {
+    color: var(--brand-blue, #0A6680);
+  }
+
+  .layer-heading {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .layer-summary {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #475569;
+    margin: 0 0 1rem 0;
+  }
+
+  .privacy-highlight-box {
     font-size: 0.875rem;
-    color: var(--color-text-muted);
+    font-weight: 500;
+    color: #065f46;
+    background: #ecfdf5;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md, 0.5rem);
+    border-left: 3px solid #10b981;
+  }
+
+  .highlight-lead {
+    font-weight: 700;
+  }
+
+  /* Transmission Gate */
+  .arch-transmission-gate {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+  }
+
+  .gate-line {
+    flex: 1;
+    height: 1px;
+    background: #cbd5e1;
+  }
+
+  .gate-core {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+  }
+
+  .gate-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3rem 0.75rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-full, 9999px);
+  }
+
+  .gate-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--brand-teal, #00A896);
+  }
+
+  .gate-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brand-navy, #0D1B3D);
+  }
+
+  .gate-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #64748b);
+  }
+
+  .aggregate-layer {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+  }
+
+  .protection-threshold-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #334155;
+    background: #f8fafc;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-md, 0.5rem);
+    border-left: 3px solid var(--brand-blue, #0A6680);
+  }
+
+  .privacy-footer-link {
+    text-align: center;
+    margin-top: var(--space-8, 2rem);
+  }
+
+  .privacy-note {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted, #64748b);
+    margin: 0 0 0.5rem 0;
+  }
+
+  /* ============================================================
+     SECTION 7: ONE ECOSYSTEM, THREE PERSPECTIVES (EDITORIAL COLS)
+     ============================================================ */
+  .ecosystem-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #ffffff;
+  }
+
+  .perspectives-columns {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-8, 2rem);
+  }
+
+  @media (min-width: 960px) {
+    .perspectives-columns {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+
+    .perspective-column {
+      padding: 0 var(--space-8, 2rem);
+      border-right: 1px solid #e2e8f0;
+    }
+
+    .perspective-column:first-child {
+      padding-left: 0;
+    }
+
+    .perspective-column:last-child {
+      padding-right: 0;
+      border-right: none;
+    }
+  }
+
+  .perspective-column {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3, 0.75rem);
+  }
+
+  .col-role {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brand-teal, #00A896);
+  }
+
+  .col-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-md, 0.5rem);
+    background: rgba(0, 168, 150, 0.08);
+    color: var(--brand-teal, #00A896);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .col-question {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--brand-navy, #0D1B3D);
+    margin: 0 0 var(--space-4, 1rem) 0;
+  }
+
+  .col-desc {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: #475569;
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+  }
+
+  .col-capabilities {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .col-capabilities li {
+    font-size: 0.9375rem;
+    color: #334155;
+    position: relative;
+    padding-left: 1.25rem;
     line-height: 1.5;
   }
 
-  .privacy-feature-card code {
-    background-color: var(--color-bg-surface);
-    padding: 0.1rem 0.3rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-  }
-
-  /* Stakeholder Grid */
-  .stakeholder-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--space-6);
-  }
-
-  .stakeholder-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  .stakeholder-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .stakeholder-icon {
-    color: var(--color-primary-600);
-  }
-
-  .stakeholder-header h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-  }
-
-  .stakeholder-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .stakeholder-list li {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    position: relative;
-    padding-left: var(--space-4);
-  }
-
-  .stakeholder-list li::before {
+  .col-capabilities li::before {
     content: "•";
-    color: var(--color-primary-600);
-    font-weight: bold;
     position: absolute;
     left: 0;
+    color: var(--brand-teal, #00A896);
+    font-weight: bold;
+    font-size: 1.25rem;
+    line-height: 1rem;
   }
 
-  /* CTA & Footer */
-  .cta-section {
-    margin-bottom: var(--space-12);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-8);
+  /* ============================================================
+     SECTION 8: SYSTEM ARCHITECTURE (ECOSYSTEM CIRCUIT)
+     ============================================================ */
+  .architecture-loop-section {
+    padding: clamp(4rem, 7.5vw, 6.5rem) 0;
+    background: #f8fafc;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
   }
 
-  .cta-card {
+  .ecosystem-circuit {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
-    gap: var(--space-4);
-    background: linear-gradient(135deg, var(--color-bg-surface) 0%, var(--color-primary-50) 100%);
+    gap: 0.75rem 1.25rem;
+    max-width: 64rem;
+    margin: 0 auto;
   }
 
-  .cta-card h2 {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--color-text-main);
+  .circuit-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-md, 0.5rem);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+    transition: transform var(--transition-fast, 0.15s ease);
   }
 
-  .cta-card p {
+  .circuit-node:hover {
+    transform: translateY(-1px);
+    border-color: var(--brand-teal, #00A896);
+  }
+
+  .circuit-step {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--brand-teal, #00A896);
+    background: rgba(0, 168, 150, 0.08);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm, 0.25rem);
+  }
+
+  .circuit-name {
     font-size: 0.9375rem;
-    color: var(--color-text-muted);
+    font-weight: 600;
+    color: var(--brand-navy, #0D1B3D);
   }
 
-  .cta-actions {
-    margin-top: var(--space-2);
+  .circuit-arrow {
+    color: #94a3b8;
+    font-weight: 600;
   }
 
-  @media (max-width: 768px) {
-    .hero-title {
-      font-size: 1.875rem;
+  @media (max-width: 640px) {
+    .circuit-arrow {
+      display: none;
     }
-
-    .hero-desc {
-      font-size: 1rem;
+    .ecosystem-circuit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.625rem;
     }
+  }
 
-    .section-title {
-      font-size: 1.375rem;
+  /* ============================================================
+     SECTION 9: NON-CLINICAL BOUNDARY (SLIM BAND)
+     ============================================================ */
+  .boundary-band {
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    background: #ffffff;
+    padding: 1.25rem 0;
+  }
+
+  .boundary-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    text-align: center;
+  }
+
+  .boundary-icon {
+    color: var(--brand-blue, #0A6680);
+    flex-shrink: 0;
+  }
+
+  .boundary-text {
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+  }
+
+  /* ============================================================
+     SECTION 10: FINAL CTA
+     ============================================================ */
+  .final-cta-section {
+    padding: clamp(4rem, 8vw, 6.5rem) 0;
+    background: #ffffff;
+  }
+
+  .cta-inner-card {
+    position: relative;
+    background: linear-gradient(135deg, var(--brand-navy, #0D1B3D) 0%, #162a56 100%);
+    border-radius: 1.5rem;
+    padding: clamp(3rem, 6vw, 4.5rem) clamp(1.5rem, 4vw, 3rem);
+    text-align: center;
+    color: #ffffff;
+    overflow: hidden;
+    box-shadow: 0 24px 50px rgba(13, 27, 61, 0.16);
+  }
+
+  .cta-watermark {
+    position: absolute;
+    right: -2rem;
+    bottom: -2rem;
+    width: 240px;
+    height: 240px;
+    pointer-events: none;
+  }
+
+  .cta-title {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: clamp(2.125rem, 4vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    margin: 0 0 var(--space-4, 1rem) 0;
+  }
+
+  .cta-body {
+    font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+    line-height: 1.65;
+    color: #cbd5e1;
+    max-width: 37rem;
+    margin: 0 auto var(--space-8, 2rem) auto;
+  }
+
+  .cta-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-4, 1rem);
+  }
+
+  .cta-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.75rem;
+    background: var(--brand-teal, #00A896);
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    text-decoration: none;
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .cta-btn-primary:hover {
+    background: #008f80;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 168, 150, 0.4);
+  }
+
+  .cta-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 1.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.5rem);
+    text-decoration: none;
+    backdrop-filter: blur(8px);
+    transition: all var(--transition-fast, 0.15s ease);
+  }
+
+  .cta-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* Accessibility: Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .hero-primary-btn,
+    .hero-secondary-btn,
+    .cta-btn-primary,
+    .cta-btn-secondary,
+    .continuum-node,
+    .circuit-node,
+    .inline-link-cta,
+    .hero-floating-pill,
+    .heart-container,
+    .concentric-rings {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
     }
   }
 </style>
-
